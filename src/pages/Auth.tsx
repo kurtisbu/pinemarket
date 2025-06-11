@@ -3,8 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { Github, Mail, Chrome } from 'lucide-react';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -14,7 +16,7 @@ const Auth = () => {
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
   
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, signUp, signInWithProvider, user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -69,6 +71,28 @@ const Auth = () => {
     }
   };
 
+  const handleSocialLogin = async (provider: 'google' | 'github') => {
+    setLoading(true);
+    try {
+      const { error } = await signInWithProvider(provider);
+      if (error) {
+        toast({
+          title: `Error signing in with ${provider}`,
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "An error occurred",
+        description: "Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="max-w-md w-full space-y-8">
@@ -87,6 +111,38 @@ const Auth = () => {
               ? 'Welcome back to the Pine Script marketplace' 
               : 'Join the Pine Script community'}
           </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Button
+            variant="outline"
+            className="w-full"
+            disabled={loading}
+            onClick={() => handleSocialLogin('google')}
+          >
+            <Chrome className="mr-2 h-4 w-4" />
+            Google
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full"
+            disabled={loading}
+            onClick={() => handleSocialLogin('github')}
+          >
+            <Github className="mr-2 h-4 w-4" />
+            GitHub
+          </Button>
+        </div>
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <Separator className="w-full" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">
+              Or continue with
+            </span>
+          </div>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
