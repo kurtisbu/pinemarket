@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Search, User, ShoppingCart, LogOut } from 'lucide-react';
+import { Search, User, ShoppingCart, LogOut, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,16 +9,48 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 const Header = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const [profile, setProfile] = useState<{ username: string; avatar_url: string; display_name: string } | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      const fetchProfile = async () => {
+        const { data } = await supabase
+          .from('profiles')
+          .select('username, avatar_url, display_name')
+          .eq('id', user.id)
+          .single();
+        
+        if (data) {
+          setProfile(data);
+        }
+      };
+      fetchProfile();
+    }
+  }, [user]);
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
+  };
+
+  const handleViewProfile = () => {
+    if (profile?.username) {
+      navigate(`/profile/${profile.username}`);
+    }
+  };
+
+  const handleSettings = () => {
+    navigate('/settings/profile');
   };
 
   return (
@@ -57,18 +89,28 @@ const Header = () => {
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <User className="w-5 h-5" />
+                  <Button variant="ghost" size="icon" className="relative">
+                    <Avatar className="w-8 h-8">
+                      <AvatarImage src={profile?.avatar_url} alt={profile?.display_name || 'User'} />
+                      <AvatarFallback>
+                        <User className="w-4 h-4" />
+                      </AvatarFallback>
+                    </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>
-                    Profile
-                  </DropdownMenuItem>
+                <DropdownMenuContent align="end" className="w-56">
+                  {profile?.username && (
+                    <DropdownMenuItem onClick={handleViewProfile}>
+                      <User className="w-4 h-4 mr-2" />
+                      View Profile
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem>
                     My Programs
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSettings}>
+                    <Settings className="w-4 h-4 mr-2" />
                     Settings
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleSignOut}>
