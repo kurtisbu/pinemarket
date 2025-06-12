@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import Header from '@/components/Header';
 import { Upload, X, Plus } from 'lucide-react';
 
@@ -21,6 +22,8 @@ const SellScript = () => {
   
   const [loading, setLoading] = useState(false);
   const [scriptFile, setScriptFile] = useState<File | null>(null);
+  const [scriptType, setScriptType] = useState<'file' | 'link'>('file');
+  const [tradingViewLink, setTradingViewLink] = useState('');
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [currentTag, setCurrentTag] = useState('');
   const [formData, setFormData] = useState({
@@ -73,10 +76,10 @@ const SellScript = () => {
   const handleScriptFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (!file.name.endsWith('.pine')) {
+      if (!file.name.endsWith('.txt')) {
         toast({
           title: 'Invalid file type',
-          description: 'Please upload a .pine script file.',
+          description: 'Please upload a .txt file containing your Pine Script.',
           variant: 'destructive',
         });
         return;
@@ -114,12 +117,37 @@ const SellScript = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !scriptFile) return;
+    if (!user) return;
+
+    // Validate script input based on type
+    if (scriptType === 'file' && !scriptFile) {
+      toast({
+        title: 'Script file required',
+        description: 'Please upload a .txt file containing your Pine Script.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (scriptType === 'link' && !tradingViewLink.trim()) {
+      toast({
+        title: 'TradingView link required',
+        description: 'Please provide a TradingView publication link.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setLoading(true);
     try {
-      // Upload script file
-      const scriptPath = await uploadFile(scriptFile, 'scripts', user.id);
+      let scriptPath = null;
+
+      // Handle script file upload or store TradingView link
+      if (scriptType === 'file' && scriptFile) {
+        scriptPath = await uploadFile(scriptFile, 'scripts', user.id);
+      } else if (scriptType === 'link') {
+        scriptPath = tradingViewLink;
+      }
 
       // Upload media files
       const imageUrls: string[] = [];
@@ -256,28 +284,51 @@ const SellScript = () => {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="script">Pine Script File *</Label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
-                    <div className="text-center">
-                      <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                      <div className="mt-4">
-                        <Label htmlFor="script" className="cursor-pointer">
-                          <span className="mt-2 block text-sm font-medium text-gray-900">
-                            {scriptFile ? scriptFile.name : 'Upload your .pine script file'}
-                          </span>
-                        </Label>
-                        <Input
-                          id="script"
-                          type="file"
-                          accept=".pine"
-                          onChange={handleScriptFileChange}
-                          className="hidden"
-                          required
-                        />
+                <div className="space-y-4">
+                  <Label>Pine Script *</Label>
+                  <RadioGroup value={scriptType} onValueChange={(value: 'file' | 'link') => setScriptType(value)}>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="file" id="file" />
+                      <Label htmlFor="file">Upload .txt file</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="link" id="link" />
+                      <Label htmlFor="link">TradingView publication link</Label>
+                    </div>
+                  </RadioGroup>
+
+                  {scriptType === 'file' ? (
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
+                      <div className="text-center">
+                        <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                        <div className="mt-4">
+                          <Label htmlFor="script" className="cursor-pointer">
+                            <span className="mt-2 block text-sm font-medium text-gray-900">
+                              {scriptFile ? scriptFile.name : 'Upload your .txt file containing Pine Script'}
+                            </span>
+                          </Label>
+                          <Input
+                            id="script"
+                            type="file"
+                            accept=".txt"
+                            onChange={handleScriptFileChange}
+                            className="hidden"
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Input
+                        value={tradingViewLink}
+                        onChange={(e) => setTradingViewLink(e.target.value)}
+                        placeholder="https://www.tradingview.com/script/..."
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Provide a link to your published Pine Script on TradingView
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">

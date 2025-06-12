@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import Header from '@/components/Header';
 import { Upload, X, Plus } from 'lucide-react';
 
@@ -22,6 +23,9 @@ const EditProgram = () => {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [scriptFile, setScriptFile] = useState<File | null>(null);
+  const [scriptType, setScriptType] = useState<'file' | 'link'>('file');
+  const [tradingViewLink, setTradingViewLink] = useState('');
+  const [currentScriptType, setCurrentScriptType] = useState<'file' | 'link'>('file');
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [currentTag, setCurrentTag] = useState('');
   const [existingImageUrls, setExistingImageUrls] = useState<string[]>([]);
@@ -73,6 +77,18 @@ const EditProgram = () => {
         status: data.status
       });
       setExistingImageUrls(data.image_urls || []);
+      
+      // Determine if current script is a file or link
+      if (data.script_file_path) {
+        if (data.script_file_path.startsWith('http')) {
+          setCurrentScriptType('link');
+          setScriptType('link');
+          setTradingViewLink(data.script_file_path);
+        } else {
+          setCurrentScriptType('file');
+          setScriptType('file');
+        }
+      }
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -112,10 +128,10 @@ const EditProgram = () => {
   const handleScriptFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (!file.name.endsWith('.pine')) {
+      if (!file.name.endsWith('.txt')) {
         toast({
           title: 'Invalid file type',
-          description: 'Please upload a .pine script file.',
+          description: 'Please upload a .txt file containing your Pine Script.',
           variant: 'destructive',
         });
         return;
@@ -162,9 +178,14 @@ const EditProgram = () => {
     setLoading(true);
     try {
       let scriptPath;
-      if (scriptFile) {
+      
+      // Handle script update based on type
+      if (scriptType === 'file' && scriptFile) {
         scriptPath = await uploadFile(scriptFile, 'scripts', user.id);
+      } else if (scriptType === 'link' && tradingViewLink.trim()) {
+        scriptPath = tradingViewLink;
       }
+      // If no new script provided, keep existing path (don't update)
 
       const newImageUrls: string[] = [];
       for (const file of mediaFiles) {
@@ -313,27 +334,54 @@ const EditProgram = () => {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="script">Update Pine Script File (Optional)</Label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
-                    <div className="text-center">
-                      <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                      <div className="mt-4">
-                        <Label htmlFor="script" className="cursor-pointer">
-                          <span className="mt-2 block text-sm font-medium text-gray-900">
-                            {scriptFile ? scriptFile.name : 'Upload new .pine script file to replace existing'}
-                          </span>
-                        </Label>
-                        <Input
-                          id="script"
-                          type="file"
-                          accept=".pine"
-                          onChange={handleScriptFileChange}
-                          className="hidden"
-                        />
+                <div className="space-y-4">
+                  <Label>Update Pine Script (Optional)</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Current script type: {currentScriptType === 'link' ? 'TradingView link' : 'Uploaded file'}
+                  </p>
+                  <RadioGroup value={scriptType} onValueChange={(value: 'file' | 'link') => setScriptType(value)}>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="file" id="file" />
+                      <Label htmlFor="file">Upload new .txt file</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="link" id="link" />
+                      <Label htmlFor="link">Update TradingView publication link</Label>
+                    </div>
+                  </RadioGroup>
+
+                  {scriptType === 'file' ? (
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
+                      <div className="text-center">
+                        <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                        <div className="mt-4">
+                          <Label htmlFor="script" className="cursor-pointer">
+                            <span className="mt-2 block text-sm font-medium text-gray-900">
+                              {scriptFile ? scriptFile.name : 'Upload new .txt file to replace existing script'}
+                            </span>
+                          </Label>
+                          <Input
+                            id="script"
+                            type="file"
+                            accept=".txt"
+                            onChange={handleScriptFileChange}
+                            className="hidden"
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Input
+                        value={tradingViewLink}
+                        onChange={(e) => setTradingViewLink(e.target.value)}
+                        placeholder="https://www.tradingview.com/script/..."
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Update the link to your published Pine Script on TradingView
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
