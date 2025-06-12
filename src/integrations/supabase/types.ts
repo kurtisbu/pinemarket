@@ -42,6 +42,59 @@ export type Database = {
         }
         Relationships: []
       }
+      programs: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          id: string
+          image_urls: string[] | null
+          price: number
+          script_file_path: string | null
+          seller_id: string
+          status: string
+          tags: string[] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description: string
+          id?: string
+          image_urls?: string[] | null
+          price: number
+          script_file_path?: string | null
+          seller_id: string
+          status?: string
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          image_urls?: string[] | null
+          price?: number
+          script_file_path?: string | null
+          seller_id?: string
+          status?: string
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programs_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

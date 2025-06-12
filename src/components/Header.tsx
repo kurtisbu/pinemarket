@@ -53,6 +53,14 @@ const Header = () => {
     navigate('/settings/profile');
   };
 
+  const handleMyPrograms = () => {
+    navigate('/my-programs');
+  };
+
+  const handleSellScript = () => {
+    navigate('/sell-script');
+  };
+
   return (
     <header className="bg-background border-b border-border sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4">
@@ -105,7 +113,7 @@ const Header = () => {
                       View Profile
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleMyPrograms}>
                     My Programs
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -126,7 +134,7 @@ const Header = () => {
             )}
             
             {user ? (
-              <Button>Sell Your Script</Button>
+              <Button onClick={handleSellScript}>Sell Your Script</Button>
             ) : (
               <Button onClick={() => navigate('/auth')}>Join PineMarket</Button>
             )}

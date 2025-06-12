@@ -9,6 +9,9 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Profile from "./pages/Profile";
 import ProfileSettings from "./pages/ProfileSettings";
+import SellScript from "./pages/SellScript";
+import MyPrograms from "./pages/MyPrograms";
+import EditProgram from "./pages/EditProgram";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +28,9 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/profile/:username" element={<Profile />} />
             <Route path="/settings/profile" element={<ProfileSettings />} />
+            <Route path="/sell-script" element={<SellScript />} />
+            <Route path="/my-programs" element={<MyPrograms />} />
+            <Route path="/edit-program/:id" element={<EditProgram />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
