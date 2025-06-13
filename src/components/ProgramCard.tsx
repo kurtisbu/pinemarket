@@ -1,11 +1,13 @@
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Star, Download, Eye } from 'lucide-react';
 
 interface ProgramCardProps {
+  id: string;
   title: string;
   description: string;
   price: number;
@@ -19,6 +21,7 @@ interface ProgramCardProps {
 }
 
 const ProgramCard: React.FC<ProgramCardProps> = ({
+  id,
   title,
   description,
   price,
@@ -30,6 +33,12 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
   image,
   tags
 }) => {
+  const navigate = useNavigate();
+
+  const handleViewDetails = () => {
+    navigate(`/program/${id}`);
+  };
+
   return (
     <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-border">
       <CardHeader className="p-0">
@@ -37,7 +46,8 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
           <img 
             src={image} 
             alt={title}
-            className="w-full h-48 object-cover rounded-t-lg"
+            className="w-full h-48 object-cover rounded-t-lg cursor-pointer"
+            onClick={handleViewDetails}
           />
           <Badge className="absolute top-3 left-3 bg-blue-500 hover:bg-blue-600">
             {category}
@@ -49,7 +59,10 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
       </CardHeader>
       
       <CardContent className="p-4">
-        <h3 className="font-semibold text-lg mb-2 group-hover:text-blue-500 transition-colors">
+        <h3 
+          className="font-semibold text-lg mb-2 group-hover:text-blue-500 transition-colors cursor-pointer"
+          onClick={handleViewDetails}
+        >
           {title}
         </h3>
         <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
@@ -60,7 +73,7 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
           <span>by {author}</span>
           <div className="flex items-center space-x-1">
             <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-            <span>{rating}</span>
+            <span>{rating.toFixed(1)}</span>
           </div>
         </div>
         
@@ -85,7 +98,10 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
       </CardContent>
       
       <CardFooter className="p-4 pt-0">
-        <Button className="w-full bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600">
+        <Button 
+          className="w-full bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600"
+          onClick={handleViewDetails}
+        >
           View Details
         </Button>
       </CardFooter>

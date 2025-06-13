@@ -44,46 +44,58 @@ export type Database = {
       }
       programs: {
         Row: {
+          average_rating: number
           category: string
           created_at: string
           description: string
+          download_count: number
           id: string
           image_urls: string[] | null
           price: number
+          rating_count: number
           script_file_path: string | null
           seller_id: string
           status: string
           tags: string[] | null
           title: string
           updated_at: string
+          view_count: number
         }
         Insert: {
+          average_rating?: number
           category: string
           created_at?: string
           description: string
+          download_count?: number
           id?: string
           image_urls?: string[] | null
           price: number
+          rating_count?: number
           script_file_path?: string | null
           seller_id: string
           status?: string
           tags?: string[] | null
           title: string
           updated_at?: string
+          view_count?: number
         }
         Update: {
+          average_rating?: number
           category?: string
           created_at?: string
           description?: string
+          download_count?: number
           id?: string
           image_urls?: string[] | null
           price?: number
+          rating_count?: number
           script_file_path?: string | null
           seller_id?: string
           status?: string
           tags?: string[] | null
           title?: string
           updated_at?: string
+          view_count?: number
         }
         Relationships: [
           {
@@ -100,7 +112,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_program_view_count: {
+        Args: { program_uuid: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

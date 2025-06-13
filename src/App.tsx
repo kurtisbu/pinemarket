@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
+import Browse from "./pages/Browse";
+import ProgramDetail from "./pages/ProgramDetail";
 import Auth from "./pages/Auth";
 import Profile from "./pages/Profile";
 import ProfileSettings from "./pages/ProfileSettings";
@@ -23,6 +25,8 @@ const App = () => (
       <AuthProvider>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/browse" element={<Browse />} />
+          <Route path="/program/:id" element={<ProgramDetail />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/profile/:username" element={<Profile />} />
           <Route path="/settings/profile" element={<ProfileSettings />} />

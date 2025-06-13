@@ -4,7 +4,7 @@ import { Search, User, ShoppingCart, LogOut, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,10 +16,17 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-const Header = () => {
+interface HeaderProps {
+  onSearch?: (query: string) => void;
+  searchQuery?: string;
+}
+
+const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [profile, setProfile] = useState<{ username: string; avatar_url: string; display_name: string } | null>(null);
+  const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
 
   useEffect(() => {
     if (user) {
@@ -37,6 +44,10 @@ const Header = () => {
       fetchProfile();
     }
   }, [user]);
+
+  useEffect(() => {
+    setLocalSearchQuery(searchQuery);
+  }, [searchQuery]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -61,6 +72,28 @@ const Header = () => {
     navigate('/sell-script');
   };
 
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (onSearch) {
+      onSearch(localSearchQuery);
+    } else {
+      // Navigate to browse page with search query
+      const params = new URLSearchParams();
+      if (localSearchQuery) params.set('search', localSearchQuery);
+      navigate(`/browse?${params.toString()}`);
+    }
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setLocalSearchQuery(value);
+    
+    // If we're on the browse page and have an onSearch callback, update immediately
+    if (onSearch && location.pathname === '/browse') {
+      onSearch(value);
+    }
+  };
+
   return (
     <header className="bg-background border-b border-border sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4">
@@ -74,7 +107,12 @@ const Header = () => {
             </div>
             
             <nav className="hidden md:flex space-x-6">
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Browse</a>
+              <button 
+                onClick={() => navigate('/browse')}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Browse
+              </button>
               <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Categories</a>
               <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Top Sellers</a>
               <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">New</a>
@@ -82,13 +120,15 @@ const Header = () => {
           </div>
           
           <div className="flex items-center space-x-4">
-            <div className="relative hidden md:block">
+            <form onSubmit={handleSearchSubmit} className="relative hidden md:block">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input 
                 placeholder="Search Pine Script programs..." 
                 className="pl-10 w-64"
+                value={localSearchQuery}
+                onChange={handleSearchChange}
               />
-            </div>
+            </form>
             
             <Button variant="ghost" size="icon">
               <ShoppingCart className="w-5 h-5" />
