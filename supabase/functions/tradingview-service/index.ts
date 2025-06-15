@@ -1,7 +1,7 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
+import { DOMParser } from "https://deno.land/x/deno_dom/deno-dom-wasm.ts";
 
 // AES-256-GCM encryption function
 async function encrypt(text: string, key: CryptoKey): Promise<string> {
@@ -22,13 +22,28 @@ async function encrypt(text: string, key: CryptoKey): Promise<string> {
   return btoa(String.fromCharCode(...ivAndCiphertext));
 }
 
+// AES-256-GCM decryption function
+async function decrypt(encryptedText: string, key: CryptoKey): Promise<string> {
+  const ivAndCiphertext = new Uint8Array(atob(encryptedText).split('').map(c => c.charCodeAt(0)));
+  const iv = ivAndCiphertext.slice(0, 12);
+  const ciphertext = ivAndCiphertext.slice(12);
+
+  const decryptedBuffer = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    ciphertext
+  );
+
+  return new TextDecoder().decode(decryptedBuffer);
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const { action, credentials, user_id } = await req.json();
+    const { action, ...payload } = await req.json();
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -49,9 +64,9 @@ serve(async (req) => {
     );
 
     if (action === 'test-connection') {
-      const { tradingview_session_cookie, tradingview_signed_session_cookie } = credentials;
+      const { credentials, user_id } = payload;
 
-      if (!tradingview_session_cookie || !tradingview_signed_session_cookie || !user_id) {
+      if (!credentials.tradingview_session_cookie || !credentials.tradingview_signed_session_cookie || !user_id) {
         return new Response(JSON.stringify({ error: 'Missing required credentials or user ID.' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400,
@@ -63,8 +78,8 @@ serve(async (req) => {
       const isConnectionSuccessful = true; 
 
       if (isConnectionSuccessful) {
-        const encrypted_session = await encrypt(tradingview_session_cookie, key);
-        const encrypted_signed_session = await encrypt(tradingview_signed_session_cookie, key);
+        const encrypted_session = await encrypt(credentials.tradingview_session_cookie, key);
+        const encrypted_signed_session = await encrypt(credentials.tradingview_signed_session_cookie, key);
 
         const { error } = await supabaseAdmin
           .from('profiles')
@@ -88,6 +103,70 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: 'TradingView connection failed. Please check your credentials.' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401,
+        });
+      }
+    }
+    
+    if (action === 'validate-script-ownership') {
+      const { user_id, publication_url } = payload;
+
+      if (!user_id || !publication_url) {
+        return new Response(JSON.stringify({ error: 'Missing user ID or publication URL.' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        });
+      }
+
+      const { data: profile, error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .select('is_tradingview_connected, tradingview_session_cookie, tradingview_signed_session_cookie, tradingview_username')
+        .eq('id', user_id)
+        .single();
+      
+      if (profileError || !profile) {
+        return new Response(JSON.stringify({ error: 'User profile not found.' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+      }
+      if (!profile.is_tradingview_connected || !profile.tradingview_session_cookie || !profile.tradingview_signed_session_cookie || !profile.tradingview_username) {
+        return new Response(JSON.stringify({ error: 'TradingView not connected. Please connect your account in settings.' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+      }
+
+      const sessionCookie = await decrypt(profile.tradingview_session_cookie, key);
+      const signedSessionCookie = await decrypt(profile.tradingview_signed_session_cookie, key);
+
+      const tvResponse = await fetch(publication_url, {
+        headers: { 'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}` }
+      });
+
+      if (!tvResponse.ok) {
+        return new Response(JSON.stringify({ error: `Failed to fetch from TradingView (status: ${tvResponse.status})` }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+      }
+
+      const html = await tvResponse.text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      
+      const authorElement = doc.querySelector('.tv-chart-view__title-user-name');
+      const authorUsernameOnPage = authorElement?.textContent?.trim();
+
+      if (!authorUsernameOnPage) {
+        return new Response(JSON.stringify({ error: 'Could not find author username on the script page. The page structure might have changed.' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+      }
+
+      if (authorUsernameOnPage.toLowerCase() === profile.tradingview_username.toLowerCase()) {
+        const scriptIdMatch = publication_url.match(/script\/([a-zA-Z0-9-]+)\//);
+        const script_id = scriptIdMatch ? scriptIdMatch[1] : null;
+
+        if (!script_id) {
+           return new Response(JSON.stringify({ error: 'Could not extract script ID from URL.' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+        }
+
+        return new Response(JSON.stringify({ message: 'Script ownership verified.', script_id }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        });
+      } else {
+        return new Response(JSON.stringify({ error: `Script ownership mismatch. You are connected as '${profile.tradingview_username}', but the script author is '${authorUsernameOnPage}'.` }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403,
         });
       }
     }

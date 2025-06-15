@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,6 +15,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 interface Program {
   id: string;
@@ -27,6 +32,9 @@ interface Program {
   status: string;
   created_at: string;
   image_urls: string[];
+  tradingview_publication_url: string | null;
+  validation_status: 'pending' | 'validated' | 'failed_validation';
+  validation_error_message: string | null;
 }
 
 const MyPrograms = () => {
@@ -111,6 +119,34 @@ const MyPrograms = () => {
         return 'bg-gray-100 text-gray-800';
       default:
         return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getValidationStatusBadge = (program: Program) => {
+    if (!program.tradingview_publication_url) return null;
+
+    switch (program.validation_status) {
+      case 'validated':
+        return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Validated</Badge>;
+      case 'pending':
+        return <Badge className="bg-gray-100 text-gray-800 border-gray-200">Pending</Badge>;
+      case 'failed_validation':
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="destructive" className="cursor-pointer">
+                  Failed
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{program.validation_error_message || 'No details provided.'}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+      default:
+        return null;
     }
   };
 
@@ -230,9 +266,12 @@ const MyPrograms = () => {
                       )}
                     </div>
                     <div className="flex justify-between items-center">
-                      <Badge className={getStatusColor(program.status)}>
-                        {program.status}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge className={getStatusColor(program.status)}>
+                          {program.status}
+                        </Badge>
+                        {getValidationStatusBadge(program)}
+                      </div>
                       <span className="text-xs text-muted-foreground">
                         {new Date(program.created_at).toLocaleDateString()}
                       </span>

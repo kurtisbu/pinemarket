@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,7 +22,6 @@ const SellScript = () => {
   const [loading, setLoading] = useState(false);
   const [scriptFile, setScriptFile] = useState<File | null>(null);
   const [scriptType, setScriptType] = useState<'file' | 'link'>('file');
-  const [tradingViewLink, setTradingViewLink] = useState('');
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [currentTag, setCurrentTag] = useState('');
   const [formData, setFormData] = useState({
@@ -31,7 +29,8 @@ const SellScript = () => {
     description: '',
     price: '',
     category: '',
-    tags: [] as string[]
+    tags: [] as string[],
+    tradingview_publication_url: ''
   });
 
   const categories = [
@@ -118,35 +117,46 @@ const SellScript = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-
-    // Validate script input based on type
-    if (scriptType === 'file' && !scriptFile) {
-      toast({
-        title: 'Script file required',
-        description: 'Please upload a .txt file containing your Pine Script.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (scriptType === 'link' && !tradingViewLink.trim()) {
-      toast({
-        title: 'TradingView link required',
-        description: 'Please provide a TradingView publication link.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
+    
     setLoading(true);
-    try {
-      let scriptPath = null;
 
-      // Handle script file upload or store TradingView link
-      if (scriptType === 'file' && scriptFile) {
+    try {
+      let scriptPath: string | null = null;
+      let publicationUrl: string | null = null;
+      let scriptId: string | null = null;
+      let validationStatus: 'validated' | 'pending' = 'pending';
+
+      if (scriptType === 'file') {
+        if (!scriptFile) {
+          toast({ title: 'Script file required', description: 'Please upload a .txt file containing your Pine Script.', variant: 'destructive' });
+          setLoading(false);
+          return;
+        }
         scriptPath = await uploadFile(scriptFile, 'scripts', user.id);
       } else if (scriptType === 'link') {
-        scriptPath = tradingViewLink;
+        if (!formData.tradingview_publication_url.trim()) {
+          toast({ title: 'TradingView link required', description: 'Please provide a TradingView publication link.', variant: 'destructive' });
+          setLoading(false);
+          return;
+        }
+        publicationUrl = formData.tradingview_publication_url;
+
+        toast({ title: 'Validating Script...', description: 'Please wait while we verify ownership of the script.' });
+
+        const { data: validationData, error: validationError } = await supabase.functions.invoke('tradingview-service', {
+          body: {
+            action: 'validate-script-ownership',
+            user_id: user.id,
+            publication_url: publicationUrl,
+          },
+        });
+
+        if (validationError) throw new Error(validationError.message);
+        if (validationData.error) throw new Error(validationData.error);
+        
+        scriptId = validationData.script_id;
+        validationStatus = 'validated';
+        toast({ title: 'Validation Successful', description: 'Script ownership has been verified.' });
       }
 
       // Upload media files
@@ -166,9 +176,13 @@ const SellScript = () => {
           price: parseFloat(formData.price),
           category: formData.category,
           tags: formData.tags,
-          script_file_path: scriptPath,
           image_urls: imageUrls,
-          status: 'draft'
+          status: 'draft',
+          script_file_path: scriptPath,
+          tradingview_publication_url: publicationUrl,
+          tradingview_script_id: scriptId,
+          validation_status: validationStatus,
+          last_validated_at: validationStatus === 'validated' ? new Date().toISOString() : null
         });
 
       if (error) throw error;
@@ -181,7 +195,7 @@ const SellScript = () => {
       navigate('/my-programs');
     } catch (error: any) {
       toast({
-        title: 'Upload failed',
+        title: 'Operation failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -320,8 +334,8 @@ const SellScript = () => {
                   ) : (
                     <div className="space-y-2">
                       <Input
-                        value={tradingViewLink}
-                        onChange={(e) => setTradingViewLink(e.target.value)}
+                        value={formData.tradingview_publication_url}
+                        onChange={(e) => handleInputChange('tradingview_publication_url', e.target.value)}
                         placeholder="https://www.tradingview.com/script/..."
                       />
                       <p className="text-sm text-muted-foreground">
