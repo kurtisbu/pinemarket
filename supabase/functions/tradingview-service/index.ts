@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -144,41 +145,44 @@ serve(async (req) => {
       }
       
       const html = await tvResponse.text();
-      console.log('--- TradingView HTML Response (sample) ---');
-      console.log(html.substring(0, 5000));
-      console.log('--- End of TradingView HTML sample ---');
       
-      const doc = new DOMParser().parseFromString(html, 'text/html');
-      
-      const scriptElements = doc.querySelectorAll('.tv-widget-idea');
-      console.log(`Found ${scriptElements.length} script elements with selector '.tv-widget-idea'`);
+      // New method: Find the script tag with bootstrap data. This is more reliable for JS-rendered pages.
+      const scriptDataRegex = /<script id="user-page-bootstrap-data" type="application\/json">([\s\S]*?)<\/script>/;
+      const match = html.match(scriptDataRegex);
+
+      if (!match || !match[1]) {
+        console.error("Could not find user page bootstrap data script tag. The page structure might have changed.");
+        console.log('--- TradingView HTML Response (sample) ---');
+        console.log(html.substring(0, 5000));
+        console.log('--- End of TradingView HTML sample ---');
+        return new Response(JSON.stringify({ error: 'Failed to find script data on TradingView page. The page structure may have changed.' }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+      }
+
       const scripts = [];
+      try {
+        const jsonData = JSON.parse(match[1]);
+        // The structure of this JSON is a guess. We'll refine this based on logs if needed.
+        const publications = jsonData?.public_scripts?.publications || [];
+        console.log(`Found ${publications.length} scripts from JSON data.`);
 
-      scriptElements.forEach(el => {
-        const titleEl = el.querySelector('.tv-widget-idea__title');
-        const coverEl = el.querySelector('.tv-widget-idea__cover-img');
-        const likesEl = el.querySelector('.tv-widget-idea__social-row span[data-metric="likes"]');
-        const commentsEl = el.querySelector('.tv-widget-idea__social-row span[data-metric="comments"]');
-        
-        const publication_url_path = titleEl?.getAttribute('href');
-        if (!publication_url_path) return;
-
-        const publication_url = `https://www.tradingview.com${publication_url_path}`;
-        const script_id_match = publication_url.match(/script\/([^\/]+)/);
-
-        if (titleEl && script_id_match) {
-          scripts.push({
-            user_id: user_id,
-            script_id: script_id_match[1],
-            title: titleEl.textContent.trim(),
-            publication_url: publication_url,
-            image_url: coverEl?.getAttribute('src'),
-            likes: parseInt(likesEl?.textContent?.trim() || '0', 10),
-            reviews_count: parseInt(commentsEl?.textContent?.trim() || '0', 10),
-            last_synced_at: new Date().toISOString(),
-          });
+        for (const p of publications) {
+            if (p.scriptIdPart && p.title && p.link) {
+                 scripts.push({
+                    user_id: user_id,
+                    script_id: p.scriptIdPart,
+                    title: p.title,
+                    publication_url: `https://www.tradingview.com${p.link}`,
+                    image_url: p.image_url || null,
+                    likes: p.likes_count || 0,
+                    reviews_count: p.reviews_count || 0,
+                    last_synced_at: new Date().toISOString(),
+                });
+            }
         }
-      });
+      } catch (e) {
+        console.error("Failed to parse JSON from bootstrap data:", e.message);
+        return new Response(JSON.stringify({ error: 'Failed to parse script data from TradingView page.' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+      }
       
       if (scripts.length > 0) {
         const { error: upsertError } = await supabaseAdmin
