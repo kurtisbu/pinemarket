@@ -101,12 +101,15 @@ serve(async (req) => {
       const html = await tvResponse.text();
       const doc = new DOMParser().parseFromString(html, 'text/html');
       const body = doc?.querySelector('body');
+      
+      // More robust check: first confirm authentication, then get username.
+      const isAuthenticated = body?.getAttribute('data-is-authenticated') === 'true';
       const tradingviewUsername = body?.getAttribute('data-username');
 
-      if (!tradingviewUsername) {
+      if (!isAuthenticated || !tradingviewUsername) {
          await supabaseAdmin.from('profiles').update({ is_tradingview_connected: false, updated_at: new Date().toISOString() }).eq('id', user_id);
-         console.error("Could not find data-username attribute on body tag.");
-         return new Response(JSON.stringify({ error: `Could not verify TradingView session. Are your cookies correct?` }), {
+         console.error("Could not verify TradingView session. data-is-authenticated:", isAuthenticated, "data-username:", tradingviewUsername);
+         return new Response(JSON.stringify({ error: `Could not verify TradingView session. Your cookies may be invalid or expired. Please get new ones from your browser.` }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401,
         });
