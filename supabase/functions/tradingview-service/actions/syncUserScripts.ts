@@ -115,10 +115,12 @@ export async function syncUserScripts(
   if (apiData && apiData.html && typeof apiData.html === 'string') {
     console.log("Parsing HTML content from TradingView API response based on Python script logic.");
     const htmlContent = apiData.html;
-    
-    // Based on your python script: soup.find_all('div', class_='tv-feed-layout__card-item')
-    const scriptCards = htmlContent.split(/class="tv-feed-layout__card-item/);
 
+    // Mimic Python's `soup.find_all('div', class_='tv-feed-layout__card-item')`
+    // This regex finds each card's HTML block and is more robust than the previous split().
+    const scriptCardRegex = /<div class="[^"]*?tv-feed-layout__card-item[^"]*?">[\s\S]*?(?=<div class="[^"]*?tv-feed-layout__card-item|$)/g;
+    const scriptCards = htmlContent.match(scriptCardRegex) || [];
+    
     const parseCount = (text: string | null | undefined): number => {
         if (!text) return 0;
         const lowerText = text.toLowerCase().replace(/,/g, '');
@@ -134,41 +136,39 @@ export async function syncUserScripts(
         return Math.round(num);
     };
 
-    if (scriptCards.length > 1) {
-        console.log(`Found ${scriptCards.length - 1} script cards.`);
-        scriptCards.slice(1).forEach(cardHtml => {
+    if (scriptCards.length > 0) {
+        console.log(`Found ${scriptCards.length} script cards.`);
+        scriptCards.forEach(cardHtml => {
+            // Mimic `card.find('a', class_='tv-widget-idea__title')`
             const titleRegex = /<a[^>]+class="[^"]*tv-widget-idea__title[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/;
+            
+            // Mimic `card.find('span', {'data-name': 'agrees'}).find('span', class_='tv-card-social-item__count')`
             const likesRegex = /<span[^>]+data-name="agrees"[^>]*>[\s\S]*?<span[^>]+class="[^"]*tv-card-social-item__count[^"]*"[^>]*>([^<]+)<\/span>/;
-            const commentsRegex = /<span[^>]+data-name="comments"[^>]*>[\s\S]*?<span[^>]+class="[^"]*tv-card-social-item__count[^"]*"[^>]*>([^<]+)<\/span>/;
-            const imageRegex = /<img[^>]+class="[^"]*tv-widget-idea__image[^"]*"[^>]+src="([^"]+)"/;
 
             const titleMatch = cardHtml.match(titleRegex);
             const likesMatch = cardHtml.match(likesRegex);
-            const commentsMatch = cardHtml.match(commentsRegex);
-            const imageMatch = cardHtml.match(imageRegex);
 
             if (titleMatch && titleMatch[1] && titleMatch[2]) {
                 const scriptUrl = "https://www.tradingview.com" + titleMatch[1];
                 const scriptTitle = titleMatch[2].replace(/<[^>]*>?/gm, '').trim();
-                
                 const likesCount = parseCount(likesMatch ? likesMatch[1] : '0');
-                const commentsCount = parseCount(commentsMatch ? commentsMatch[1] : '0');
-                const imageUrl = imageMatch ? imageMatch[1] : null;
 
                 console.log(`Parsed Script: Title=${scriptTitle}, Likes=${likesCount}, URL=${scriptUrl}`);
 
                 scriptsData.push({
                     script_name: scriptTitle,
                     url: scriptUrl,
-                    image_url: imageUrl,
+                    image_url: null, // Not available via this scraping method
                     likes_count: likesCount,
-                    reviews_count: commentsCount,
-                    script_id_private: null // Not available with this scraping method
+                    reviews_count: 0, // Not available via this scraping method
+                    script_id_private: null
                 });
+            } else {
+               console.log("A script card was found but some details could not be parsed. Card HTML snippet:", cardHtml.substring(0, 300));
             }
         });
     } else {
-        console.log("Could not find any script cards with class 'tv-feed-layout__card-item'. HTML structure has likely changed again.");
+        console.log("Could not find any script cards with class 'tv-feed-layout__card-item'. HTML structure has likely changed. Full HTML length:", htmlContent.length);
     }
   } else if (apiData && apiData.results) {
     console.log("Parsing JSON 'results' from TradingView API response.");
