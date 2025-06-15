@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -145,6 +144,10 @@ serve(async (req) => {
       }
       
       const html = await tvResponse.text();
+      console.log('--- TradingView HTML Response (sample) ---');
+      console.log(html.substring(0, 5000));
+      console.log('--- End of TradingView HTML sample ---');
+      
       const doc = new DOMParser().parseFromString(html, 'text/html');
       
       const scriptElements = doc.querySelectorAll('.tv-widget-idea');
