@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
-import { DOMParser } from "https://deno.land/x/deno_dom/deno-dom-wasm.ts";
+import { DOMParser } from "https://deno.land/x/deno-dom/deno-dom-wasm.ts";
 
 // AES-256-GCM encryption function
 async function encrypt(text: string, key: CryptoKey): Promise<string> {
@@ -164,56 +164,62 @@ serve(async (req) => {
       
       const html = await tvResponse.text();
       
-      // New method: Parse HTML and find the correct script tag with bootstrap data.
-      const doc = new DOMParser().parseFromString(html, "text/html");
-      const scriptTags = doc.querySelectorAll('script[type="application/json"]');
-      let bootstrapData;
+      // New, more robust method: Search all script tags for the data.
+      const scriptContentRegex = /<script[^>]*>([\s\S]*?)<\/script>/g;
+      let publications = [];
+      let foundData = false;
 
-      for (const tag of scriptTags) {
-        try {
-          if (!tag.textContent) continue;
-          const data = JSON.parse(tag.textContent);
-          // A good heuristic is that the data object will contain user info or script info.
-          if (data && (data.public_scripts || data.user)) {
-            bootstrapData = data;
-            console.log("Found potential bootstrap data in a script tag.");
-            break;
+      let match;
+      while ((match = scriptContentRegex.exec(html)) !== null) {
+        const scriptContent = match[1];
+
+        // Heuristic: The data we want is a JSON object containing 'public_scripts'.
+        if (scriptContent.includes('"public_scripts"')) {
+          try {
+            // The script content might be `window.data = {...json...}`. We need to extract the JSON object itself.
+            // Using a regex to find the outermost curly braces. The 's' flag allows '.' to match newlines.
+            const jsonStringMatch = scriptContent.match(/({.*})/s);
+            if (jsonStringMatch && jsonStringMatch[0]) {
+              const potentialJson = jsonStringMatch[0];
+              const data = JSON.parse(potentialJson);
+
+              if (data && data.public_scripts && Array.isArray(data.public_scripts.publications)) {
+                publications = data.public_scripts.publications;
+                console.log(`Found ${publications.length} scripts from JSON data in a script tag.`);
+                foundData = true;
+                break; // Exit the loop once data is found
+              }
+            }
+          } catch (e) {
+            // This script tag didn't contain the data in the expected format. Continue searching.
           }
-        } catch (e) {
-          // This tag did not contain valid JSON, or not the one we want. Ignore.
         }
       }
 
-      if (!bootstrapData) {
+      if (!foundData) {
         console.error("Could not find user page bootstrap data in any script tag. The page structure might have changed.");
-        console.log('--- TradingView HTML Response (sample) ---');
+        console.log('--- TradingView HTML Response (sample)---');
         console.log(html.substring(0, 8000));
         console.log('--- End of TradingView HTML sample ---');
         return new Response(JSON.stringify({ error: 'Failed to find script data on TradingView page. The page structure may have changed.' }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
       }
 
       const scripts = [];
-      try {
-        const publications = bootstrapData?.public_scripts?.publications || [];
-        console.log(`Found ${publications.length} scripts from JSON data.`);
+      console.log(`Processing ${publications.length} publications into scripts.`);
 
-        for (const p of publications) {
-            if (p.scriptIdPart && p.title && p.link) {
-                 scripts.push({
-                    user_id: user_id,
-                    script_id: p.scriptIdPart,
-                    title: p.title,
-                    publication_url: `https://www.tradingview.com${p.link}`,
-                    image_url: p.image_url || null,
-                    likes: p.likes_count || 0,
-                    reviews_count: p.reviews_count || 0,
-                    last_synced_at: new Date().toISOString(),
-                });
-            }
-        }
-      } catch (e) {
-        console.error("Failed to parse JSON from bootstrap data:", e.message);
-        return new Response(JSON.stringify({ error: 'Failed to parse script data from TradingView page.' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+      for (const p of publications) {
+          if (p.scriptIdPart && p.title && p.link) {
+               scripts.push({
+                  user_id: user_id,
+                  script_id: p.scriptIdPart,
+                  title: p.title,
+                  publication_url: `https://www.tradingview.com${p.link}`,
+                  image_url: p.image_url || null,
+                  likes: p.likes_count || 0,
+                  reviews_count: p.reviews_count || 0,
+                  last_synced_at: new Date().toISOString(),
+              });
+          }
       }
       
       if (scripts.length > 0) {
