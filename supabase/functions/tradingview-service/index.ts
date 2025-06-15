@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
+import { DOMParser, Element } from 'https://deno.land/x/deno_dom/deno-dom-wasm.ts';
 
 // AES-256-GCM encryption function
 async function encrypt(text: string, key: CryptoKey): Promise<string> {
@@ -131,11 +132,10 @@ serve(async (req) => {
       const signedSessionCookie = await decrypt(profile.tradingview_signed_session_cookie, key);
 
       // Fetch the user's main profile page, following redirects automatically.
-      // The public scripts data is embedded in this page's HTML.
-      const userProfileUrl = `https://www.tradingview.com/u/${profile.tradingview_username}/`;
+      const userProfileUrl = `https://www.tradingview.com/u/${profile.tradingview_username}/#published-scripts`;
       const tvResponse = await fetch(userProfileUrl, {
         headers: { 'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}` },
-        redirect: 'follow', // Let fetch handle redirects to get the final page content
+        redirect: 'follow',
       });
 
       console.log(`TradingView profile fetch for ${userProfileUrl} - Status: ${tvResponse.status}`);
@@ -163,59 +163,56 @@ serve(async (req) => {
       
       const html = await tvResponse.text();
       
-      // New, more robust method: Search all script tags for the data.
-      const scriptContentRegex = /<script[^>]*>([\s\S]*?)<\/script>/g;
-      let publications = [];
-      let foundData = false;
-
-      let match;
-      while ((match = scriptContentRegex.exec(html)) !== null) {
-        const scriptContent = match[1];
-
-        // Heuristic: The data we want is a JSON object containing 'public_scripts'.
-        if (scriptContent.includes('"public_scripts"')) {
-          try {
-            // The script content might be `window.data = {...json...}`. We need to extract the JSON object itself.
-            // Using a regex to find the outermost curly braces. The 's' flag allows '.' to match newlines.
-            const jsonStringMatch = scriptContent.match(/({.*})/s);
-            if (jsonStringMatch && jsonStringMatch[0]) {
-              const potentialJson = jsonStringMatch[0];
-              const data = JSON.parse(potentialJson);
-
-              if (data && data.public_scripts && Array.isArray(data.public_scripts.publications)) {
-                publications = data.public_scripts.publications;
-                console.log(`Found ${publications.length} scripts from JSON data in a script tag.`);
-                foundData = true;
-                break; // Exit the loop once data is found
-              }
-            }
-          } catch (e) {
-            // This script tag didn't contain the data in the expected format. Continue searching.
-          }
-        }
+      // New logic: Parse the HTML and look for script widgets by class name.
+      const document = new DOMParser().parseFromString(html, 'text/html');
+      if (!document) {
+        return new Response(JSON.stringify({ error: 'Failed to parse TradingView page HTML.' }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
       }
 
-      if (!foundData) {
-        console.error("Could not find user page bootstrap data in any script tag. The page structure might have changed.");
+      const scriptElements = document.querySelectorAll('.tv-widget-idea');
+      console.log(`Found ${scriptElements.length} elements with class .tv-widget-idea`);
+
+      if (scriptElements.length === 0) {
+        console.error("Could not find any '.tv-widget-idea' elements. The page structure might have changed.");
         console.log('--- TradingView HTML Response (sample)---');
         console.log(html.substring(0, 8000));
         console.log('--- End of TradingView HTML sample ---');
-        return new Response(JSON.stringify({ error: 'Failed to find script data on TradingView page. The page structure may have changed.' }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+        return new Response(JSON.stringify({ error: 'Failed to find any scripts on the page using class "tv-widget-idea". The page structure may have changed.' }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
       }
-
+      
       const scripts = [];
-      console.log(`Processing ${publications.length} publications into scripts.`);
+      console.log(`Processing ${scriptElements.length} publications into scripts.`);
 
-      for (const p of publications) {
-          if (p.scriptIdPart && p.title && p.link) {
+      for (const p of scriptElements) {
+          const element = p as Element;
+          
+          const titleElement = element.querySelector('.tv-widget-idea__title');
+          const title = titleElement?.textContent?.trim() || 'Untitled';
+          const link = titleElement?.getAttribute('href');
+          
+          if (!link) continue; // Skip if there's no link to the publication
+
+          const publication_url = `https://www.tradingview.com${link}`;
+          
+          // The scriptIdPart is the unique part of the URL path for the script
+          const scriptIdPart = link.split('/').filter(part => part).pop() || null;
+
+          const imageElement = element.querySelector('.tv-widget-idea__cover img');
+          const image_url = imageElement?.getAttribute('src') || null;
+          
+          const socialStats = element.querySelectorAll('.tv-social-stats__count');
+          const likes = socialStats[0] ? parseInt(socialStats[0].textContent?.trim() || '0', 10) : 0;
+          const reviews_count = socialStats[1] ? parseInt(socialStats[1].textContent?.trim() || '0', 10) : 0;
+
+          if (scriptIdPart) {
                scripts.push({
                   user_id: user_id,
-                  script_id: p.scriptIdPart,
-                  title: p.title,
-                  publication_url: `https://www.tradingview.com${p.link}`,
-                  image_url: p.image_url || null,
-                  likes: p.likes_count || 0,
-                  reviews_count: p.reviews_count || 0,
+                  script_id: scriptIdPart,
+                  title: title,
+                  publication_url: publication_url,
+                  image_url: image_url,
+                  likes: isNaN(likes) ? 0 : likes,
+                  reviews_count: isNaN(reviews_count) ? 0 : reviews_count,
                   last_synced_at: new Date().toISOString(),
               });
           }
