@@ -48,14 +48,19 @@ export async function testConnection(
   
   const html = await tvResponse.text();
   const doc = new DOMParser().parseFromString(html, 'text/html');
-  const body = doc?.querySelector('body');
   
-  const isAuthenticated = body?.getAttribute('data-is-authenticated') === 'true';
-  const foundUsername = body?.getAttribute('data-username');
+  // Updated check: Look for 'is-authenticated' class on the <html> tag.
+  const isAuthenticated = doc?.querySelector('html')?.classList.contains('is-authenticated');
+  
+  // Updated check: Extract username from the <title> tag as a fallback.
+  const title = doc?.querySelector('title')?.textContent;
+  const usernameMatch = title?.match(/Trader (.+?) —/);
+  const foundUsername = usernameMatch ? usernameMatch[1] : null;
+
 
   if (!isAuthenticated || !foundUsername) {
      await supabaseAdmin.from('profiles').update({ is_tradingview_connected: false, updated_at: new Date().toISOString() }).eq('id', user_id);
-     console.error("Could not verify TradingView session. data-is-authenticated:", isAuthenticated, "data-username:", foundUsername);
+     console.error("Could not verify TradingView session. isAuthenticated:", isAuthenticated, "foundUsername:", foundUsername);
      console.error("Received HTML (first 500 chars):", html.substring(0, 500));
      return new Response(JSON.stringify({ error: `Could not verify TradingView session. Your cookies may be invalid or expired. Please get new ones from your browser.` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
