@@ -18,6 +18,7 @@ interface Profile {
   bio: string;
   role: string;
   created_at: string;
+  is_tradingview_connected: boolean;
 }
 
 const Profile = () => {
