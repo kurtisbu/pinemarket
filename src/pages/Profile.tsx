@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Header from '@/components/Header';
 import { User, Calendar } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import UserTradingViewScripts from '@/components/UserTradingViewScripts';
 
 interface Profile {
   id: string;
@@ -20,6 +22,7 @@ interface Profile {
 
 const Profile = () => {
   const { username } = useParams<{ username: string }>();
+  const { user: authUser } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -81,6 +84,8 @@ const Profile = () => {
     month: 'long'
   });
 
+  const isOwner = authUser?.id === profile.id;
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -128,11 +133,15 @@ const Profile = () => {
               )}
               
               <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold mb-4">Pine Script Programs</h3>
+                <h3 className="text-lg font-semibold mb-4">Pine Script Programs for Sale</h3>
                 <div className="text-center py-8 text-muted-foreground">
                   <p>No programs available yet. Check back later!</p>
                 </div>
               </div>
+
+              {profile.is_tradingview_connected && (
+                <UserTradingViewScripts profileId={profile.id} isOwner={isOwner} />
+              )}
             </CardContent>
           </Card>
         </div>

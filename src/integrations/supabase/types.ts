@@ -63,7 +63,6 @@ export type Database = {
           download_count: number
           id: string
           image_urls: string[] | null
-          last_validated_at: string | null
           price: number
           rating_count: number
           script_file_path: string | null
@@ -74,8 +73,6 @@ export type Database = {
           tradingview_publication_url: string | null
           tradingview_script_id: string | null
           updated_at: string
-          validation_error_message: string | null
-          validation_status: Database["public"]["Enums"]["program_validation_status"]
           view_count: number
         }
         Insert: {
@@ -86,7 +83,6 @@ export type Database = {
           download_count?: number
           id?: string
           image_urls?: string[] | null
-          last_validated_at?: string | null
           price: number
           rating_count?: number
           script_file_path?: string | null
@@ -97,8 +93,6 @@ export type Database = {
           tradingview_publication_url?: string | null
           tradingview_script_id?: string | null
           updated_at?: string
-          validation_error_message?: string | null
-          validation_status?: Database["public"]["Enums"]["program_validation_status"]
           view_count?: number
         }
         Update: {
@@ -109,7 +103,6 @@ export type Database = {
           download_count?: number
           id?: string
           image_urls?: string[] | null
-          last_validated_at?: string | null
           price?: number
           rating_count?: number
           script_file_path?: string | null
@@ -120,8 +113,6 @@ export type Database = {
           tradingview_publication_url?: string | null
           tradingview_script_id?: string | null
           updated_at?: string
-          validation_error_message?: string | null
-          validation_status?: Database["public"]["Enums"]["program_validation_status"]
           view_count?: number
         }
         Relationships: [
@@ -269,6 +260,56 @@ export type Database = {
           },
         ]
       }
+      tradingview_scripts: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string | null
+          last_synced_at: string
+          likes: number
+          publication_url: string
+          reviews_count: number
+          script_id: string
+          title: string
+          user_id: string
+          version: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          last_synced_at?: string
+          likes?: number
+          publication_url: string
+          reviews_count?: number
+          script_id: string
+          title: string
+          user_id: string
+          version?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          last_synced_at?: string
+          likes?: number
+          publication_url?: string
+          reviews_count?: number
+          script_id?: string
+          title?: string
+          user_id?: string
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tradingview_scripts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -281,7 +322,6 @@ export type Database = {
     }
     Enums: {
       assignment_status: "pending" | "assigned" | "failed" | "expired"
-      program_validation_status: "pending" | "validated" | "failed_validation"
       purchase_status: "pending" | "completed" | "failed" | "refunded"
     }
     CompositeTypes: {
@@ -399,7 +439,6 @@ export const Constants = {
   public: {
     Enums: {
       assignment_status: ["pending", "assigned", "failed", "expired"],
-      program_validation_status: ["pending", "validated", "failed_validation"],
       purchase_status: ["pending", "completed", "failed", "refunded"],
     },
   },

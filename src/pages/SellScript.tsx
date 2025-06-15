@@ -124,7 +124,6 @@ const SellScript = () => {
       let scriptPath: string | null = null;
       let publicationUrl: string | null = null;
       let scriptId: string | null = null;
-      let validationStatus: 'validated' | 'pending' = 'pending';
 
       if (scriptType === 'file') {
         if (!scriptFile) {
@@ -140,23 +139,14 @@ const SellScript = () => {
           return;
         }
         publicationUrl = formData.tradingview_publication_url;
+        const scriptIdMatch = publicationUrl.match(/script\/([a-zA-Z0-9-]+)\//);
+        scriptId = scriptIdMatch ? scriptIdMatch[1] : null;
 
-        toast({ title: 'Validating Script...', description: 'Please wait while we verify ownership of the script.' });
-
-        const { data: validationData, error: validationError } = await supabase.functions.invoke('tradingview-service', {
-          body: {
-            action: 'validate-script-ownership',
-            user_id: user.id,
-            publication_url: publicationUrl,
-          },
-        });
-
-        if (validationError) throw new Error(validationError.message);
-        if (validationData.error) throw new Error(validationData.error);
-        
-        scriptId = validationData.script_id;
-        validationStatus = 'validated';
-        toast({ title: 'Validation Successful', description: 'Script ownership has been verified.' });
+        if (!scriptId) {
+            toast({ title: 'Invalid TradingView URL', description: 'Could not extract script ID from the provided link.', variant: 'destructive' });
+            setLoading(false);
+            return;
+        }
       }
 
       // Upload media files
@@ -181,8 +171,6 @@ const SellScript = () => {
           script_file_path: scriptPath,
           tradingview_publication_url: publicationUrl,
           tradingview_script_id: scriptId,
-          validation_status: validationStatus,
-          last_validated_at: validationStatus === 'validated' ? new Date().toISOString() : null
         });
 
       if (error) throw error;

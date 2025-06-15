@@ -106,14 +106,12 @@ serve(async (req) => {
         });
       }
     }
-    
-    if (action === 'validate-script-ownership') {
-      const { user_id, publication_url } = payload;
 
-      if (!user_id || !publication_url) {
-        return new Response(JSON.stringify({ error: 'Missing user ID or publication URL.' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400,
+    if (action === 'sync-user-scripts') {
+      const { user_id } = payload;
+      if (!user_id) {
+        return new Response(JSON.stringify({ error: 'Missing user ID.' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
@@ -129,65 +127,61 @@ serve(async (req) => {
       if (!profile.is_tradingview_connected || !profile.tradingview_session_cookie || !profile.tradingview_signed_session_cookie || !profile.tradingview_username) {
         return new Response(JSON.stringify({ error: 'TradingView not connected. Please connect your account in settings.' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
       }
-
+      
       const sessionCookie = await decrypt(profile.tradingview_session_cookie, key);
       const signedSessionCookie = await decrypt(profile.tradingview_signed_session_cookie, key);
 
-      const tvResponse = await fetch(publication_url, {
+      const profileUrl = `https://www.tradingview.com/u/${profile.tradingview_username}/#scripts`;
+      
+      const tvResponse = await fetch(profileUrl, {
         headers: { 'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}` }
       });
 
       if (!tvResponse.ok) {
         return new Response(JSON.stringify({ error: `Failed to fetch from TradingView (status: ${tvResponse.status})` }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
       }
-
+      
       const html = await tvResponse.text();
       const doc = new DOMParser().parseFromString(html, 'text/html');
       
-      let authorUsernameOnPage: string | null = null;
+      const scriptElements = doc.querySelectorAll('.tv-widget-idea');
+      const scripts = [];
 
-      // New, more robust method: extract username from the profile link href
-      const authorLinkElement = doc.querySelector('.tv-chart-view__title-user-name a[href*="/u/"]');
-      if (authorLinkElement) {
-        const href = authorLinkElement.getAttribute('href');
-        if (href) {
-          const match = href.match(/\/u\/([^\/]+)/);
-          if (match && match[1]) {
-            authorUsernameOnPage = match[1];
-          }
+      scriptElements.forEach(el => {
+        const titleEl = el.querySelector('.tv-widget-idea__title');
+        const coverEl = el.querySelector('.tv-widget-idea__cover-img');
+        const likesEl = el.querySelector('.tv-widget-idea__social-row span[data-metric="likes"]');
+        const commentsEl = el.querySelector('.tv-widget-idea__social-row span[data-metric="comments"]');
+        
+        const publication_url = `https://www.tradingview.com${titleEl?.getAttribute('href')}`;
+        const script_id_match = publication_url.match(/script\/([^\/]+)/);
+
+        if (titleEl && script_id_match) {
+          scripts.push({
+            user_id: user_id,
+            script_id: script_id_match[1],
+            title: titleEl.textContent.trim(),
+            publication_url: publication_url,
+            image_url: coverEl?.getAttribute('src'),
+            likes: parseInt(likesEl?.textContent?.trim() || '0', 10),
+            reviews_count: parseInt(commentsEl?.textContent?.trim() || '0', 10),
+            last_synced_at: new Date().toISOString(),
+          });
         }
+      });
+      
+      if (scripts.length > 0) {
+        const { error: upsertError } = await supabaseAdmin
+          .from('tradingview_scripts')
+          .upsert(scripts, { onConflict: 'user_id,script_id' });
+        
+        if (upsertError) throw upsertError;
       }
 
-      // Fallback to the original method if the new one fails
-      if (!authorUsernameOnPage) {
-        const authorElement = doc.querySelector('.tv-chart-view__title-user-name');
-        if (authorElement) {
-          authorUsernameOnPage = authorElement.textContent?.trim();
-        }
-      }
-
-      if (!authorUsernameOnPage) {
-        return new Response(JSON.stringify({ error: 'Could not find author username on the script page. The page structure might have changed.' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
-      }
-
-      if (authorUsernameOnPage.toLowerCase() === profile.tradingview_username.toLowerCase()) {
-        const scriptIdMatch = publication_url.match(/script\/([a-zA-Z0-9-]+)\//);
-        const script_id = scriptIdMatch ? scriptIdMatch[1] : null;
-
-        if (!script_id) {
-           return new Response(JSON.stringify({ error: 'Could not extract script ID from URL.' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
-        }
-
-        return new Response(JSON.stringify({ message: 'Script ownership verified.', script_id }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        });
-      } else {
-        return new Response(JSON.stringify({ error: `Script ownership mismatch. You are connected as '${profile.tradingview_username}', but the script author is '${authorUsernameOnPage}'.` }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 403,
-        });
-      }
+      return new Response(JSON.stringify({ message: `Sync complete. Found ${scripts.length} scripts.` }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
     }
 
     return new Response(JSON.stringify({ error: 'Invalid action.' }), {
