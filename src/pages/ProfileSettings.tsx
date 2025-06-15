@@ -1,7 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -118,13 +118,13 @@ const ProfileSettings = () => {
 
     setLoading(true);
     try {
-      const updateData: { [key: string]: any } = {
+      const updateData: Database['public']['Tables']['profiles']['Insert'] = {
         id: user.id,
         display_name: formData.display_name,
         bio: formData.bio,
         avatar_url: formData.avatar_url,
         tradingview_username: formData.tradingview_username,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       };
 
       if (formData.tradingview_session_cookie) {
