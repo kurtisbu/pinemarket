@@ -164,22 +164,37 @@ serve(async (req) => {
       
       const html = await tvResponse.text();
       
-      // New method: Find the script tag with bootstrap data.
-      const scriptDataRegex = /<script id="user-page-bootstrap-data" type="application\/json">([\s\S]*?)<\/script>/;
-      const match = html.match(scriptDataRegex);
+      // New method: Parse HTML and find the correct script tag with bootstrap data.
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const scriptTags = doc.querySelectorAll('script[type="application/json"]');
+      let bootstrapData;
 
-      if (!match || !match[1]) {
-        console.error("Could not find user page bootstrap data script tag. The page structure might have changed.");
+      for (const tag of scriptTags) {
+        try {
+          if (!tag.textContent) continue;
+          const data = JSON.parse(tag.textContent);
+          // A good heuristic is that the data object will contain user info or script info.
+          if (data && (data.public_scripts || data.user)) {
+            bootstrapData = data;
+            console.log("Found potential bootstrap data in a script tag.");
+            break;
+          }
+        } catch (e) {
+          // This tag did not contain valid JSON, or not the one we want. Ignore.
+        }
+      }
+
+      if (!bootstrapData) {
+        console.error("Could not find user page bootstrap data in any script tag. The page structure might have changed.");
         console.log('--- TradingView HTML Response (sample) ---');
-        console.log(html.substring(0, 5000));
+        console.log(html.substring(0, 8000));
         console.log('--- End of TradingView HTML sample ---');
         return new Response(JSON.stringify({ error: 'Failed to find script data on TradingView page. The page structure may have changed.' }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
       }
 
       const scripts = [];
       try {
-        const jsonData = JSON.parse(match[1]);
-        const publications = jsonData?.public_scripts?.publications || [];
+        const publications = bootstrapData?.public_scripts?.publications || [];
         console.log(`Found ${publications.length} scripts from JSON data.`);
 
         for (const p of publications) {
