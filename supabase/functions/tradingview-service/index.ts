@@ -64,7 +64,7 @@ serve(async (req) => {
     );
 
     if (action === 'test-connection') {
-      const { credentials, user_id } = payload;
+      const { credentials, user_id, tradingview_username } = payload;
 
       if (!credentials.tradingview_session_cookie || !credentials.tradingview_signed_session_cookie || !user_id) {
         return new Response(JSON.stringify({ error: 'Missing required credentials or user ID.' }), {
@@ -74,7 +74,12 @@ serve(async (req) => {
       }
 
       // --- New, more robust Connection Test Logic ---
-      const testUrl = 'https://www.tradingview.com/chart/'; // A page central to the logged-in experience
+      const testUrl = tradingview_username
+        ? `https://www.tradingview.com/u/${tradingview_username}/#settings-profile`
+        : 'https://www.tradingview.com/chart/';
+      
+      console.log(`Attempting TradingView connection test at: ${testUrl}`);
+      
       const sessionCookie = credentials.tradingview_session_cookie;
       const signedSessionCookie = credentials.tradingview_signed_session_cookie;
 
@@ -83,7 +88,6 @@ serve(async (req) => {
           'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         },
-        // No more 'redirect: manual'. Follow redirects normally.
       });
       
       console.log(`TradingView connection test - Status: ${tvResponse.status}`);
@@ -102,14 +106,23 @@ serve(async (req) => {
       const doc = new DOMParser().parseFromString(html, 'text/html');
       const body = doc?.querySelector('body');
       
-      // More robust check: first confirm authentication, then get username.
       const isAuthenticated = body?.getAttribute('data-is-authenticated') === 'true';
-      const tradingviewUsername = body?.getAttribute('data-username');
+      const foundUsername = body?.getAttribute('data-username');
 
-      if (!isAuthenticated || !tradingviewUsername) {
+      if (!isAuthenticated || !foundUsername) {
          await supabaseAdmin.from('profiles').update({ is_tradingview_connected: false, updated_at: new Date().toISOString() }).eq('id', user_id);
-         console.error("Could not verify TradingView session. data-is-authenticated:", isAuthenticated, "data-username:", tradingviewUsername);
+         console.error("Could not verify TradingView session. data-is-authenticated:", isAuthenticated, "data-username:", foundUsername);
+         console.error("Received HTML (first 500 chars):", html.substring(0, 500));
          return new Response(JSON.stringify({ error: `Could not verify TradingView session. Your cookies may be invalid or expired. Please get new ones from your browser.` }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401,
+        });
+      }
+
+      if (tradingview_username && foundUsername.toLowerCase() !== tradingview_username.toLowerCase()) {
+        await supabaseAdmin.from('profiles').update({ is_tradingview_connected: false, updated_at: new Date().toISOString() }).eq('id', user_id);
+        console.error(`Username mismatch. Provided: ${tradingview_username}, Found: ${foundUsername}`);
+        return new Response(JSON.stringify({ error: `Connection failed. The provided cookies belong to user '${foundUsername}', but you entered username '${tradingview_username}'. Please ensure the username and cookies match.` }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401,
         });
@@ -124,7 +137,7 @@ serve(async (req) => {
         .update({
           tradingview_session_cookie: encrypted_session,
           tradingview_signed_session_cookie: encrypted_signed_session,
-          tradingview_username: tradingviewUsername, // <-- Use the username from the page body
+          tradingview_username: foundUsername, // <-- Use the username from the page body
           is_tradingview_connected: true,
           updated_at: new Date().toISOString(),
         })
@@ -132,7 +145,7 @@ serve(async (req) => {
 
       if (error) throw error;
       
-      return new Response(JSON.stringify({ message: `Connection successful! Found and saved profile for TradingView user '${tradingviewUsername}'.` }), {
+      return new Response(JSON.stringify({ message: `Connection successful! Found and saved profile for TradingView user '${foundUsername}'.` }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });

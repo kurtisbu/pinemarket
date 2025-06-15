@@ -120,6 +120,7 @@ const ProfileSettings = () => {
             tradingview_signed_session_cookie: formData.tradingview_signed_session_cookie,
           },
           user_id: user.id,
+          tradingview_username: formData.tradingview_username,
         },
       });
 
