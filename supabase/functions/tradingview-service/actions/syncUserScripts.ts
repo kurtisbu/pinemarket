@@ -74,7 +74,7 @@ export async function syncUserScripts(
   console.log(`Found numeric user ID: ${numericUserId} for username: ${profile.tradingview_username}`);
   
   // Step 3: Fetch scripts from the API endpoint
-  const scriptsApiUrl = `https://www.tradingview.com/api/v1/user/profile/charts/?script_type=all&access_script=all&privacy_script=all&by=${numericUserId}&q=`;
+  const scriptsApiUrl = `https://www.tradingview.com/api/v1/user/profile/charts/?script_type=all&access_script=all&privacy_script=all&by=${numericUserId}&q=&script_access=invite-only-open`;
   console.log(`Fetching scripts from TradingView API: ${scriptsApiUrl}`);
 
   const tvResponse = await fetch(scriptsApiUrl, {
@@ -108,42 +108,68 @@ export async function syncUserScripts(
     apiData = { html: responseTextForHtmlParsing };
   }
   
-  console.log("Raw TradingView API Data (snippet):", JSON.stringify(apiData, null, 2).substring(0, 1500));
+  console.log("Raw TradingView API Data (snippet):", JSON.stringify(apiData, null, 2).substring(0, 500));
 
   let scriptsData: any[] = [];
   
   if (apiData && apiData.html && typeof apiData.html === 'string') {
-    console.log("Parsing HTML content from TradingView API response.");
+    console.log("Parsing HTML content from TradingView API response based on Python script logic.");
     const htmlContent = apiData.html;
-    const scriptBlocks = htmlContent.split(/<div class="tv-feed__item[^>]*>/);
+    
+    // Based on your python script: soup.find_all('div', class_='tv-feed-layout__card-item')
+    const scriptCards = htmlContent.split(/class="tv-feed-layout__card-item/);
 
-    scriptBlocks.slice(1).forEach(block => {
-        try {
-            const widgetMatch = block.match(/data-widget-data=\\?"(.*?)\\?"/);
-            const modelMatch = block.match(/data-model=\\?"(.*?)\\?"/);
+    const parseCount = (text: string | null | undefined): number => {
+        if (!text) return 0;
+        const lowerText = text.toLowerCase().replace(/,/g, '');
+        const num = parseFloat(lowerText);
+        if (isNaN(num)) return 0;
 
-            if (widgetMatch && widgetMatch[1] && modelMatch && modelMatch[1]) {
-                const widgetJsonString = widgetMatch[1].replace(/&quot;/g, '"').replace(/&#34;/g, '"').replace(/&amp;/g, '&');
-                const widgetInfo = JSON.parse(widgetJsonString);
+        if (lowerText.includes('k')) {
+            return Math.round(num * 1000);
+        }
+        if (lowerText.includes('m')) {
+            return Math.round(num * 1000000);
+        }
+        return Math.round(num);
+    };
 
-                const modelJsonString = modelMatch[1].replace(/&quot;/g, '"').replace(/&#34;/g, '"').replace(/&amp;/g, '&');
-                const modelInfo = JSON.parse(modelJsonString);
+    if (scriptCards.length > 1) {
+        console.log(`Found ${scriptCards.length - 1} script cards.`);
+        scriptCards.slice(1).forEach(cardHtml => {
+            const titleRegex = /<a[^>]+class="[^"]*tv-widget-idea__title[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/;
+            const likesRegex = /<span[^>]+data-name="agrees"[^>]*>[\s\S]*?<span[^>]+class="[^"]*tv-card-social-item__count[^"]*"[^>]*>([^<]+)<\/span>/;
+            const commentsRegex = /<span[^>]+data-name="comments"[^>]*>[\s\S]*?<span[^>]+class="[^"]*tv-card-social-item__count[^"]*"[^>]*>([^<]+)<\/span>/;
+            const imageRegex = /<img[^>]+class="[^"]*tv-widget-idea__image[^"]*"[^>]+src="([^"]+)"/;
+
+            const titleMatch = cardHtml.match(titleRegex);
+            const likesMatch = cardHtml.match(likesRegex);
+            const commentsMatch = cardHtml.match(commentsRegex);
+            const imageMatch = cardHtml.match(imageRegex);
+
+            if (titleMatch && titleMatch[1] && titleMatch[2]) {
+                const scriptUrl = "https://www.tradingview.com" + titleMatch[1];
+                const scriptTitle = titleMatch[2].replace(/<[^>]*>?/gm, '').trim();
                 
-                const imageUrl = widgetInfo.image_url ? `https://s3.tradingview.com/l/${widgetInfo.image_url}_mid.webp` : null;
+                const likesCount = parseCount(likesMatch ? likesMatch[1] : '0');
+                const commentsCount = parseCount(commentsMatch ? commentsMatch[1] : '0');
+                const imageUrl = imageMatch ? imageMatch[1] : null;
+
+                console.log(`Parsed Script: Title=${scriptTitle}, Likes=${likesCount}, URL=${scriptUrl}`);
 
                 scriptsData.push({
-                    script_name: widgetInfo.name,
-                    url: widgetInfo.published_chart_url,
+                    script_name: scriptTitle,
+                    url: scriptUrl,
                     image_url: imageUrl,
-                    likes_count: modelInfo.agreesCount || widgetInfo.like_score || 0,
-                    reviews_count: modelInfo.commentsCount || 0,
-                    script_id_private: widgetInfo.id,
+                    likes_count: likesCount,
+                    reviews_count: commentsCount,
+                    script_id_private: null // Not available with this scraping method
                 });
             }
-        } catch (e) {
-            console.error("Error parsing a script block from HTML:", e);
-        }
-    });
+        });
+    } else {
+        console.log("Could not find any script cards with class 'tv-feed-layout__card-item'. HTML structure has likely changed again.");
+    }
   } else if (apiData && apiData.results) {
     console.log("Parsing JSON 'results' from TradingView API response.");
     if (Array.isArray(apiData.results)) {
