@@ -1,4 +1,3 @@
-
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { decrypt } from '../utils/crypto.ts';
@@ -49,12 +48,29 @@ export async function syncUserScripts(
   const profilePageHtml = await profilePageResponse.text();
 
   // Step 2: Extract numeric user ID from HTML
-  const userIdMatch = profilePageHtml.match(/"user_id":\s*(\d+)/);
-  const numericUserId = userIdMatch ? userIdMatch[1] : null;
+  // The previous regex /"user_id":\s*(\d+)/ is no longer reliable.
+  // Let's try to find the ID associated with the username from a JSON object in the HTML.
+  const escapedUsername = profile.tradingview_username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const userIdRegex = new RegExp(`"id":\\s*(\\d+),\\s*"username":\\s*"${escapedUsername}"`, "i");
+  
+  let numericUserId: string | null = null;
+  const userIdMatch = profilePageHtml.match(userIdRegex);
+  
+  if (userIdMatch && userIdMatch[1]) {
+    numericUserId = userIdMatch[1];
+  } else {
+    // Fallback to the old regex just in case.
+    const oldUserIdMatch = profilePageHtml.match(/"user_id":\s*(\d+)/);
+    if (oldUserIdMatch && oldUserIdMatch[1]) {
+      numericUserId = oldUserIdMatch[1];
+    }
+  }
 
   if (!numericUserId) {
-    console.error("Could not find numeric user ID in profile page HTML.");
-    return new Response(JSON.stringify({ error: 'Could not determine TradingView numeric user ID. Unable to sync scripts.' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+    console.error("Could not find numeric user ID in profile page HTML after trying multiple patterns.");
+    // Log a portion of the HTML for easier debugging without leaking too much.
+    console.error("HTML snippet:", profilePageHtml.substring(0, 3000));
+    return new Response(JSON.stringify({ error: 'Could not determine TradingView numeric user ID. This may be due to a recent change on TradingView\'s website. Please try again later.' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
   }
 
   console.log(`Found numeric user ID: ${numericUserId} for username: ${profile.tradingview_username}`);
