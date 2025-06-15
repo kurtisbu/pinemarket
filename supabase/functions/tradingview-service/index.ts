@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -131,11 +132,13 @@ serve(async (req) => {
       const sessionCookie = await decrypt(profile.tradingview_session_cookie, key);
       const signedSessionCookie = await decrypt(profile.tradingview_signed_session_cookie, key);
 
-      const profileUrl = `https://www.tradingview.com/u/${profile.tradingview_username}/#scripts`;
+      const profileUrl = `https://www.tradingview.com/u/${profile.tradingview_username}/#published-scripts`;
       
       const tvResponse = await fetch(profileUrl, {
         headers: { 'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}` }
       });
+
+      console.log(`TradingView fetch for ${profileUrl} - Status: ${tvResponse.status}`);
 
       if (!tvResponse.ok) {
         return new Response(JSON.stringify({ error: `Failed to fetch from TradingView (status: ${tvResponse.status})` }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
@@ -145,6 +148,7 @@ serve(async (req) => {
       const doc = new DOMParser().parseFromString(html, 'text/html');
       
       const scriptElements = doc.querySelectorAll('.tv-widget-idea');
+      console.log(`Found ${scriptElements.length} script elements with selector '.tv-widget-idea'`);
       const scripts = [];
 
       scriptElements.forEach(el => {
@@ -153,7 +157,10 @@ serve(async (req) => {
         const likesEl = el.querySelector('.tv-widget-idea__social-row span[data-metric="likes"]');
         const commentsEl = el.querySelector('.tv-widget-idea__social-row span[data-metric="comments"]');
         
-        const publication_url = `https://www.tradingview.com${titleEl?.getAttribute('href')}`;
+        const publication_url_path = titleEl?.getAttribute('href');
+        if (!publication_url_path) return;
+
+        const publication_url = `https://www.tradingview.com${publication_url_path}`;
         const script_id_match = publication_url.match(/script\/([^\/]+)/);
 
         if (titleEl && script_id_match) {
