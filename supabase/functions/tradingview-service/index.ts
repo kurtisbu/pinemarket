@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -134,7 +135,11 @@ serve(async (req) => {
       // Fetch the user's main profile page, following redirects automatically.
       const userProfileUrl = `https://www.tradingview.com/u/${profile.tradingview_username}/#published-scripts`;
       const tvResponse = await fetch(userProfileUrl, {
-        headers: { 'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}` },
+        headers: { 
+          'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
+          // Add a User-Agent header to mimic a real browser request
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        },
         redirect: 'follow',
       });
 
