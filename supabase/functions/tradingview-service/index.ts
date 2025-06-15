@@ -144,8 +144,27 @@ serve(async (req) => {
       const html = await tvResponse.text();
       const doc = new DOMParser().parseFromString(html, 'text/html');
       
-      const authorElement = doc.querySelector('.tv-chart-view__title-user-name');
-      const authorUsernameOnPage = authorElement?.textContent?.trim();
+      let authorUsernameOnPage: string | null = null;
+
+      // New, more robust method: extract username from the profile link href
+      const authorLinkElement = doc.querySelector('.tv-chart-view__title-user-name a[href*="/u/"]');
+      if (authorLinkElement) {
+        const href = authorLinkElement.getAttribute('href');
+        if (href) {
+          const match = href.match(/\/u\/([^\/]+)/);
+          if (match && match[1]) {
+            authorUsernameOnPage = match[1];
+          }
+        }
+      }
+
+      // Fallback to the original method if the new one fails
+      if (!authorUsernameOnPage) {
+        const authorElement = doc.querySelector('.tv-chart-view__title-user-name');
+        if (authorElement) {
+          authorUsernameOnPage = authorElement.textContent?.trim();
+        }
+      }
 
       if (!authorUsernameOnPage) {
         return new Response(JSON.stringify({ error: 'Could not find author username on the script page. The page structure might have changed.' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
