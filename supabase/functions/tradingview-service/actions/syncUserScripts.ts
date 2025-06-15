@@ -99,7 +99,19 @@ export async function syncUserScripts(
 
   // Step 4: Parse JSON response
   const apiData = await tvResponse.json();
-  const scriptsData = apiData.results || [];
+  
+  // Log the raw API data structure for future debugging
+  console.log("Raw TradingView API Data:", JSON.stringify(apiData, null, 2));
+
+  let scriptsData: any[] = [];
+  // The API sometimes returns an array, and sometimes an object. We need to handle both.
+  if (apiData && apiData.results) {
+    if (Array.isArray(apiData.results)) {
+      scriptsData = apiData.results;
+    } else if (typeof apiData.results === 'object' && apiData.results !== null) {
+      scriptsData = Object.values(apiData.results);
+    }
+  }
 
   if (scriptsData.length === 0) {
     return new Response(JSON.stringify({ message: `Sync complete. Found 0 public scripts for '${profile.tradingview_username}'. Check if you have published scripts and they are public.` }), {
