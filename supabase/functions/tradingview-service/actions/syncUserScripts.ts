@@ -48,8 +48,6 @@ export async function syncUserScripts(
   const profilePageHtml = await profilePageResponse.text();
 
   // Step 2: Extract numeric user ID from HTML
-  // The previous regex /"user_id":\s*(\d+)/ is no longer reliable.
-  // Let's try to find the ID associated with the username from a JSON object in the HTML.
   const escapedUsername = profile.tradingview_username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const userIdRegex = new RegExp(`"id":\\s*(\\d+),\\s*"username":\\s*"${escapedUsername}"`, "i");
   
@@ -60,7 +58,7 @@ export async function syncUserScripts(
     numericUserId = userIdMatch[1];
   } else {
     // Fallback to the old regex just in case.
-    const oldUserIdMatch = profilePageHtml.match(/"user_id":\s*(\d+)/);
+    const oldUserIdMatch = profilePageHtml.match(/"user_id":\\s*(\d+)/);
     if (oldUserIdMatch && oldUserIdMatch[1]) {
       numericUserId = oldUserIdMatch[1];
     }
@@ -97,15 +95,57 @@ export async function syncUserScripts(
     return new Response(JSON.stringify({ error: `Failed to fetch scripts from TradingView API (status: ${tvResponse.status})` }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
   }
 
-  // Step 4: Parse JSON response
-  const apiData = await tvResponse.json();
+  // Step 4: Parse response and extract scripts
+  let apiData;
+  let responseTextForHtmlParsing = '';
+
+  try {
+    const responseText = await tvResponse.text();
+    responseTextForHtmlParsing = responseText;
+    apiData = JSON.parse(responseText);
+  } catch (e) {
+    console.log("Could not parse TradingView API response as JSON, assuming HTML content.");
+    apiData = { html: responseTextForHtmlParsing };
+  }
   
-  // Log the raw API data structure for future debugging
-  console.log("Raw TradingView API Data:", JSON.stringify(apiData, null, 2));
+  console.log("Raw TradingView API Data (snippet):", JSON.stringify(apiData, null, 2).substring(0, 1500));
 
   let scriptsData: any[] = [];
-  // The API sometimes returns an array, and sometimes an object. We need to handle both.
-  if (apiData && apiData.results) {
+  
+  if (apiData && apiData.html && typeof apiData.html === 'string') {
+    console.log("Parsing HTML content from TradingView API response.");
+    const htmlContent = apiData.html;
+    const scriptBlocks = htmlContent.split(/<div class="tv-feed__item[^>]*>/);
+
+    scriptBlocks.slice(1).forEach(block => {
+        try {
+            const widgetMatch = block.match(/data-widget-data=\\?"(.*?)\\?"/);
+            const modelMatch = block.match(/data-model=\\?"(.*?)\\?"/);
+
+            if (widgetMatch && widgetMatch[1] && modelMatch && modelMatch[1]) {
+                const widgetJsonString = widgetMatch[1].replace(/&quot;/g, '"').replace(/&#34;/g, '"').replace(/&amp;/g, '&');
+                const widgetInfo = JSON.parse(widgetJsonString);
+
+                const modelJsonString = modelMatch[1].replace(/&quot;/g, '"').replace(/&#34;/g, '"').replace(/&amp;/g, '&');
+                const modelInfo = JSON.parse(modelJsonString);
+                
+                const imageUrl = widgetInfo.image_url ? `https://s3.tradingview.com/l/${widgetInfo.image_url}_mid.webp` : null;
+
+                scriptsData.push({
+                    script_name: widgetInfo.name,
+                    url: widgetInfo.published_chart_url,
+                    image_url: imageUrl,
+                    likes_count: modelInfo.agreesCount || widgetInfo.like_score || 0,
+                    reviews_count: modelInfo.commentsCount || 0,
+                    script_id_private: widgetInfo.id,
+                });
+            }
+        } catch (e) {
+            console.error("Error parsing a script block from HTML:", e);
+        }
+    });
+  } else if (apiData && apiData.results) {
+    console.log("Parsing JSON 'results' from TradingView API response.");
     if (Array.isArray(apiData.results)) {
       scriptsData = apiData.results;
     } else if (typeof apiData.results === 'object' && apiData.results !== null) {
@@ -114,7 +154,7 @@ export async function syncUserScripts(
   }
 
   if (scriptsData.length === 0) {
-    return new Response(JSON.stringify({ message: `Sync complete. Found 0 public scripts for '${profile.tradingview_username}'. Check if you have published scripts and they are public.` }), {
+    return new Response(JSON.stringify({ message: `Sync complete. Found 0 scripts for '${profile.tradingview_username}'. Check if you have published scripts.` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
@@ -122,10 +162,9 @@ export async function syncUserScripts(
   
   // Step 5: Map API data to our database schema
   const scripts = scriptsData.map((script: any) => {
-      const publicationUrl = `https://www.tradingview.com${script.url}`;
+      const publicationUrl = script.url.startsWith('http') ? script.url : `https://www.tradingview.com${script.url}`;
       
       const scriptIdMatch = publicationUrl.match(/\/script\/([^\/]+)\//);
-      // Use the private script ID as a fallback if regex fails
       const scriptId = scriptIdMatch ? scriptIdMatch[1] : script.script_id_private;
       
       return {
