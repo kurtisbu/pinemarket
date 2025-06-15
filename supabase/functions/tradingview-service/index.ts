@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -132,96 +131,52 @@ serve(async (req) => {
       const sessionCookie = await decrypt(profile.tradingview_session_cookie, key);
       const signedSessionCookie = await decrypt(profile.tradingview_signed_session_cookie, key);
 
-      // Fetch the user's main profile page, following redirects automatically.
-      const userProfileUrl = `https://www.tradingview.com/u/${profile.tradingview_username}/#published-scripts`;
-      const tvResponse = await fetch(userProfileUrl, {
+      // New approach: Hit the data endpoint directly
+      const scriptsApiUrl = `https://www.tradingview.com/publish/history/${profile.tradingview_username}/?sort=recent&page=1`;
+      
+      console.log(`Fetching scripts from TradingView API: ${scriptsApiUrl}`);
+
+      const tvResponse = await fetch(scriptsApiUrl, {
         headers: { 
           'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
-          // Add a User-Agent header to mimic a real browser request
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'X-Requested-With': 'XMLHttpRequest', // Important header for API-like requests
         },
-        redirect: 'follow',
       });
 
-      console.log(`TradingView profile fetch for ${userProfileUrl} - Status: ${tvResponse.status}`);
-      console.log(`Final URL after redirects: ${tvResponse.url}`);
-
+      console.log(`TradingView API fetch for ${profile.tradingview_username} - Status: ${tvResponse.status}`);
+      
       if (!tvResponse.ok) {
         if (tvResponse.status === 404) {
            return new Response(JSON.stringify({ error: `TradingView user '${profile.tradingview_username}' not found. Please check the username in your settings.` }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
         }
-        return new Response(JSON.stringify({ error: `Failed to fetch profile page from TradingView (status: ${tvResponse.status})` }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+        const errorText = await tvResponse.text();
+        console.error("TradingView API Error Response:", errorText);
+        return new Response(JSON.stringify({ error: `Failed to fetch scripts from TradingView API (status: ${tvResponse.status})` }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+      }
+
+      const responseData = await tvResponse.json();
+      const publications = responseData.results?.publications || [];
+      
+      console.log(`Found ${publications.length} publications in API response.`);
+
+      if (publications.length === 0) {
+        return new Response(JSON.stringify({ message: `Sync complete. Found 0 public scripts for '${profile.tradingview_username}'.` }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        });
       }
       
-      // Determine the effective username from the final URL after redirects.
-      let effectiveUsername = profile.tradingview_username;
-      try {
-        const finalUrl = new URL(tvResponse.url);
-        const pathParts = finalUrl.pathname.split('/').filter(p => p);
-        if (pathParts.length >= 2 && pathParts[0] === 'u') {
-          effectiveUsername = pathParts[1];
-          console.log(`Using effective username from final URL: ${effectiveUsername}`);
-        }
-      } catch (e) {
-        console.error('Could not parse final URL, falling back to original username.', e.message);
-      }
-      
-      const html = await tvResponse.text();
-      
-      // New logic: Parse the HTML and look for script widgets by class name.
-      const document = new DOMParser().parseFromString(html, 'text/html');
-      if (!document) {
-        return new Response(JSON.stringify({ error: 'Failed to parse TradingView page HTML.' }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
-      }
-
-      const scriptElements = document.querySelectorAll('.tv-widget-idea');
-      console.log(`Found ${scriptElements.length} elements with class .tv-widget-idea`);
-
-      if (scriptElements.length === 0) {
-        console.error("Could not find any '.tv-widget-idea' elements. The page structure might have changed.");
-        console.log('--- TradingView HTML Response (sample)---');
-        console.log(html.substring(0, 8000));
-        console.log('--- End of TradingView HTML sample ---');
-        return new Response(JSON.stringify({ error: 'Failed to find any scripts on the page using class "tv-widget-idea". The page structure may have changed.' }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
-      }
-      
-      const scripts = [];
-      console.log(`Processing ${scriptElements.length} publications into scripts.`);
-
-      for (const p of scriptElements) {
-          const element = p as Element;
-          
-          const titleElement = element.querySelector('.tv-widget-idea__title');
-          const title = titleElement?.textContent?.trim() || 'Untitled';
-          const link = titleElement?.getAttribute('href');
-          
-          if (!link) continue; // Skip if there's no link to the publication
-
-          const publication_url = `https://www.tradingview.com${link}`;
-          
-          // The scriptIdPart is the unique part of the URL path for the script
-          const scriptIdPart = link.split('/').filter(part => part).pop() || null;
-
-          const imageElement = element.querySelector('.tv-widget-idea__cover img');
-          const image_url = imageElement?.getAttribute('src') || null;
-          
-          const socialStats = element.querySelectorAll('.tv-social-stats__count');
-          const likes = socialStats[0] ? parseInt(socialStats[0].textContent?.trim() || '0', 10) : 0;
-          const reviews_count = socialStats[1] ? parseInt(socialStats[1].textContent?.trim() || '0', 10) : 0;
-
-          if (scriptIdPart) {
-               scripts.push({
-                  user_id: user_id,
-                  script_id: scriptIdPart,
-                  title: title,
-                  publication_url: publication_url,
-                  image_url: image_url,
-                  likes: isNaN(likes) ? 0 : likes,
-                  reviews_count: isNaN(reviews_count) ? 0 : reviews_count,
-                  last_synced_at: new Date().toISOString(),
-              });
-          }
-      }
+      const scripts = publications.map((p: any) => ({
+          user_id: user_id,
+          script_id: p.script_id_name,
+          title: p.name,
+          publication_url: `https://www.tradingview.com${p.link}`,
+          image_url: p.image_url,
+          likes: p.likes_count || 0,
+          reviews_count: p.reviews_count || 0,
+          last_synced_at: new Date().toISOString(),
+      }));
       
       if (scripts.length > 0) {
         const { error: upsertError } = await supabaseAdmin
@@ -231,21 +186,7 @@ serve(async (req) => {
         if (upsertError) throw upsertError;
       }
 
-      // If we found scripts, also update the profile with the effective username if it changed.
-      if (effectiveUsername.toLowerCase() !== profile.tradingview_username.toLowerCase()) {
-        console.log(`Updating username in profile from '${profile.tradingview_username}' to '${effectiveUsername}'.`);
-        const { error: profileUpdateError } = await supabaseAdmin
-          .from('profiles')
-          .update({ tradingview_username: effectiveUsername, updated_at: new Date().toISOString() })
-          .eq('id', user_id);
-        
-        if (profileUpdateError) {
-          // Log the error but don't fail the whole sync process
-          console.error('Failed to update effective username in profile:', profileUpdateError.message);
-        }
-      }
-
-      return new Response(JSON.stringify({ message: `Sync complete. Found ${scripts.length} scripts for '${effectiveUsername}'.` }), {
+      return new Response(JSON.stringify({ message: `Sync complete. Found ${scripts.length} scripts for '${profile.tradingview_username}'.` }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
