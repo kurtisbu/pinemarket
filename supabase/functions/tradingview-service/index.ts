@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -82,27 +83,39 @@ serve(async (req) => {
         headers: {
           'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        }
+        },
+        redirect: 'manual' // Check for a redirect instead of fetching content
       });
       
       console.log(`TradingView connection test - Status: ${tvResponse.status}`);
 
-      if (!tvResponse.ok) {
+      // We expect a redirect (301 or 302) if cookies are valid
+      if (tvResponse.status !== 301 && tvResponse.status !== 302) {
         await supabaseAdmin.from('profiles').update({ is_tradingview_connected: false, updated_at: new Date().toISOString() }).eq('id', user_id);
         const errorText = await tvResponse.text();
-        console.error("TradingView Connection Test Error:", errorText);
+        console.error("TradingView Connection Test Error:", errorText.substring(0, 500));
         return new Response(JSON.stringify({ error: `TradingView connection failed. Please check your session cookies. (Status: ${tvResponse.status})` }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401,
         });
       }
       
-      const tvUserData = await tvResponse.json();
-      const tradingviewUsername = tvUserData.username;
-      
+      const location = tvResponse.headers.get('location');
+      if (!location) {
+         await supabaseAdmin.from('profiles').update({ is_tradingview_connected: false, updated_at: new Date().toISOString() }).eq('id', user_id);
+         return new Response(JSON.stringify({ error: 'Could not determine TradingView profile URL from redirect.' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401,
+        });
+      }
+
+      // location is expected to be '/u/USERNAME/'
+      const usernameMatch = location.match(/\/u\/([^\/]+)\//);
+      const tradingviewUsername = usernameMatch ? usernameMatch[1] : null;
+
       if (!tradingviewUsername) {
          await supabaseAdmin.from('profiles').update({ is_tradingview_connected: false, updated_at: new Date().toISOString() }).eq('id', user_id);
-         return new Response(JSON.stringify({ error: 'Could not retrieve TradingView username. Your session might be invalid.' }), {
+         return new Response(JSON.stringify({ error: `Could not parse TradingView username from redirect URL: ${location}` }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401,
         });
@@ -117,7 +130,7 @@ serve(async (req) => {
         .update({
           tradingview_session_cookie: encrypted_session,
           tradingview_signed_session_cookie: encrypted_signed_session,
-          tradingview_username: tradingviewUsername, // <-- Use the username from the API
+          tradingview_username: tradingviewUsername, // <-- Use the username from the redirect
           is_tradingview_connected: true,
           updated_at: new Date().toISOString(),
         })
