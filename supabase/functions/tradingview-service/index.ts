@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -143,7 +142,8 @@ serve(async (req) => {
       if (userProfileResponse.status === 404) {
         return new Response(JSON.stringify({ error: `TradingView user '${profile.tradingview_username}' not found. Please check the username in your settings.` }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
       }
-      if (!userProfileResponse.ok && userProfileResponse.status !== 302) { // 302 is a common redirect for logged-in users, which is fine
+      // Allow 301 (Moved Permanently) and 302 (Found) redirects as they are valid for profile URLs.
+      if (!userProfileResponse.ok && ![301, 302].includes(userProfileResponse.status)) { 
         return new Response(JSON.stringify({ error: `Failed to fetch profile from TradingView (status: ${userProfileResponse.status})` }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
       }
       
