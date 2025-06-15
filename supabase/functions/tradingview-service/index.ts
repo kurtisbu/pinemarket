@@ -132,16 +132,40 @@ serve(async (req) => {
       const sessionCookie = await decrypt(profile.tradingview_session_cookie, key);
       const signedSessionCookie = await decrypt(profile.tradingview_signed_session_cookie, key);
 
-      const profileUrl = `https://www.tradingview.com/u/${profile.tradingview_username}/scripts/`;
+      // 1. Check if the user profile page itself exists
+      const userProfileUrl = `https://www.tradingview.com/u/${profile.tradingview_username}/`;
+      const userProfileResponse = await fetch(userProfileUrl, {
+        headers: { 'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}` },
+        redirect: 'manual', // Don't follow redirects, a redirect might indicate an issue
+      });
+      console.log(`TradingView profile check for ${userProfileUrl} - Status: ${userProfileResponse.status}`);
+
+      if (userProfileResponse.status === 404) {
+        return new Response(JSON.stringify({ error: `TradingView user '${profile.tradingview_username}' not found. Please check the username in your settings.` }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+      }
+      if (!userProfileResponse.ok && userProfileResponse.status !== 302) { // 302 is a common redirect for logged-in users, which is fine
+        return new Response(JSON.stringify({ error: `Failed to fetch profile from TradingView (status: ${userProfileResponse.status})` }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+      }
       
-      const tvResponse = await fetch(profileUrl, {
+      // 2. Now try to fetch the scripts page
+      const scriptsUrl = `https://www.tradingview.com/u/${profile.tradingview_username}/scripts/`;
+      
+      const tvResponse = await fetch(scriptsUrl, {
         headers: { 'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}` }
       });
 
-      console.log(`TradingView fetch for ${profileUrl} - Status: ${tvResponse.status}`);
+      console.log(`TradingView scripts fetch for ${scriptsUrl} - Status: ${tvResponse.status}`);
+
+      // If scripts page is 404, it likely means the user has no public scripts. This is not an error.
+      if (tvResponse.status === 404) {
+         return new Response(JSON.stringify({ message: `Sync complete. No public scripts found for '${profile.tradingview_username}'.` }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        });
+      }
 
       if (!tvResponse.ok) {
-        return new Response(JSON.stringify({ error: `Failed to fetch from TradingView (status: ${tvResponse.status})` }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+        return new Response(JSON.stringify({ error: `Failed to fetch scripts from TradingView (status: ${tvResponse.status})` }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
       }
       
       const html = await tvResponse.text();
