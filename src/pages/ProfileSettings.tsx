@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Header from '@/components/Header';
-import { Upload, User } from 'lucide-react';
+import { Upload, User, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 const ProfileSettings = () => {
@@ -20,6 +20,7 @@ const ProfileSettings = () => {
   const navigate = useNavigate();
   
   const [loading, setLoading] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({
     display_name: '',
@@ -105,11 +106,48 @@ const ProfileSettings = () => {
     }
   };
 
-  const handleTestConnection = () => {
-    toast({
-      title: "Feature coming soon!",
-      description: "Connection testing will be enabled once the backend service is live.",
-    });
+  const handleTestConnection = async () => {
+    if (!user) return;
+    setTestingConnection(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('tradingview-service', {
+        body: {
+          action: 'test-connection',
+          credentials: {
+            tradingview_session_cookie: formData.tradingview_session_cookie,
+            tradingview_signed_session_cookie: formData.tradingview_signed_session_cookie,
+          },
+          user_id: user.id,
+        },
+      });
+
+      if (error) throw new Error(error.message);
+
+      if (data.error) throw new Error(data.error);
+
+      toast({
+        title: 'Success!',
+        description: data.message,
+      });
+
+      setFormData(prev => ({
+        ...prev,
+        is_tradingview_connected: true,
+        tradingview_session_cookie: '',
+        tradingview_signed_session_cookie: '',
+      }));
+
+    } catch (error: any) {
+      setFormData(prev => ({ ...prev, is_tradingview_connected: false }));
+      toast({
+        title: 'Connection Test Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setTestingConnection(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -127,12 +165,8 @@ const ProfileSettings = () => {
         updated_at: new Date().toISOString(),
       };
 
-      if (formData.tradingview_session_cookie) {
-        updateData.tradingview_session_cookie = formData.tradingview_session_cookie;
-      }
-      if (formData.tradingview_signed_session_cookie) {
-        updateData.tradingview_signed_session_cookie = formData.tradingview_signed_session_cookie;
-      }
+      // Cookie data is now handled by the 'tradingview-service' edge function
+      // and is no longer part of this form submission for security reasons.
 
       const { error } = await supabase
         .from('profiles')
@@ -142,7 +176,7 @@ const ProfileSettings = () => {
 
       toast({
         title: 'Settings updated',
-        description: 'Your profile and TradingView settings have been successfully updated.',
+        description: 'Your profile settings have been successfully updated.',
       });
 
       // Clear cookie fields from state for security
@@ -269,13 +303,14 @@ const ProfileSettings = () => {
                   disabled={loading}
                 />
               </div>
-              <Button type="button" onClick={handleTestConnection} variant="outline" disabled={loading}>
-                Test Connection
+              <Button type="button" onClick={handleTestConnection} variant="outline" disabled={loading || testingConnection}>
+                {testingConnection ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {testingConnection ? 'Testing...' : 'Test & Save Connection'}
               </Button>
             </CardContent>
           </Card>
 
-          <Button type="submit" disabled={loading || uploading} className="w-full">
+          <Button type="submit" disabled={loading || uploading || testingConnection} className="w-full">
             {loading ? 'Saving Settings...' : 'Save All Settings'}
           </Button>
         </form>
