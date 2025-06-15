@@ -16,7 +16,11 @@ export type Database = {
           created_at: string
           display_name: string | null
           id: string
+          is_tradingview_connected: boolean
           role: string | null
+          tradingview_session_cookie: string | null
+          tradingview_signed_session_cookie: string | null
+          tradingview_username: string | null
           updated_at: string
           username: string | null
         }
@@ -26,7 +30,11 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id: string
+          is_tradingview_connected?: boolean
           role?: string | null
+          tradingview_session_cookie?: string | null
+          tradingview_signed_session_cookie?: string | null
+          tradingview_username?: string | null
           updated_at?: string
           username?: string | null
         }
@@ -36,7 +44,11 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          is_tradingview_connected?: boolean
           role?: string | null
+          tradingview_session_cookie?: string | null
+          tradingview_signed_session_cookie?: string | null
+          tradingview_username?: string | null
           updated_at?: string
           username?: string | null
         }
@@ -107,6 +119,141 @@ export type Database = {
           },
         ]
       }
+      purchases: {
+        Row: {
+          amount: number
+          buyer_id: string
+          created_at: string
+          id: string
+          payment_intent_id: string | null
+          program_id: string
+          purchased_at: string
+          seller_id: string
+          status: Database["public"]["Enums"]["purchase_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          buyer_id: string
+          created_at?: string
+          id?: string
+          payment_intent_id?: string | null
+          program_id: string
+          purchased_at?: string
+          seller_id: string
+          status?: Database["public"]["Enums"]["purchase_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          buyer_id?: string
+          created_at?: string
+          id?: string
+          payment_intent_id?: string | null
+          program_id?: string
+          purchased_at?: string
+          seller_id?: string
+          status?: Database["public"]["Enums"]["purchase_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchases_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchases_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchases_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      script_assignments: {
+        Row: {
+          assigned_at: string | null
+          buyer_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          program_id: string
+          purchase_id: string
+          retry_count: number
+          seller_id: string
+          status: Database["public"]["Enums"]["assignment_status"]
+          tradingview_script_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          buyer_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          program_id: string
+          purchase_id: string
+          retry_count?: number
+          seller_id: string
+          status?: Database["public"]["Enums"]["assignment_status"]
+          tradingview_script_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_at?: string | null
+          buyer_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          program_id?: string
+          purchase_id?: string
+          retry_count?: number
+          seller_id?: string
+          status?: Database["public"]["Enums"]["assignment_status"]
+          tradingview_script_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "script_assignments_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "script_assignments_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "script_assignments_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: true
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "script_assignments_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -118,7 +265,8 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      assignment_status: "pending" | "assigned" | "failed" | "expired"
+      purchase_status: "pending" | "completed" | "failed" | "refunded"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -233,6 +381,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      assignment_status: ["pending", "assigned", "failed", "expired"],
+      purchase_status: ["pending", "completed", "failed", "refunded"],
+    },
   },
 } as const

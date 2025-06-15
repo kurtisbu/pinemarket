@@ -12,6 +12,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Header from '@/components/Header';
 import { Upload, User } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 const ProfileSettings = () => {
   const { user } = useAuth();
@@ -23,7 +24,11 @@ const ProfileSettings = () => {
   const [formData, setFormData] = useState({
     display_name: '',
     bio: '',
-    avatar_url: ''
+    avatar_url: '',
+    tradingview_username: '',
+    tradingview_session_cookie: '',
+    tradingview_signed_session_cookie: '',
+    is_tradingview_connected: false,
   });
 
   useEffect(() => {
@@ -35,16 +40,19 @@ const ProfileSettings = () => {
     const fetchProfile = async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('display_name, bio, avatar_url, tradingview_username, is_tradingview_connected')
         .eq('id', user.id)
         .single();
 
       if (data) {
-        setFormData({
+        setFormData(prev => ({
+          ...prev,
           display_name: data.display_name || '',
           bio: data.bio || '',
-          avatar_url: data.avatar_url || ''
-        });
+          avatar_url: data.avatar_url || '',
+          tradingview_username: data.tradingview_username || '',
+          is_tradingview_connected: data.is_tradingview_connected || false,
+        }));
       }
     };
 
@@ -97,28 +105,53 @@ const ProfileSettings = () => {
     }
   };
 
+  const handleTestConnection = () => {
+    toast({
+      title: "Feature coming soon!",
+      description: "Connection testing will be enabled once the backend service is live.",
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
     setLoading(true);
     try {
+      const updateData: { [key: string]: any } = {
+        id: user.id,
+        display_name: formData.display_name,
+        bio: formData.bio,
+        avatar_url: formData.avatar_url,
+        tradingview_username: formData.tradingview_username,
+        updated_at: new Date().toISOString()
+      };
+
+      if (formData.tradingview_session_cookie) {
+        updateData.tradingview_session_cookie = formData.tradingview_session_cookie;
+      }
+      if (formData.tradingview_signed_session_cookie) {
+        updateData.tradingview_signed_session_cookie = formData.tradingview_signed_session_cookie;
+      }
+
       const { error } = await supabase
         .from('profiles')
-        .upsert({
-          id: user.id,
-          display_name: formData.display_name,
-          bio: formData.bio,
-          avatar_url: formData.avatar_url,
-          updated_at: new Date().toISOString()
-        });
+        .upsert(updateData);
 
       if (error) throw error;
 
       toast({
-        title: 'Profile updated',
-        description: 'Your profile has been successfully updated.',
+        title: 'Settings updated',
+        description: 'Your profile and TradingView settings have been successfully updated.',
       });
+
+      // Clear cookie fields from state for security
+      setFormData(prev => ({
+        ...prev,
+        tradingview_session_cookie: '',
+        tradingview_signed_session_cookie: '',
+      }));
+
     } catch (error: any) {
       toast({
         title: 'Update failed',
@@ -136,66 +169,116 @@ const ProfileSettings = () => {
     <div className="min-h-screen bg-background">
       <Header />
       <div className="container mx-auto px-4 py-8">
-        <div className="max-w-2xl mx-auto">
+        <form onSubmit={handleSubmit} className="max-w-2xl mx-auto space-y-8">
           <Card>
             <CardHeader>
               <CardTitle>Profile Settings</CardTitle>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="flex flex-col items-center space-y-4">
-                  <Avatar className="w-24 h-24">
-                    <AvatarImage src={formData.avatar_url} alt="Profile picture" />
-                    <AvatarFallback className="text-2xl">
-                      <User className="w-8 h-8" />
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <Label htmlFor="avatar" className="cursor-pointer">
-                      <div className="flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors">
-                        <Upload className="w-4 h-4" />
-                        {uploading ? 'Uploading...' : 'Change Avatar'}
-                      </div>
-                    </Label>
-                    <Input
-                      id="avatar"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleAvatarUpload}
-                      disabled={uploading}
-                      className="hidden"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="display_name">Display Name</Label>
+            <CardContent className="space-y-6">
+              <div className="flex flex-col items-center space-y-4">
+                <Avatar className="w-24 h-24">
+                  <AvatarImage src={formData.avatar_url} alt="Profile picture" />
+                  <AvatarFallback className="text-2xl">
+                    <User className="w-8 h-8" />
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <Label htmlFor="avatar" className="cursor-pointer">
+                    <div className="flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors">
+                      <Upload className="w-4 h-4" />
+                      {uploading ? 'Uploading...' : 'Change Avatar'}
+                    </div>
+                  </Label>
                   <Input
-                    id="display_name"
-                    value={formData.display_name}
-                    onChange={(e) => handleInputChange('display_name', e.target.value)}
-                    placeholder="Your display name"
+                    id="avatar"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarUpload}
+                    disabled={uploading}
+                    className="hidden"
                   />
                 </div>
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="bio">Bio</Label>
-                  <Textarea
-                    id="bio"
-                    value={formData.bio}
-                    onChange={(e) => handleInputChange('bio', e.target.value)}
-                    placeholder="Tell us about yourself..."
-                    rows={4}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="display_name">Display Name</Label>
+                <Input
+                  id="display_name"
+                  value={formData.display_name}
+                  onChange={(e) => handleInputChange('display_name', e.target.value)}
+                  placeholder="Your display name"
+                />
+              </div>
 
-                <Button type="submit" disabled={loading || uploading} className="w-full">
-                  {loading ? 'Updating...' : 'Update Profile'}
-                </Button>
-              </form>
+              <div className="space-y-2">
+                <Label htmlFor="bio">Bio</Label>
+                <Textarea
+                  id="bio"
+                  value={formData.bio}
+                  onChange={(e) => handleInputChange('bio', e.target.value)}
+                  placeholder="Tell us about yourself..."
+                  rows={4}
+                />
+              </div>
             </CardContent>
           </Card>
-        </div>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>TradingView Integration</CardTitle>
+                <Badge variant={formData.is_tradingview_connected ? 'default' : 'destructive'}>
+                  {formData.is_tradingview_connected ? 'Connected' : 'Not Connected'}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+               <p className="text-sm text-muted-foreground">
+                Connect your TradingView account to automate script assignments for your buyers.
+                Your credentials will be securely stored.
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="tradingview_username">TradingView Username</Label>
+                <Input
+                  id="tradingview_username"
+                  value={formData.tradingview_username}
+                  onChange={(e) => handleInputChange('tradingview_username', e.target.value)}
+                  placeholder="Your TradingView username"
+                  disabled={loading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="session_cookie">Session Cookie (sessionid)</Label>
+                <Input
+                  id="session_cookie"
+                  type="password"
+                  value={formData.tradingview_session_cookie}
+                  onChange={(e) => handleInputChange('tradingview_session_cookie', e.target.value)}
+                  placeholder="Value is hidden for security"
+                  disabled={loading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="signed_session_cookie">Signed Session Cookie (sessionid_sign)</Label>
+                <Input
+                  id="signed_session_cookie"
+                  type="password"
+                  value={formData.tradingview_signed_session_cookie}
+                  onChange={(e) => handleInputChange('tradingview_signed_session_cookie', e.target.value)}
+                  placeholder="Value is hidden for security"
+                  disabled={loading}
+                />
+              </div>
+              <Button type="button" onClick={handleTestConnection} variant="outline" disabled={loading}>
+                Test Connection
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Button type="submit" disabled={loading || uploading} className="w-full">
+            {loading ? 'Saving Settings...' : 'Save All Settings'}
+          </Button>
+        </form>
       </div>
     </div>
   );
