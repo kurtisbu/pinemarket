@@ -132,7 +132,7 @@ serve(async (req) => {
       const sessionCookie = await decrypt(profile.tradingview_session_cookie, key);
       const signedSessionCookie = await decrypt(profile.tradingview_signed_session_cookie, key);
 
-      const profileUrl = `https://www.tradingview.com/u/${profile.tradingview_username}/#published-scripts`;
+      const profileUrl = `https://www.tradingview.com/u/${profile.tradingview_username}/scripts/`;
       
       const tvResponse = await fetch(profileUrl, {
         headers: { 'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}` }
