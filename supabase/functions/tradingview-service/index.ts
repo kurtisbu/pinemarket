@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -75,7 +74,7 @@ serve(async (req) => {
       }
 
       // --- New Connection Test Logic ---
-      const testUrl = 'https://www.tradingview.com/user/';
+      const testUrl = 'https://www.tradingview.com/profile/';
       const sessionCookie = credentials.tradingview_session_cookie;
       const signedSessionCookie = credentials.tradingview_signed_session_cookie;
 
