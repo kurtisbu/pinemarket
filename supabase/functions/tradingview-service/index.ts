@@ -131,24 +131,42 @@ serve(async (req) => {
       const sessionCookie = await decrypt(profile.tradingview_session_cookie, key);
       const signedSessionCookie = await decrypt(profile.tradingview_signed_session_cookie, key);
 
-      // 1. Check if the user profile page itself exists
+      // 1. Check if the user profile page itself exists and handle redirects
       const userProfileUrl = `https://www.tradingview.com/u/${profile.tradingview_username}/`;
       const userProfileResponse = await fetch(userProfileUrl, {
         headers: { 'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}` },
-        redirect: 'manual', // Don't follow redirects, a redirect might indicate an issue
+        redirect: 'manual', // Don't follow redirects so we can inspect the response
       });
       console.log(`TradingView profile check for ${userProfileUrl} - Status: ${userProfileResponse.status}`);
+
+      let effectiveUsername = profile.tradingview_username;
 
       if (userProfileResponse.status === 404) {
         return new Response(JSON.stringify({ error: `TradingView user '${profile.tradingview_username}' not found. Please check the username in your settings.` }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
       }
-      // Allow 301 (Moved Permanently) and 302 (Found) redirects as they are valid for profile URLs.
-      if (!userProfileResponse.ok && ![301, 302].includes(userProfileResponse.status)) { 
+
+      // Handle redirects (e.g. for case correction in username)
+      if ([301, 302].includes(userProfileResponse.status)) {
+        const location = userProfileResponse.headers.get('location');
+        if (location) {
+          console.log(`Profile page redirected to: ${location}`);
+          try {
+            const redirectedUrl = new URL(location, userProfileUrl);
+            const pathParts = redirectedUrl.pathname.split('/').filter(p => p);
+            if (pathParts.length >= 2 && pathParts[0] === 'u') {
+              effectiveUsername = pathParts[1];
+              console.log(`Using effective username from redirect: ${effectiveUsername}`);
+            }
+          } catch (e) {
+            console.error('Could not parse redirect URL, falling back to original username.', e.message);
+          }
+        }
+      } else if (!userProfileResponse.ok) { 
         return new Response(JSON.stringify({ error: `Failed to fetch profile from TradingView (status: ${userProfileResponse.status})` }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
       }
       
-      // 2. Now try to fetch the scripts page
-      const scriptsUrl = `https://www.tradingview.com/u/${profile.tradingview_username}/scripts/`;
+      // 2. Now construct the scripts URL with the (potentially corrected) username
+      const scriptsUrl = `https://www.tradingview.com/u/${effectiveUsername}/scripts/`;
       
       const tvResponse = await fetch(scriptsUrl, {
         headers: { 'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}` }
@@ -158,7 +176,7 @@ serve(async (req) => {
 
       // If scripts page is 404, it likely means the user has no public scripts. This is not an error.
       if (tvResponse.status === 404) {
-         return new Response(JSON.stringify({ message: `Sync complete. No public scripts found for '${profile.tradingview_username}'.` }), {
+         return new Response(JSON.stringify({ message: `Sync complete. No public scripts found for '${effectiveUsername}'.` }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
         });
@@ -170,7 +188,7 @@ serve(async (req) => {
       
       const html = await tvResponse.text();
       
-      // New method: Find the script tag with bootstrap data. This is more reliable for JS-rendered pages.
+      // New method: Find the script tag with bootstrap data.
       const scriptDataRegex = /<script id="user-page-bootstrap-data" type="application\/json">([\s\S]*?)<\/script>/;
       const match = html.match(scriptDataRegex);
 
@@ -185,7 +203,6 @@ serve(async (req) => {
       const scripts = [];
       try {
         const jsonData = JSON.parse(match[1]);
-        // The structure of this JSON is a guess. We'll refine this based on logs if needed.
         const publications = jsonData?.public_scripts?.publications || [];
         console.log(`Found ${publications.length} scripts from JSON data.`);
 
@@ -216,7 +233,7 @@ serve(async (req) => {
         if (upsertError) throw upsertError;
       }
 
-      return new Response(JSON.stringify({ message: `Sync complete. Found ${scripts.length} scripts.` }), {
+      return new Response(JSON.stringify({ message: `Sync complete. Found ${scripts.length} scripts for '${effectiveUsername}'.` }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
