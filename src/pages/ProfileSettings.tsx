@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
@@ -32,33 +32,34 @@ const ProfileSettings = () => {
     is_tradingview_connected: false,
   });
 
+  const fetchProfile = useCallback(async () => {
+    if (!user) return;
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('display_name, bio, avatar_url, tradingview_username, is_tradingview_connected')
+      .eq('id', user.id)
+      .single();
+
+    if (data) {
+      setFormData(prev => ({
+        ...prev,
+        display_name: data.display_name || '',
+        bio: data.bio || '',
+        avatar_url: data.avatar_url || '',
+        tradingview_username: data.tradingview_username || '',
+        is_tradingview_connected: data.is_tradingview_connected || false,
+      }));
+    }
+  }, [user]);
+
   useEffect(() => {
     if (!user) {
       navigate('/auth');
       return;
     }
 
-    const fetchProfile = async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('display_name, bio, avatar_url, tradingview_username, is_tradingview_connected')
-        .eq('id', user.id)
-        .single();
-
-      if (data) {
-        setFormData(prev => ({
-          ...prev,
-          display_name: data.display_name || '',
-          bio: data.bio || '',
-          avatar_url: data.avatar_url || '',
-          tradingview_username: data.tradingview_username || '',
-          is_tradingview_connected: data.is_tradingview_connected || false,
-        }));
-      }
-    };
-
     fetchProfile();
-  }, [user, navigate]);
+  }, [user, navigate, fetchProfile]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -131,15 +132,18 @@ const ProfileSettings = () => {
         description: data.message,
       });
 
+      // Clear cookie fields from state for security
       setFormData(prev => ({
         ...prev,
-        is_tradingview_connected: true,
         tradingview_session_cookie: '',
         tradingview_signed_session_cookie: '',
       }));
 
+      // Refetch profile to get updated username and connection status
+      await fetchProfile();
+
     } catch (error: any) {
-      setFormData(prev => ({ ...prev, is_tradingview_connected: false }));
+      // No need to set is_tradingview_connected to false here, fetchProfile will handle it on next load if needed.
       toast({
         title: 'Connection Test Failed',
         description: error.message,

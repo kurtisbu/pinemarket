@@ -73,38 +73,62 @@ serve(async (req) => {
         });
       }
 
-      // Here you would typically test the credentials against TradingView.
-      // For now, we'll simulate a successful connection and proceed with encryption and saving.
-      const isConnectionSuccessful = true; 
+      // --- New Connection Test Logic ---
+      const testUrl = 'https://www.tradingview.com/user/';
+      const sessionCookie = credentials.tradingview_session_cookie;
+      const signedSessionCookie = credentials.tradingview_signed_session_cookie;
 
-      if (isConnectionSuccessful) {
-        const encrypted_session = await encrypt(credentials.tradingview_session_cookie, key);
-        const encrypted_signed_session = await encrypt(credentials.tradingview_signed_session_cookie, key);
+      const tvResponse = await fetch(testUrl, {
+        headers: {
+          'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        }
+      });
+      
+      console.log(`TradingView connection test - Status: ${tvResponse.status}`);
 
-        const { error } = await supabaseAdmin
-          .from('profiles')
-          .update({
-            tradingview_session_cookie: encrypted_session,
-            tradingview_signed_session_cookie: encrypted_signed_session,
-            is_tradingview_connected: true,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', user_id);
-
-        if (error) throw error;
-        
-        return new Response(JSON.stringify({ message: 'Connection successful and credentials saved securely.' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        });
-      } else {
-        // In a real scenario, you'd update the connection status to false
-        await supabaseAdmin.from('profiles').update({ is_tradingview_connected: false }).eq('id', user_id);
-        return new Response(JSON.stringify({ error: 'TradingView connection failed. Please check your credentials.' }), {
+      if (!tvResponse.ok) {
+        await supabaseAdmin.from('profiles').update({ is_tradingview_connected: false, updated_at: new Date().toISOString() }).eq('id', user_id);
+        const errorText = await tvResponse.text();
+        console.error("TradingView Connection Test Error:", errorText);
+        return new Response(JSON.stringify({ error: `TradingView connection failed. Please check your session cookies. (Status: ${tvResponse.status})` }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401,
         });
       }
+      
+      const tvUserData = await tvResponse.json();
+      const tradingviewUsername = tvUserData.username;
+      
+      if (!tradingviewUsername) {
+         await supabaseAdmin.from('profiles').update({ is_tradingview_connected: false, updated_at: new Date().toISOString() }).eq('id', user_id);
+         return new Response(JSON.stringify({ error: 'Could not retrieve TradingView username. Your session might be invalid.' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401,
+        });
+      }
+      // --- End of New Connection Test Logic ---
+
+      const encrypted_session = await encrypt(sessionCookie, key);
+      const encrypted_signed_session = await encrypt(signedSessionCookie, key);
+
+      const { error } = await supabaseAdmin
+        .from('profiles')
+        .update({
+          tradingview_session_cookie: encrypted_session,
+          tradingview_signed_session_cookie: encrypted_signed_session,
+          tradingview_username: tradingviewUsername, // <-- Use the username from the API
+          is_tradingview_connected: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user_id);
+
+      if (error) throw error;
+      
+      return new Response(JSON.stringify({ message: `Connection successful! Found and saved profile for TradingView user '${tradingviewUsername}'.` }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
     }
 
     if (action === 'sync-user-scripts') {
@@ -148,7 +172,7 @@ serve(async (req) => {
       
       if (!tvResponse.ok) {
         if (tvResponse.status === 404) {
-           return new Response(JSON.stringify({ error: `TradingView user '${profile.tradingview_username}' not found. Please check the username in your settings.` }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+           return new Response(JSON.stringify({ error: `TradingView user '${profile.tradingview_username}' not found or has no public scripts. Please check your username or script visibility.` }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
         }
         const errorText = await tvResponse.text();
         console.error("TradingView API Error Response:", errorText);
