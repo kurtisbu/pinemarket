@@ -1,6 +1,5 @@
 
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { DOMParser } from 'https://deno.land/x/deno_dom/deno-dom-wasm.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { decrypt } from '../utils/crypto.ts';
 
@@ -32,76 +31,88 @@ export async function syncUserScripts(
   const sessionCookie = await decrypt(profile.tradingview_session_cookie, key);
   const signedSessionCookie = await decrypt(profile.tradingview_signed_session_cookie, key);
 
-  const scriptsPageUrl = `https://www.tradingview.com/u/${profile.tradingview_username}/#published-scripts`;
-  
-  console.log(`Fetching scripts from TradingView page: ${scriptsPageUrl}`);
+  // Step 1: Fetch profile page to get numeric user ID
+  const profilePageUrl = `https://www.tradingview.com/u/${profile.tradingview_username}/`;
+  console.log(`Fetching profile page to find numeric user ID: ${profilePageUrl}`);
 
-  const tvResponse = await fetch(scriptsPageUrl, {
+  const profilePageResponse = await fetch(profilePageUrl, {
     headers: { 
       'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
     },
   });
 
-  console.log(`TradingView page scrape for ${profile.tradingview_username} - Status: ${tvResponse.status}`);
+  if (!profilePageResponse.ok) {
+    return new Response(JSON.stringify({ error: `Failed to fetch TradingView profile page (status: ${profilePageResponse.status})` }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+  }
+
+  const profilePageHtml = await profilePageResponse.text();
+
+  // Step 2: Extract numeric user ID from HTML
+  const userIdMatch = profilePageHtml.match(/"user_id":\s*(\d+)/);
+  const numericUserId = userIdMatch ? userIdMatch[1] : null;
+
+  if (!numericUserId) {
+    console.error("Could not find numeric user ID in profile page HTML.");
+    return new Response(JSON.stringify({ error: 'Could not determine TradingView numeric user ID. Unable to sync scripts.' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+  }
+
+  console.log(`Found numeric user ID: ${numericUserId} for username: ${profile.tradingview_username}`);
+  
+  // Step 3: Fetch scripts from the API endpoint
+  const scriptsApiUrl = `https://www.tradingview.com/api/v1/user/profile/charts/?script_type=all&access_script=all&privacy_script=all&by=${numericUserId}&q=`;
+  console.log(`Fetching scripts from TradingView API: ${scriptsApiUrl}`);
+
+  const tvResponse = await fetch(scriptsApiUrl, {
+    headers: { 
+      'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    },
+  });
+
+  console.log(`TradingView API call for ${profile.tradingview_username} - Status: ${tvResponse.status}`);
   
   if (!tvResponse.ok) {
     if (tvResponse.status === 404) {
-       return new Response(JSON.stringify({ error: `TradingView user '${profile.tradingview_username}' not found. Please check your username.` }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+       return new Response(JSON.stringify({ error: `TradingView user '${profile.tradingview_username}' (ID: ${numericUserId}) not found via API.` }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
     }
     const errorText = await tvResponse.text();
-    console.error("TradingView Page Scrape Error Response:", errorText);
-    return new Response(JSON.stringify({ error: `Failed to fetch scripts page from TradingView (status: ${tvResponse.status})` }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+    console.error("TradingView API Error Response:", errorText);
+    return new Response(JSON.stringify({ error: `Failed to fetch scripts from TradingView API (status: ${tvResponse.status})` }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
   }
 
-  const html = await tvResponse.text();
-  const doc = new DOMParser().parseFromString(html, 'text/html');
+  // Step 4: Parse JSON response
+  const apiData = await tvResponse.json();
+  const scriptsData = apiData.results || [];
 
-  if (!doc) {
-    return new Response(JSON.stringify({ error: 'Failed to parse TradingView page HTML.' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
-  }
-
-  const scriptElements = doc.querySelectorAll('.tv-widget-idea');
-  
-  console.log(`Found ${scriptElements.length} potential script elements on page.`);
-
-  if (scriptElements.length === 0) {
+  if (scriptsData.length === 0) {
     return new Response(JSON.stringify({ message: `Sync complete. Found 0 public scripts for '${profile.tradingview_username}'. Check if you have published scripts and they are public.` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
   }
   
-  const scripts = Array.from(scriptElements).map((el: any) => {
-      const titleEl = el.querySelector('a.tv-widget-idea__title');
-      const title = titleEl?.textContent?.trim() || 'Untitled';
-      const publicationUrl = `https://www.tradingview.com${titleEl?.getAttribute('href') || ''}`;
+  // Step 5: Map API data to our database schema
+  const scripts = scriptsData.map((script: any) => {
+      const publicationUrl = `https://www.tradingview.com${script.url}`;
       
       const scriptIdMatch = publicationUrl.match(/\/script\/([^\/]+)\//);
-      const scriptId = scriptIdMatch ? scriptIdMatch[1] : `unknown-${Math.random()}`;
+      // Use the private script ID as a fallback if regex fails
+      const scriptId = scriptIdMatch ? scriptIdMatch[1] : script.script_id_private;
       
-      const imageEl = el.querySelector('img.tv-widget-idea__cover-img');
-      const imageUrl = imageEl?.getAttribute('src');
-
-      const likesEl = el.querySelector('span[data-role="likes-count"]');
-      const likes = parseInt(likesEl?.textContent || '0', 10);
-
-      const commentsEl = el.querySelector('span[data-role="comments-count"]');
-      const reviews_count = parseInt(commentsEl?.textContent || '0', 10);
-
       return {
         user_id: user_id,
         script_id: scriptId,
-        title: title,
+        title: script.script_name || 'Untitled',
         publication_url: publicationUrl,
-        image_url: imageUrl,
-        likes: likes || 0,
-        reviews_count: reviews_count || 0,
+        image_url: script.image_url,
+        likes: script.likes_count || 0,
+        reviews_count: script.reviews_count || 0,
         last_synced_at: new Date().toISOString(),
       };
     }).filter((script: any) => script.publication_url.includes('/script/'));
   
-  console.log(`Successfully parsed ${scripts.length} scripts.`);
+  console.log(`Successfully parsed ${scripts.length} scripts from API.`);
 
   if (scripts.length > 0) {
     const { error: upsertError } = await supabaseAdmin
