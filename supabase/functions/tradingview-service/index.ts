@@ -74,7 +74,7 @@ serve(async (req) => {
       }
 
       // --- New, more robust Connection Test Logic ---
-      const testUrl = 'https://www.tradingview.com/'; // Fetch the main page
+      const testUrl = 'https://www.tradingview.com/chart/'; // A page central to the logged-in experience
       const sessionCookie = credentials.tradingview_session_cookie;
       const signedSessionCookie = credentials.tradingview_signed_session_cookie;
 
