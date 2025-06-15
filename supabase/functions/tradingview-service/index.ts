@@ -73,8 +73,8 @@ serve(async (req) => {
         });
       }
 
-      // --- New Connection Test Logic ---
-      const testUrl = 'https://www.tradingview.com/profile/';
+      // --- New, more robust Connection Test Logic ---
+      const testUrl = 'https://www.tradingview.com/'; // Fetch the main page
       const sessionCookie = credentials.tradingview_session_cookie;
       const signedSessionCookie = credentials.tradingview_signed_session_cookie;
 
@@ -83,13 +83,12 @@ serve(async (req) => {
           'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         },
-        redirect: 'manual' // Check for a redirect instead of fetching content
+        // No more 'redirect: manual'. Follow redirects normally.
       });
       
       console.log(`TradingView connection test - Status: ${tvResponse.status}`);
 
-      // We expect a redirect (301 or 302) if cookies are valid
-      if (tvResponse.status !== 301 && tvResponse.status !== 302) {
+      if (!tvResponse.ok) {
         await supabaseAdmin.from('profiles').update({ is_tradingview_connected: false, updated_at: new Date().toISOString() }).eq('id', user_id);
         const errorText = await tvResponse.text();
         console.error("TradingView Connection Test Error:", errorText.substring(0, 500));
@@ -99,22 +98,15 @@ serve(async (req) => {
         });
       }
       
-      const location = tvResponse.headers.get('location');
-      if (!location) {
-         await supabaseAdmin.from('profiles').update({ is_tradingview_connected: false, updated_at: new Date().toISOString() }).eq('id', user_id);
-         return new Response(JSON.stringify({ error: 'Could not determine TradingView profile URL from redirect.' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401,
-        });
-      }
-
-      // location is expected to be '/u/USERNAME/'
-      const usernameMatch = location.match(/\/u\/([^\/]+)\//);
-      const tradingviewUsername = usernameMatch ? usernameMatch[1] : null;
+      const html = await tvResponse.text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const body = doc?.querySelector('body');
+      const tradingviewUsername = body?.getAttribute('data-username');
 
       if (!tradingviewUsername) {
          await supabaseAdmin.from('profiles').update({ is_tradingview_connected: false, updated_at: new Date().toISOString() }).eq('id', user_id);
-         return new Response(JSON.stringify({ error: `Could not parse TradingView username from redirect URL: ${location}` }), {
+         console.error("Could not find data-username attribute on body tag.");
+         return new Response(JSON.stringify({ error: `Could not verify TradingView session. Are your cookies correct?` }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401,
         });
@@ -129,7 +121,7 @@ serve(async (req) => {
         .update({
           tradingview_session_cookie: encrypted_session,
           tradingview_signed_session_cookie: encrypted_signed_session,
-          tradingview_username: tradingviewUsername, // <-- Use the username from the redirect
+          tradingview_username: tradingviewUsername, // <-- Use the username from the page body
           is_tradingview_connected: true,
           updated_at: new Date().toISOString(),
         })
