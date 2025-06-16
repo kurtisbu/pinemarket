@@ -1,3 +1,4 @@
+
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { decrypt } from '../utils/crypto.ts';
@@ -113,14 +114,50 @@ export async function syncUserScripts(
   let scriptsData: any[] = [];
   
   if (apiData && apiData.html && typeof apiData.html === 'string') {
-    console.log("Parsing HTML content from TradingView API response based on Python script logic.");
+    console.log("=== DEBUG: Starting HTML parsing ===");
     const htmlContent = apiData.html;
-
-    // Mimic Python's `soup.find_all('div', class_='tv-feed-layout__card-item')`
-    // This regex finds each card's HTML block and is more robust than the previous split().
-    const scriptCardRegex = /<div class="[^"]*?tv-feed-layout__card-item[^"]*?">[\s\S]*?(?=<div class="[^"]*?tv-feed-layout__card-item|$)/g;
-    const scriptCards = htmlContent.match(scriptCardRegex) || [];
+    console.log(`HTML Content Length: ${htmlContent.length}`);
     
+    // Log first 1000 characters to see the structure
+    console.log("HTML Structure (first 1000 chars):", htmlContent.substring(0, 1000));
+
+    // Try multiple regex patterns based on what we see in the logs
+    const patterns = [
+      // Pattern 1: Both classes together (most specific)
+      /<div[^>]+class="[^"]*tv-feed__item[^"]*tv-feed-layout__card-item[^"]*"[^>]*>[\s\S]*?(?=<div[^>]+class="[^"]*tv-feed__item[^"]*tv-feed-layout__card-item|$)/g,
+      // Pattern 2: Either class (broader)
+      /<div[^>]+class="[^"]*tv-feed-layout__card-item[^"]*"[^>]*>[\s\S]*?(?=<div[^>]+class="[^"]*tv-feed-layout__card-item|$)/g,
+      // Pattern 3: Just the feed item class
+      /<div[^>]+class="[^"]*tv-feed__item[^"]*"[^>]*>[\s\S]*?(?=<div[^>]+class="[^"]*tv-feed__item|$)/g
+    ];
+
+    let scriptCards: string[] = [];
+    let patternUsed = -1;
+    
+    for (let i = 0; i < patterns.length; i++) {
+      console.log(`Trying pattern ${i + 1}...`);
+      scriptCards = htmlContent.match(patterns[i]) || [];
+      if (scriptCards.length > 0) {
+        console.log(`SUCCESS: Pattern ${i + 1} found ${scriptCards.length} cards`);
+        patternUsed = i;
+        break;
+      }
+    }
+    
+    if (scriptCards.length === 0) {
+      console.log("FALLBACK: Trying simple div split approach...");
+      const divSections = htmlContent.split(/<div[^>]*>/);
+      console.log(`Found ${divSections.length} div sections`);
+      
+      // Look for sections that contain script-like content
+      scriptCards = divSections.filter(section => 
+        section.includes('tv-widget-idea__title') || 
+        section.includes('published_chart_url') ||
+        section.includes('/script/')
+      );
+      console.log(`Found ${scriptCards.length} potential script sections using fallback`);
+    }
+
     const parseCount = (text: string | null | undefined): number => {
         if (!text) return 0;
         const lowerText = text.toLowerCase().replace(/,/g, '');
@@ -137,38 +174,93 @@ export async function syncUserScripts(
     };
 
     if (scriptCards.length > 0) {
-        console.log(`Found ${scriptCards.length} script cards.`);
-        scriptCards.forEach(cardHtml => {
-            // Mimic `card.find('a', class_='tv-widget-idea__title')`
-            const titleRegex = /<a[^>]+class="[^"]*tv-widget-idea__title[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/;
+        console.log(`Processing ${scriptCards.length} script cards...`);
+        
+        scriptCards.forEach((cardHtml, index) => {
+            console.log(`--- Processing card ${index + 1} ---`);
+            console.log(`Card HTML snippet (first 200 chars):`, cardHtml.substring(0, 200));
             
-            // Mimic `card.find('span', {'data-name': 'agrees'}).find('span', class_='tv-card-social-item__count')`
-            const likesRegex = /<span[^>]+data-name="agrees"[^>]*>[\s\S]*?<span[^>]+class="[^"]*tv-card-social-item__count[^"]*"[^>]*>([^<]+)<\/span>/;
+            // Multiple approaches to find the title and URL
+            const titlePatterns = [
+              // Pattern 1: tv-widget-idea__title class
+              /<a[^>]+class="[^"]*tv-widget-idea__title[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/,
+              // Pattern 2: Look for /script/ links directly
+              /<a[^>]+href="([^"]*\/script\/[^"]*)"[^>]*>([\s\S]*?)<\/a>/,
+              // Pattern 3: Look in data attributes
+              /published_chart_url[^:]*:\s*"([^"]+)"[^}]*name[^:]*:\s*"([^"]+)"/
+            ];
 
-            const titleMatch = cardHtml.match(titleRegex);
-            const likesMatch = cardHtml.match(likesRegex);
+            let titleMatch = null;
+            let patternIndex = -1;
+            
+            for (let i = 0; i < titlePatterns.length; i++) {
+              titleMatch = cardHtml.match(titlePatterns[i]);
+              if (titleMatch && titleMatch[1]) {
+                console.log(`Title found using pattern ${i + 1}: URL=${titleMatch[1]}, Title=${titleMatch[2] || 'N/A'}`);
+                patternIndex = i;
+                break;
+              }
+            }
+            
+            // Look for likes count
+            const likesPatterns = [
+              /<span[^>]+data-name="agrees"[^>]*>[\s\S]*?<span[^>]+class="[^"]*tv-card-social-item__count[^"]*"[^>]*>([^<]+)<\/span>/,
+              /data-name="agrees"[^>]*>[\s\S]*?(\d+)/,
+              /"agrees":\s*(\d+)/
+            ];
+            
+            let likesMatch = null;
+            for (const pattern of likesPatterns) {
+              likesMatch = cardHtml.match(pattern);
+              if (likesMatch && likesMatch[1]) {
+                console.log(`Likes found: ${likesMatch[1]}`);
+                break;
+              }
+            }
 
-            if (titleMatch && titleMatch[1] && titleMatch[2]) {
-                const scriptUrl = "https://www.tradingview.com" + titleMatch[1];
-                const scriptTitle = titleMatch[2].replace(/<[^>]*>?/gm, '').trim();
+            if (titleMatch && titleMatch[1]) {
+                let scriptUrl = titleMatch[1];
+                if (!scriptUrl.startsWith('http')) {
+                  scriptUrl = "https://www.tradingview.com" + scriptUrl;
+                }
+                
+                let scriptTitle = titleMatch[2] || 'Untitled Script';
+                if (patternIndex === 2) {
+                  // For data attribute pattern, title is in position 2
+                  scriptTitle = titleMatch[2] || 'Untitled Script';
+                }
+                
+                scriptTitle = scriptTitle.replace(/<[^>]*>/g, '').trim();
                 const likesCount = parseCount(likesMatch ? likesMatch[1] : '0');
 
-                console.log(`Parsed Script: Title=${scriptTitle}, Likes=${likesCount}, URL=${scriptUrl}`);
+                console.log(`✓ Successfully parsed: Title="${scriptTitle}", Likes=${likesCount}, URL=${scriptUrl}`);
 
                 scriptsData.push({
                     script_name: scriptTitle,
                     url: scriptUrl,
-                    image_url: null, // Not available via this scraping method
+                    image_url: null,
                     likes_count: likesCount,
-                    reviews_count: 0, // Not available via this scraping method
+                    reviews_count: 0,
                     script_id_private: null
                 });
             } else {
-               console.log("A script card was found but some details could not be parsed. Card HTML snippet:", cardHtml.substring(0, 300));
+               console.log(`✗ Could not extract script info from card ${index + 1}`);
+               console.log(`Card content (first 500 chars):`, cardHtml.substring(0, 500));
             }
         });
     } else {
-        console.log("Could not find any script cards with class 'tv-feed-layout__card-item'. HTML structure has likely changed. Full HTML length:", htmlContent.length);
+        console.log("ERROR: No script cards found with any pattern");
+        console.log("Searching for any /script/ URLs in the HTML...");
+        const scriptUrlMatches = htmlContent.match(/\/script\/[^"'\s>]+/g) || [];
+        console.log(`Found ${scriptUrlMatches.length} script URLs:`, scriptUrlMatches.slice(0, 5));
+        
+        console.log("Searching for tv-widget-idea__title classes...");
+        const titleMatches = htmlContent.match(/tv-widget-idea__title/g) || [];
+        console.log(`Found ${titleMatches.length} title elements`);
+        
+        console.log("Searching for any div classes containing 'card' or 'item'...");
+        const cardClassMatches = htmlContent.match(/class="[^"]*(?:card|item)[^"]*"/g) || [];
+        console.log(`Found ${cardClassMatches.length} potential card classes:`, cardClassMatches.slice(0, 10));
     }
   } else if (apiData && apiData.results) {
     console.log("Parsing JSON 'results' from TradingView API response.");
@@ -178,6 +270,8 @@ export async function syncUserScripts(
       scriptsData = Object.values(apiData.results);
     }
   }
+
+  console.log(`=== FINAL RESULT: Found ${scriptsData.length} scripts ===`);
 
   if (scriptsData.length === 0) {
     return new Response(JSON.stringify({ message: `Sync complete. Found 0 scripts for '${profile.tradingview_username}'. Check if you have published scripts.` }), {
