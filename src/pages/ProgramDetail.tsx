@@ -166,7 +166,11 @@ const ProgramDetail = () => {
           {/* Sidebar */}
           <div className="space-y-6">
             <DeliveryInfo program={program} />
-            <PurchaseCard price={program.price} />
+            <PurchaseCard 
+              price={program.price} 
+              programId={program.id}
+              sellerId={program.seller_id}
+            />
             <SellerInfo program={program} onViewProfile={handleViewProfile} />
           </div>
         </div>
