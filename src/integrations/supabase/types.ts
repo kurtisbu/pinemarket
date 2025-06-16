@@ -18,6 +18,10 @@ export type Database = {
           id: string
           is_tradingview_connected: boolean
           role: string | null
+          stripe_account_id: string | null
+          stripe_charges_enabled: boolean | null
+          stripe_onboarding_completed: boolean | null
+          stripe_payouts_enabled: boolean | null
           tradingview_session_cookie: string | null
           tradingview_signed_session_cookie: string | null
           tradingview_username: string | null
@@ -32,6 +36,10 @@ export type Database = {
           id: string
           is_tradingview_connected?: boolean
           role?: string | null
+          stripe_account_id?: string | null
+          stripe_charges_enabled?: boolean | null
+          stripe_onboarding_completed?: boolean | null
+          stripe_payouts_enabled?: boolean | null
           tradingview_session_cookie?: string | null
           tradingview_signed_session_cookie?: string | null
           tradingview_username?: string | null
@@ -46,6 +54,10 @@ export type Database = {
           id?: string
           is_tradingview_connected?: boolean
           role?: string | null
+          stripe_account_id?: string | null
+          stripe_charges_enabled?: boolean | null
+          stripe_onboarding_completed?: boolean | null
+          stripe_payouts_enabled?: boolean | null
           tradingview_session_cookie?: string | null
           tradingview_signed_session_cookie?: string | null
           tradingview_username?: string | null

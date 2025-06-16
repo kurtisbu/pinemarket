@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Header from '@/components/Header';
+import StripeConnectSettings from '@/components/StripeConnectSettings';
 import { Upload, User, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -133,18 +134,15 @@ const ProfileSettings = () => {
         description: data.message,
       });
 
-      // Clear cookie fields from state for security
       setFormData(prev => ({
         ...prev,
         tradingview_session_cookie: '',
         tradingview_signed_session_cookie: '',
       }));
 
-      // Refetch profile to get updated username and connection status
       await fetchProfile();
 
     } catch (error: any) {
-      // No need to set is_tradingview_connected to false here, fetchProfile will handle it on next load if needed.
       toast({
         title: 'Connection Test Failed',
         description: error.message,
@@ -170,9 +168,6 @@ const ProfileSettings = () => {
         updated_at: new Date().toISOString(),
       };
 
-      // Cookie data is now handled by the 'tradingview-service' edge function
-      // and is no longer part of this form submission for security reasons.
-
       const { error } = await supabase
         .from('profiles')
         .upsert(updateData);
@@ -184,7 +179,6 @@ const ProfileSettings = () => {
         description: 'Your profile settings have been successfully updated.',
       });
 
-      // Clear cookie fields from state for security
       setFormData(prev => ({
         ...prev,
         tradingview_session_cookie: '',
@@ -262,6 +256,8 @@ const ProfileSettings = () => {
             </CardContent>
           </Card>
 
+          <StripeConnectSettings />
+
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -272,7 +268,7 @@ const ProfileSettings = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-               <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 Connect your TradingView account to automate script assignments for your buyers.
                 Your credentials will be securely stored.
               </p>
