@@ -1,20 +1,51 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import AdminScriptAssignments from '@/components/AdminScriptAssignments';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { supabase } from '@/integrations/supabase/client';
 
 const AdminDashboard: React.FC = () => {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
+  const [profile, setProfile] = useState<{ role: string } | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Redirect if not authenticated or not admin
+  useEffect(() => {
+    if (user) {
+      const fetchProfile = async () => {
+        const { data } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        
+        setProfile(data);
+        setLoading(false);
+      };
+      fetchProfile();
+    } else {
+      setLoading(false);
+    }
+  }, [user]);
+
+  // Redirect if not authenticated
   if (!user) {
     return <Navigate to="/auth" replace />;
   }
 
+  // Show loading while checking permissions
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div>Loading...</div>
+      </div>
+    );
+  }
+
+  // Redirect if not admin
   if (!profile || profile.role !== 'admin') {
     return <Navigate to="/" replace />;
   }

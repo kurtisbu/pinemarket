@@ -18,7 +18,7 @@ interface ScriptAssignment {
   tradingview_script_id: string;
   pine_id: string;
   tradingview_username: string;
-  status: 'pending' | 'assigned' | 'failed';
+  status: 'pending' | 'assigned' | 'failed' | 'expired';
   assignment_attempts: number;
   last_attempt_at: string | null;
   assigned_at: string | null;
@@ -43,7 +43,7 @@ const AdminScriptAssignments: React.FC = () => {
   const [assignments, setAssignments] = useState<ScriptAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'assigned' | 'failed'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'assigned' | 'failed' | 'expired'>('all');
 
   const fetchAssignments = async () => {
     setLoading(true);
@@ -112,6 +112,8 @@ const AdminScriptAssignments: React.FC = () => {
         return <CheckCircle className="w-4 h-4 text-green-500" />;
       case 'failed':
         return <AlertCircle className="w-4 h-4 text-red-500" />;
+      case 'expired':
+        return <AlertCircle className="w-4 h-4 text-orange-500" />;
       case 'pending':
         return <Clock className="w-4 h-4 text-yellow-500" />;
       default:
@@ -120,7 +122,14 @@ const AdminScriptAssignments: React.FC = () => {
   };
 
   const getStatusBadge = (status: string) => {
-    const variant = status === 'assigned' ? 'default' : status === 'failed' ? 'destructive' : 'secondary';
+    let variant: 'default' | 'destructive' | 'secondary' = 'secondary';
+    
+    if (status === 'assigned') {
+      variant = 'default';
+    } else if (status === 'failed' || status === 'expired') {
+      variant = 'destructive';
+    }
+    
     return (
       <Badge variant={variant} className="flex items-center gap-1">
         {getStatusIcon(status)}
@@ -138,6 +147,7 @@ const AdminScriptAssignments: React.FC = () => {
     pending: assignments.filter(a => a.status === 'pending').length,
     assigned: assignments.filter(a => a.status === 'assigned').length,
     failed: assignments.filter(a => a.status === 'failed').length,
+    expired: assignments.filter(a => a.status === 'expired').length,
   };
 
   return (
@@ -151,11 +161,11 @@ const AdminScriptAssignments: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4 text-center">
             <div className="text-2xl font-bold">{stats.total}</div>
-            <div className="text-sm text-muted-foreground">Total Assignments</div>
+            <div className="text-sm text-muted-foreground">Total</div>
           </CardContent>
         </Card>
         <Card>
@@ -176,6 +186,12 @@ const AdminScriptAssignments: React.FC = () => {
             <div className="text-sm text-muted-foreground">Failed</div>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-orange-500">{stats.expired}</div>
+            <div className="text-sm text-muted-foreground">Expired</div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filter Tabs */}
@@ -185,6 +201,7 @@ const AdminScriptAssignments: React.FC = () => {
           <TabsTrigger value="pending">Pending ({stats.pending})</TabsTrigger>
           <TabsTrigger value="assigned">Assigned ({stats.assigned})</TabsTrigger>
           <TabsTrigger value="failed">Failed ({stats.failed})</TabsTrigger>
+          <TabsTrigger value="expired">Expired ({stats.expired})</TabsTrigger>
         </TabsList>
 
         <TabsContent value={filter} className="space-y-4">
@@ -264,7 +281,7 @@ const AdminScriptAssignments: React.FC = () => {
                         Created: {new Date(assignment.created_at).toLocaleString()}
                       </div>
                       <div className="flex gap-2">
-                        {assignment.status === 'failed' && (
+                        {(assignment.status === 'failed' || assignment.status === 'expired') && (
                           <Button
                             size="sm"
                             onClick={() => handleRetryAssignment(assignment)}
