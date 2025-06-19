@@ -66,12 +66,16 @@ serve(async (req) => {
       case 'confirm-purchase': {
         const { payment_intent_id, program_id, tradingview_username } = payload;
 
+        // Enhanced logging for debugging
+        console.log(`[PURCHASE CONFIRMATION] Starting purchase confirmation for payment_intent: ${payment_intent_id}, program: ${program_id}, username: ${tradingview_username}`);
+
         // Get current user
         const authHeader = req.headers.get('Authorization')!;
         const token = authHeader.replace('Bearer ', '');
         const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
         if (authError || !user) {
+          console.error(`[PURCHASE CONFIRMATION] Authentication failed: ${authError?.message}`);
           throw new Error('Authentication required');
         }
 
@@ -83,11 +87,14 @@ serve(async (req) => {
           .single();
 
         if (programError || !program) {
+          console.error(`[PURCHASE CONFIRMATION] Program not found: ${programError?.message}`);
           throw new Error('Program not found');
         }
 
         // Calculate fees
         const platformFee = Math.round(program.price * 0.10 * 100) / 100;
+
+        console.log(`[PURCHASE CONFIRMATION] Creating purchase record for buyer: ${user.id}, seller: ${program.seller_id}, amount: ${program.price}`);
 
         // Create purchase record
         const { data: purchase, error: purchaseError } = await supabaseAdmin
@@ -106,13 +113,16 @@ serve(async (req) => {
           .single();
 
         if (purchaseError) {
+          console.error(`[PURCHASE CONFIRMATION] Failed to create purchase record: ${purchaseError.message}`);
           throw new Error('Failed to create purchase record');
         }
 
-        console.log('Purchase created successfully:', purchase.id);
+        console.log(`[PURCHASE CONFIRMATION] Purchase created successfully: ${purchase.id}`);
 
-        // Enhanced script assignment logic
+        // Enhanced script assignment logic with comprehensive logging
         if (tradingview_username?.trim()) {
+          console.log(`[SCRIPT ASSIGNMENT] Starting assignment process for username: ${tradingview_username}`);
+          
           // Get seller's TradingView script for this program
           const { data: script, error: scriptError } = await supabaseAdmin
             .from('tradingview_scripts')
@@ -122,11 +132,21 @@ serve(async (req) => {
             .single();
 
           if (scriptError) {
-            console.error('Error fetching script:', scriptError);
+            console.error(`[SCRIPT ASSIGNMENT] Error fetching script: ${scriptError.message}`);
+            
+            // Log assignment failure in database
+            await supabaseAdmin
+              .from('assignment_logs')
+              .insert({
+                purchase_id: purchase.id,
+                log_level: 'error',
+                message: `Script not found: ${scriptError.message}`,
+                details: { script_id: program.tradingview_script_id, seller_id: program.seller_id }
+              });
           }
 
           if (script && script.pine_id) {
-            console.log(`Creating script assignment for purchase ${purchase.id}`);
+            console.log(`[SCRIPT ASSIGNMENT] Creating script assignment for purchase ${purchase.id}, pine_id: ${script.pine_id}`);
             
             // Create script assignment record
             const { data: assignment, error: assignmentError } = await supabaseAdmin
@@ -145,13 +165,34 @@ serve(async (req) => {
               .single();
 
             if (assignmentError) {
-              console.error('Failed to create script assignment:', assignmentError);
+              console.error(`[SCRIPT ASSIGNMENT] Failed to create script assignment: ${assignmentError.message}`);
+              
+              // Log assignment failure
+              await supabaseAdmin
+                .from('assignment_logs')
+                .insert({
+                  purchase_id: purchase.id,
+                  log_level: 'error',
+                  message: `Failed to create assignment record: ${assignmentError.message}`,
+                  details: { assignment_error: assignmentError }
+                });
             } else if (assignment) {
-              console.log(`Script assignment created: ${assignment.id}`);
+              console.log(`[SCRIPT ASSIGNMENT] Assignment record created: ${assignment.id}`);
+              
+              // Log assignment creation
+              await supabaseAdmin
+                .from('assignment_logs')
+                .insert({
+                  assignment_id: assignment.id,
+                  purchase_id: purchase.id,
+                  log_level: 'info',
+                  message: 'Assignment record created successfully',
+                  details: { pine_id: script.pine_id, username: tradingview_username }
+                });
               
               // Trigger automatic script assignment with enhanced error handling
               try {
-                console.log(`Triggering assignment for pine_id: ${script.pine_id}, username: ${tradingview_username}`);
+                console.log(`[SCRIPT ASSIGNMENT] Invoking TradingView service for assignment: ${assignment.id}`);
                 
                 const { data: assignmentResult, error: assignmentServiceError } = await supabaseAdmin.functions.invoke('tradingview-service', {
                   body: {
@@ -163,8 +204,9 @@ serve(async (req) => {
                 });
 
                 if (assignmentServiceError) {
-                  console.error('Assignment service error:', assignmentServiceError);
-                  // Update assignment with error
+                  console.error(`[SCRIPT ASSIGNMENT] Service error: ${assignmentServiceError.message}`);
+                  
+                  // Update assignment with error and log
                   await supabaseAdmin
                     .from('script_assignments')
                     .update({
@@ -173,12 +215,33 @@ serve(async (req) => {
                       last_attempt_at: new Date().toISOString(),
                     })
                     .eq('id', assignment.id);
+
+                  await supabaseAdmin
+                    .from('assignment_logs')
+                    .insert({
+                      assignment_id: assignment.id,
+                      purchase_id: purchase.id,
+                      log_level: 'error',
+                      message: 'TradingView service invocation failed',
+                      details: { service_error: assignmentServiceError.message }
+                    });
                 } else {
-                  console.log('Assignment service response:', assignmentResult);
+                  console.log(`[SCRIPT ASSIGNMENT] Service response: ${JSON.stringify(assignmentResult)}`);
+                  
+                  await supabaseAdmin
+                    .from('assignment_logs')
+                    .insert({
+                      assignment_id: assignment.id,
+                      purchase_id: purchase.id,
+                      log_level: 'info',
+                      message: 'TradingView service invoked successfully',
+                      details: { service_response: assignmentResult }
+                    });
                 }
               } catch (assignError: any) {
-                console.error('Failed to trigger script assignment:', assignError);
-                // Update assignment with error
+                console.error(`[SCRIPT ASSIGNMENT] Assignment trigger failed: ${assignError.message}`);
+                
+                // Update assignment with error and log
                 await supabaseAdmin
                   .from('script_assignments')
                   .update({
@@ -187,13 +250,41 @@ serve(async (req) => {
                     last_attempt_at: new Date().toISOString(),
                   })
                   .eq('id', assignment.id);
+
+                await supabaseAdmin
+                  .from('assignment_logs')
+                  .insert({
+                    assignment_id: assignment.id,
+                    purchase_id: purchase.id,
+                    log_level: 'error',
+                    message: 'Assignment trigger failed',
+                    details: { trigger_error: assignError.message, stack: assignError.stack }
+                  });
               }
             }
           } else {
-            console.log('No script found or missing pine_id for assignment');
+            console.log(`[SCRIPT ASSIGNMENT] No script found or missing pine_id for assignment`);
+            
+            await supabaseAdmin
+              .from('assignment_logs')
+              .insert({
+                purchase_id: purchase.id,
+                log_level: 'warning',
+                message: 'No script found or missing pine_id',
+                details: { script_available: !!script, pine_id: script?.pine_id }
+              });
           }
         } else {
-          console.log('No TradingView username provided, skipping assignment');
+          console.log(`[SCRIPT ASSIGNMENT] No TradingView username provided, skipping assignment`);
+          
+          await supabaseAdmin
+            .from('assignment_logs')
+            .insert({
+              purchase_id: purchase.id,
+              log_level: 'info',
+              message: 'No TradingView username provided, assignment skipped',
+              details: { username_provided: false }
+            });
         }
 
         return new Response(JSON.stringify({
