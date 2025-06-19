@@ -144,10 +144,13 @@ export type Database = {
           created_at: string
           id: string
           payment_intent_id: string | null
+          platform_fee: number
           program_id: string
           purchased_at: string
           seller_id: string
           status: Database["public"]["Enums"]["purchase_status"]
+          stripe_transfer_id: string | null
+          tradingview_username: string | null
           updated_at: string
         }
         Insert: {
@@ -156,10 +159,13 @@ export type Database = {
           created_at?: string
           id?: string
           payment_intent_id?: string | null
+          platform_fee?: number
           program_id: string
           purchased_at?: string
           seller_id: string
           status?: Database["public"]["Enums"]["purchase_status"]
+          stripe_transfer_id?: string | null
+          tradingview_username?: string | null
           updated_at?: string
         }
         Update: {
@@ -168,10 +174,13 @@ export type Database = {
           created_at?: string
           id?: string
           payment_intent_id?: string | null
+          platform_fee?: number
           program_id?: string
           purchased_at?: string
           seller_id?: string
           status?: Database["public"]["Enums"]["purchase_status"]
+          stripe_transfer_id?: string | null
+          tradingview_username?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -201,44 +210,59 @@ export type Database = {
       script_assignments: {
         Row: {
           assigned_at: string | null
+          assignment_attempts: number
+          assignment_details: Json | null
           buyer_id: string
           created_at: string
           error_message: string | null
           id: string
+          last_attempt_at: string | null
+          pine_id: string | null
           program_id: string
           purchase_id: string
           retry_count: number
           seller_id: string
           status: Database["public"]["Enums"]["assignment_status"]
           tradingview_script_id: string | null
+          tradingview_username: string | null
           updated_at: string
         }
         Insert: {
           assigned_at?: string | null
+          assignment_attempts?: number
+          assignment_details?: Json | null
           buyer_id: string
           created_at?: string
           error_message?: string | null
           id?: string
+          last_attempt_at?: string | null
+          pine_id?: string | null
           program_id: string
           purchase_id: string
           retry_count?: number
           seller_id: string
           status?: Database["public"]["Enums"]["assignment_status"]
           tradingview_script_id?: string | null
+          tradingview_username?: string | null
           updated_at?: string
         }
         Update: {
           assigned_at?: string | null
+          assignment_attempts?: number
+          assignment_details?: Json | null
           buyer_id?: string
           created_at?: string
           error_message?: string | null
           id?: string
+          last_attempt_at?: string | null
+          pine_id?: string | null
           program_id?: string
           purchase_id?: string
           retry_count?: number
           seller_id?: string
           status?: Database["public"]["Enums"]["assignment_status"]
           tradingview_script_id?: string | null
+          tradingview_username?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -279,6 +303,7 @@ export type Database = {
           image_url: string | null
           last_synced_at: string
           likes: number
+          pine_id: string | null
           publication_url: string
           reviews_count: number
           script_id: string
@@ -292,6 +317,7 @@ export type Database = {
           image_url?: string | null
           last_synced_at?: string
           likes?: number
+          pine_id?: string | null
           publication_url: string
           reviews_count?: number
           script_id: string
@@ -305,6 +331,7 @@ export type Database = {
           image_url?: string | null
           last_synced_at?: string
           likes?: number
+          pine_id?: string | null
           publication_url?: string
           reviews_count?: number
           script_id?: string

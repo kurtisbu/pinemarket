@@ -233,7 +233,11 @@ export async function syncUserScripts(
                 scriptTitle = scriptTitle.replace(/<[^>]*>/g, '').trim();
                 const likesCount = parseCount(likesMatch ? likesMatch[1] : '0');
 
-                console.log(`✓ Successfully parsed: Title="${scriptTitle}", Likes=${likesCount}, URL=${scriptUrl}`);
+                // Extract pine_id from URL (between /script/ and /)
+                const pineIdMatch = scriptUrl.match(/\/script\/([^\/]+)\//);
+                const pineId = pineIdMatch ? pineIdMatch[1] : null;
+
+                console.log(`✓ Successfully parsed: Title="${scriptTitle}", Likes=${likesCount}, URL=${scriptUrl}, Pine ID=${pineId}`);
 
                 scriptsData.push({
                     script_name: scriptTitle,
@@ -241,7 +245,8 @@ export async function syncUserScripts(
                     image_url: null,
                     likes_count: likesCount,
                     reviews_count: 0,
-                    script_id_private: null
+                    script_id_private: null,
+                    pine_id: pineId
                 });
             } else {
                console.log(`✗ Could not extract script info from card ${index + 1}`);
@@ -295,6 +300,7 @@ export async function syncUserScripts(
         image_url: script.image_url,
         likes: script.likes_count || 0,
         reviews_count: script.reviews_count || 0,
+        pine_id: script.pine_id || scriptId, // Use pine_id if available, fallback to script_id
         last_synced_at: new Date().toISOString(),
       };
     }).filter((script: any) => script.publication_url.includes('/script/'));

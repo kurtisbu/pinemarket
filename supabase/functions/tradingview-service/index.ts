@@ -4,6 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { testConnection } from './actions/testConnection.ts';
 import { syncUserScripts } from './actions/syncUserScripts.ts';
+import { assignScriptAccess } from './actions/assignScriptAccess.ts';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -36,6 +37,8 @@ serve(async (req) => {
         return await testConnection(payload, supabaseAdmin, key);
       case 'sync-user-scripts':
         return await syncUserScripts(payload, supabaseAdmin, key);
+      case 'assign-script-access':
+        return await assignScriptAccess(payload, supabaseAdmin, key);
       default:
         return new Response(JSON.stringify({ error: 'Invalid action.' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
