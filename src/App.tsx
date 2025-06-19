@@ -13,6 +13,7 @@ import ProfileSettings from "./pages/ProfileSettings";
 import SellScript from "./pages/SellScript";
 import MyPrograms from "./pages/MyPrograms";
 import EditProgram from "./pages/EditProgram";
+import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +34,7 @@ const App = () => (
           <Route path="/sell-script" element={<SellScript />} />
           <Route path="/my-programs" element={<MyPrograms />} />
           <Route path="/edit-program/:id" element={<EditProgram />} />
+          <Route path="/admin" element={<AdminDashboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
