@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -110,52 +109,91 @@ serve(async (req) => {
           throw new Error('Failed to create purchase record');
         }
 
-        // Get seller's TradingView script for this program
-        const { data: script, error: scriptError } = await supabaseAdmin
-          .from('tradingview_scripts')
-          .select('*')
-          .eq('user_id', program.seller_id)
-          .eq('script_id', program.tradingview_script_id)
-          .single();
+        console.log('Purchase created successfully:', purchase.id);
 
-        if (script && script.pine_id && tradingview_username) {
-          // Create script assignment record
-          const { data: assignment, error: assignmentError } = await supabaseAdmin
-            .from('script_assignments')
-            .insert({
-              purchase_id: purchase.id,
-              buyer_id: user.id,
-              seller_id: program.seller_id,
-              program_id: program_id,
-              tradingview_script_id: script.script_id,
-              pine_id: script.pine_id,
-              tradingview_username: tradingview_username,
-              status: 'pending',
-            })
-            .select()
+        // Enhanced script assignment logic
+        if (tradingview_username?.trim()) {
+          // Get seller's TradingView script for this program
+          const { data: script, error: scriptError } = await supabaseAdmin
+            .from('tradingview_scripts')
+            .select('*')
+            .eq('user_id', program.seller_id)
+            .eq('script_id', program.tradingview_script_id)
             .single();
 
-          if (!assignmentError && assignment) {
-            // Trigger automatic script assignment
-            try {
-              const { data: assignmentResult, error: assignmentServiceError } = await supabaseAdmin.functions.invoke('tradingview-service', {
-                body: {
-                  action: 'assign-script-access',
-                  pine_id: script.pine_id,
-                  tradingview_username: tradingview_username,
-                  assignment_id: assignment.id,
-                },
-              });
-
-              console.log('Script assignment result:', assignmentResult);
-              if (assignmentServiceError) {
-                console.error('Script assignment failed:', assignmentServiceError);
-              }
-            } catch (assignError) {
-              console.error('Failed to trigger script assignment:', assignError);
-              // Don't fail the purchase if assignment fails - it can be retried
-            }
+          if (scriptError) {
+            console.error('Error fetching script:', scriptError);
           }
+
+          if (script && script.pine_id) {
+            console.log(`Creating script assignment for purchase ${purchase.id}`);
+            
+            // Create script assignment record
+            const { data: assignment, error: assignmentError } = await supabaseAdmin
+              .from('script_assignments')
+              .insert({
+                purchase_id: purchase.id,
+                buyer_id: user.id,
+                seller_id: program.seller_id,
+                program_id: program_id,
+                tradingview_script_id: script.script_id,
+                pine_id: script.pine_id,
+                tradingview_username: tradingview_username.trim(),
+                status: 'pending',
+              })
+              .select()
+              .single();
+
+            if (assignmentError) {
+              console.error('Failed to create script assignment:', assignmentError);
+            } else if (assignment) {
+              console.log(`Script assignment created: ${assignment.id}`);
+              
+              // Trigger automatic script assignment with enhanced error handling
+              try {
+                console.log(`Triggering assignment for pine_id: ${script.pine_id}, username: ${tradingview_username}`);
+                
+                const { data: assignmentResult, error: assignmentServiceError } = await supabaseAdmin.functions.invoke('tradingview-service', {
+                  body: {
+                    action: 'assign-script-access',
+                    pine_id: script.pine_id,
+                    tradingview_username: tradingview_username.trim(),
+                    assignment_id: assignment.id,
+                  },
+                });
+
+                if (assignmentServiceError) {
+                  console.error('Assignment service error:', assignmentServiceError);
+                  // Update assignment with error
+                  await supabaseAdmin
+                    .from('script_assignments')
+                    .update({
+                      status: 'failed',
+                      error_message: `Service error: ${assignmentServiceError.message}`,
+                      last_attempt_at: new Date().toISOString(),
+                    })
+                    .eq('id', assignment.id);
+                } else {
+                  console.log('Assignment service response:', assignmentResult);
+                }
+              } catch (assignError: any) {
+                console.error('Failed to trigger script assignment:', assignError);
+                // Update assignment with error
+                await supabaseAdmin
+                  .from('script_assignments')
+                  .update({
+                    status: 'failed',
+                    error_message: `Assignment trigger failed: ${assignError.message}`,
+                    last_attempt_at: new Date().toISOString(),
+                  })
+                  .eq('id', assignment.id);
+              }
+            }
+          } else {
+            console.log('No script found or missing pine_id for assignment');
+          }
+        } else {
+          console.log('No TradingView username provided, skipping assignment');
         }
 
         return new Response(JSON.stringify({
