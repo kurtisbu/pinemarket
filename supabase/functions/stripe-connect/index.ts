@@ -1,11 +1,11 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import Stripe from 'https://esm.sh/stripe@14.21.0';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 
-const stripe = Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
-  httpClient: Stripe.createFetchHttpClient(),
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
+  apiVersion: '2023-10-16',
 });
-const cryptoProvider = Stripe.createSubtleCryptoProvider();
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -21,6 +21,137 @@ serve(async (req) => {
     const { action, ...payload } = await req.json();
 
     switch (action) {
+      case 'create-connect-account': {
+        const { country = 'US' } = payload;
+        
+        console.log(`[STRIPE CONNECT] Creating account for country: ${country}`);
+        
+        // Get authenticated user
+        const authHeader = req.headers.get('Authorization')!;
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+        if (authError || !user) {
+          console.error(`[STRIPE CONNECT] Authentication failed: ${authError?.message}`);
+          throw new Error('Authentication required');
+        }
+
+        // Create Stripe Connect account
+        const account = await stripe.accounts.create({
+          type: 'express',
+          country: country,
+          email: user.email,
+          capabilities: {
+            card_payments: { requested: true },
+            transfers: { requested: true },
+          },
+        });
+
+        console.log(`[STRIPE CONNECT] Account created: ${account.id}`);
+
+        // Update user profile with Stripe account ID
+        const { error: updateError } = await supabaseAdmin
+          .from('profiles')
+          .update({
+            stripe_account_id: account.id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', user.id);
+
+        if (updateError) {
+          console.error(`[STRIPE CONNECT] Failed to update profile: ${updateError.message}`);
+          throw new Error('Failed to update profile');
+        }
+
+        return new Response(JSON.stringify({
+          success: true,
+          account_id: account.id,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        });
+      }
+
+      case 'create-account-link': {
+        const { account_id, refresh_url, return_url } = payload;
+        
+        console.log(`[STRIPE CONNECT] Creating account link for: ${account_id}`);
+
+        const accountLink = await stripe.accountLinks.create({
+          account: account_id,
+          refresh_url: refresh_url,
+          return_url: return_url,
+          type: 'account_onboarding',
+        });
+
+        console.log(`[STRIPE CONNECT] Account link created: ${accountLink.url}`);
+
+        return new Response(JSON.stringify({
+          success: true,
+          url: accountLink.url,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        });
+      }
+
+      case 'create-dashboard-link': {
+        const { account_id } = payload;
+        
+        console.log(`[STRIPE CONNECT] Creating dashboard link for: ${account_id}`);
+
+        const loginLink = await stripe.accounts.createLoginLink(account_id);
+
+        console.log(`[STRIPE CONNECT] Dashboard link created: ${loginLink.url}`);
+
+        return new Response(JSON.stringify({
+          success: true,
+          url: loginLink.url,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        });
+      }
+
+      case 'get-account-status': {
+        const { account_id } = payload;
+        
+        console.log(`[STRIPE CONNECT] Getting account status for: ${account_id}`);
+
+        const account = await stripe.accounts.retrieve(account_id);
+
+        console.log(`[STRIPE CONNECT] Account status retrieved for: ${account_id}`);
+
+        // Get authenticated user to update their profile
+        const authHeader = req.headers.get('Authorization')!;
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+        if (!authError && user) {
+          // Update profile with current Stripe status
+          await supabaseAdmin
+            .from('profiles')
+            .update({
+              stripe_onboarding_completed: account.details_submitted,
+              stripe_charges_enabled: account.charges_enabled,
+              stripe_payouts_enabled: account.payouts_enabled,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', user.id);
+        }
+
+        return new Response(JSON.stringify({
+          success: true,
+          details_submitted: account.details_submitted,
+          charges_enabled: account.charges_enabled,
+          payouts_enabled: account.payouts_enabled,
+          requirements: account.requirements,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        });
+      }
+
       case 'create-payment-intent': {
         const { program_id, amount, tradingview_username } = payload;
         
