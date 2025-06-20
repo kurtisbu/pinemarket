@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Search, User, ShoppingCart, LogOut, Settings, LayoutDashboard } from 'lucide-react';
+import { Search, User, ShoppingCart, LogOut, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
@@ -52,16 +52,6 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
-  };
-
-  const handleViewProfile = () => {
-    if (profile?.username) {
-      navigate(`/profile/${profile.username}`);
-    }
-  };
-
-  const handleSettings = () => {
-    navigate('/settings/profile');
   };
 
   const handleDashboard = () => {
@@ -147,21 +137,11 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  {profile?.username && (
-                    <DropdownMenuItem onClick={handleViewProfile}>
-                      <User className="w-4 h-4 mr-2" />
-                      View Profile
-                    </DropdownMenuItem>
-                  )}
                   <DropdownMenuItem onClick={handleDashboard}>
                     <LayoutDashboard className="w-4 h-4 mr-2" />
                     Dashboard
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSettings}>
-                    <Settings className="w-4 h-4 mr-2" />
-                    Settings
-                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleSignOut}>
                     <LogOut className="w-4 h-4 mr-2" />
                     Sign out
