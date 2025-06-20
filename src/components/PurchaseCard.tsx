@@ -23,6 +23,10 @@ const PurchaseCard: React.FC<PurchaseCardProps> = ({ price, programId, sellerId 
   const [loading, setLoading] = useState(false);
   const [tradingviewUsername, setTradingviewUsername] = useState('');
 
+  // Calculate fees for display
+  const serviceFee = Math.round(price * 0.05 * 100) / 100; // 5% service fee
+  const totalPrice = price + serviceFee;
+
   const handlePurchase = async () => {
     if (!user) {
       toast({
@@ -59,7 +63,7 @@ const PurchaseCard: React.FC<PurchaseCardProps> = ({ price, programId, sellerId 
         body: {
           action: 'create-payment-intent',
           program_id: programId,
-          amount: price,
+          amount: price, // Original price (before service fee)
           tradingview_username: tradingviewUsername.trim(),
         },
       });
@@ -69,7 +73,7 @@ const PurchaseCard: React.FC<PurchaseCardProps> = ({ price, programId, sellerId 
       // In a real implementation, you would integrate with Stripe Elements
       // For now, we'll simulate the payment process
       const confirmPayment = confirm(
-        `This will charge $${price} to your payment method and grant access to TradingView username "${tradingviewUsername}". Continue?`
+        `This will charge $${totalPrice.toFixed(2)} (including $${serviceFee.toFixed(2)} service fee) to your payment method and grant access to TradingView username "${tradingviewUsername}". Continue?`
       );
 
       if (confirmPayment) {
@@ -111,7 +115,14 @@ const PurchaseCard: React.FC<PurchaseCardProps> = ({ price, programId, sellerId 
           <div className="text-3xl font-bold text-green-600 mb-2">
             ${price}
           </div>
-          <p className="text-sm text-muted-foreground">One-time purchase</p>
+          <div className="text-sm text-muted-foreground space-y-1">
+            <div>Script Price: ${price.toFixed(2)}</div>
+            <div>Service Fee (5%): ${serviceFee.toFixed(2)}</div>
+            <div className="border-t pt-1 font-semibold">
+              Total: ${totalPrice.toFixed(2)}
+            </div>
+            <p className="text-xs">One-time purchase</p>
+          </div>
         </div>
         
         <div className="space-y-4 mb-6">
@@ -140,7 +151,7 @@ const PurchaseCard: React.FC<PurchaseCardProps> = ({ price, programId, sellerId 
           ) : (
             <ShoppingCart className="w-4 h-4 mr-2" />
           )}
-          {loading ? 'Processing...' : 'Buy Now'}
+          {loading ? 'Processing...' : `Buy Now - $${totalPrice.toFixed(2)}`}
         </Button>
         
         <Button variant="outline" className="w-full" disabled={loading}>

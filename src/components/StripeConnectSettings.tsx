@@ -177,8 +177,17 @@ const StripeConnectSettings = () => {
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
           Connect your Stripe account to receive payments when customers purchase your scripts. 
-          The platform takes a 5% fee from each sale.
+          The platform takes a 5% fee from each sale, and buyers pay an additional 5% service fee.
         </p>
+
+        <div className="bg-muted/50 p-4 rounded-lg">
+          <h4 className="font-semibold mb-2">Fee Structure:</h4>
+          <ul className="text-sm space-y-1">
+            <li>• Sellers receive: 95% of listed price</li>
+            <li>• Platform fee: 5% of listed price</li>
+            <li>• Buyers pay: Listed price + 5% service fee</li>
+          </ul>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="flex items-center gap-2">

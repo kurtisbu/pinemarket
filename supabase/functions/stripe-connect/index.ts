@@ -166,15 +166,21 @@ serve(async (req) => {
           throw new Error('Program not found');
         }
 
-        // Calculate platform fee (10%)
-        const platformFee = Math.round(amount * 0.10 * 100); // Convert to cents
-        const sellerAmount = Math.round(amount * 100) - platformFee; // Amount seller receives
+        // Calculate fees with new 5% structure
+        // Buyer pays: original price + 5% service fee
+        // Seller receives: original price - 5% platform fee
+        const originalPrice = Math.round(amount * 100); // Convert to cents
+        const serviceFee = Math.round(originalPrice * 0.05); // 5% service fee
+        const totalAmount = originalPrice + serviceFee; // Total amount buyer pays
+        const platformFee = Math.round(originalPrice * 0.05); // 5% platform fee
+
+        console.log(`[PAYMENT INTENT] Original price: $${amount}, Service fee: $${serviceFee/100}, Total: $${totalAmount/100}, Platform fee: $${platformFee/100}`);
 
         // Create Stripe payment intent
         const paymentIntent = await stripe.paymentIntents.create({
-          amount: Math.round(amount * 100), // Convert to cents
+          amount: totalAmount, // Total amount including service fee
           currency: 'usd',
-          application_fee_amount: platformFee,
+          application_fee_amount: platformFee, // Platform fee (5% of original price)
           transfer_data: {
             destination: program.profiles.stripe_account_id,
           },
@@ -182,12 +188,17 @@ serve(async (req) => {
             program_id,
             seller_id: program.seller_id,
             tradingview_username: tradingview_username || '',
+            original_price: originalPrice.toString(),
+            service_fee: serviceFee.toString(),
+            platform_fee: platformFee.toString(),
           },
         });
 
         return new Response(JSON.stringify({
           payment_intent_id: paymentIntent.id,
           client_secret: paymentIntent.client_secret,
+          total_amount: totalAmount / 100, // Return in dollars for display
+          service_fee: serviceFee / 100,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
@@ -222,20 +233,23 @@ serve(async (req) => {
           throw new Error('Program not found');
         }
 
-        // Calculate fees
-        const platformFee = Math.round(program.price * 0.10 * 100) / 100;
+        // Calculate fees with new structure
+        const originalPrice = program.price;
+        const serviceFee = Math.round(originalPrice * 0.05 * 100) / 100; // 5% service fee
+        const platformFee = Math.round(originalPrice * 0.05 * 100) / 100; // 5% platform fee
+        const totalAmount = originalPrice + serviceFee;
 
-        console.log(`[PURCHASE CONFIRMATION] Creating purchase record for buyer: ${user.id}, seller: ${program.seller_id}, amount: ${program.price}`);
+        console.log(`[PURCHASE CONFIRMATION] Creating purchase record for buyer: ${user.id}, seller: ${program.seller_id}, original: ${originalPrice}, total: ${totalAmount}`);
 
-        // Create purchase record
+        // Create purchase record with updated fee structure
         const { data: purchase, error: purchaseError } = await supabaseAdmin
           .from('purchases')
           .insert({
             buyer_id: user.id,
             seller_id: program.seller_id,
             program_id: program_id,
-            amount: program.price,
-            platform_fee: platformFee,
+            amount: totalAmount, // Total amount paid by buyer
+            platform_fee: platformFee, // 5% platform fee
             payment_intent_id: payment_intent_id,
             tradingview_username: tradingview_username,
             status: 'completed',
