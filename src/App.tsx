@@ -12,6 +12,7 @@ import Profile from "./pages/Profile";
 import ProfileSettings from "./pages/ProfileSettings";
 import SellScript from "./pages/SellScript";
 import MyPrograms from "./pages/MyPrograms";
+import SellerDashboard from "./pages/SellerDashboard";
 import EditProgram from "./pages/EditProgram";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
@@ -31,6 +32,7 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/profile/:username" element={<Profile />} />
           <Route path="/settings/profile" element={<ProfileSettings />} />
+          <Route path="/dashboard" element={<SellerDashboard />} />
           <Route path="/sell-script" element={<SellScript />} />
           <Route path="/my-programs" element={<MyPrograms />} />
           <Route path="/edit-program/:id" element={<EditProgram />} />
