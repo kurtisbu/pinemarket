@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Search, User, ShoppingCart, LogOut, Settings } from 'lucide-react';
+import { Search, User, ShoppingCart, LogOut, Settings, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
@@ -64,8 +64,8 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
     navigate('/settings/profile');
   };
 
-  const handleMyPrograms = () => {
-    navigate('/my-programs');
+  const handleDashboard = () => {
+    navigate('/dashboard');
   };
 
   const handleSellScript = () => {
@@ -153,8 +153,9 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
                       View Profile
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem onClick={handleMyPrograms}>
-                    My Programs
+                  <DropdownMenuItem onClick={handleDashboard}>
+                    <LayoutDashboard className="w-4 h-4 mr-2" />
+                    Dashboard
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSettings}>
