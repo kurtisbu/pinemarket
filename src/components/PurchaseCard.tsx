@@ -58,6 +58,8 @@ const PurchaseCard: React.FC<PurchaseCardProps> = ({ price, programId, sellerId 
 
     setLoading(true);
     try {
+      console.log('Creating payment intent...', { programId, price, totalPrice });
+      
       // Create payment intent with TradingView username
       const { data, error } = await supabase.functions.invoke('stripe-connect', {
         body: {
@@ -68,15 +70,27 @@ const PurchaseCard: React.FC<PurchaseCardProps> = ({ price, programId, sellerId 
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Payment intent creation error:', error);
+        throw error;
+      }
+
+      console.log('Payment intent created:', data);
 
       // In a real implementation, you would integrate with Stripe Elements
-      // For now, we'll simulate the payment process
+      // For now, we'll simulate the payment process with better UX
       const confirmPayment = confirm(
-        `This will charge $${totalPrice.toFixed(2)} (including $${serviceFee.toFixed(2)} service fee) to your payment method and grant access to TradingView username "${tradingviewUsername}". Continue?`
+        `Confirm Purchase Details:\n\n` +
+        `Script Price: $${price.toFixed(2)}\n` +
+        `Service Fee (5%): $${serviceFee.toFixed(2)}\n` +
+        `Total Amount: $${totalPrice.toFixed(2)}\n\n` +
+        `TradingView Username: ${tradingviewUsername}\n\n` +
+        `Click OK to proceed with payment.`
       );
 
       if (confirmPayment) {
+        console.log('Confirming purchase...', data.payment_intent_id);
+        
         // Simulate successful payment
         const { data: confirmData, error: confirmError } = await supabase.functions.invoke('stripe-connect', {
           body: {
@@ -87,20 +101,31 @@ const PurchaseCard: React.FC<PurchaseCardProps> = ({ price, programId, sellerId 
           },
         });
 
-        if (confirmError) throw confirmError;
+        if (confirmError) {
+          console.error('Purchase confirmation error:', confirmError);
+          throw confirmError;
+        }
+
+        console.log('Purchase confirmed:', confirmData);
 
         toast({
           title: 'Purchase successful!',
           description: 'Your script access is being processed. You will receive TradingView access shortly.',
         });
 
-        // Refresh the page or redirect to purchases
-        window.location.reload();
+        // Clear the form
+        setTradingviewUsername('');
+        
+        // Optional: Refresh the page or redirect to purchases
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
       }
     } catch (error: any) {
+      console.error('Purchase error:', error);
       toast({
         title: 'Purchase failed',
-        description: error.message,
+        description: error.message || 'An unexpected error occurred during purchase.',
         variant: 'destructive',
       });
     } finally {
@@ -154,9 +179,10 @@ const PurchaseCard: React.FC<PurchaseCardProps> = ({ price, programId, sellerId 
           {loading ? 'Processing...' : `Buy Now - $${totalPrice.toFixed(2)}`}
         </Button>
         
-        <Button variant="outline" className="w-full" disabled={loading}>
-          Add to Cart
-        </Button>
+        <div className="text-xs text-muted-foreground text-center">
+          <p>Secure payment processing powered by Stripe</p>
+          <p className="mt-1">For testing: Use any username, payment will be simulated</p>
+        </div>
       </CardContent>
     </Card>
   );
