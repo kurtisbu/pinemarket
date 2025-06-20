@@ -95,30 +95,13 @@ export async function assignScriptAccess(
 
     console.log(`[ASSIGN] Username "${tradingview_username}" validated successfully`);
 
-    // Step 2: Add script access directly via the add endpoint
+    // Step 2: Add script access directly via the add endpoint (without expiration for lifetime access)
     console.log(`[ASSIGN] Adding script access for ${tradingview_username} to ${pine_id}`);
-    
-    // Create expiration date (365 days from now) - match Python format exactly
-    const expirationDate = new Date();
-    expirationDate.setDate(expirationDate.getDate() + 365);
-    
-    // Format to match Python: '%Y-%m-%dT%H:%M:%S.%f'[:-3] + 'Z'
-    // This creates: 2025-06-20T15:30:45.123Z (milliseconds, not microseconds)
-    const year = expirationDate.getUTCFullYear();
-    const month = String(expirationDate.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(expirationDate.getUTCDate()).padStart(2, '0');
-    const hours = String(expirationDate.getUTCHours()).padStart(2, '0');
-    const minutes = String(expirationDate.getUTCMinutes()).padStart(2, '0');
-    const seconds = String(expirationDate.getUTCSeconds()).padStart(2, '0');
-    const milliseconds = String(expirationDate.getUTCMilliseconds()).padStart(3, '0');
-    
-    const expirationString = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${milliseconds}Z`;
-    console.log(`[ASSIGN] Expiration date formatted as: ${expirationString}`);
 
     const formData = new FormData();
     formData.append('pine_id', pine_id);
     formData.append('username_recip', tradingview_username);
-    formData.append('expiration', expirationString);
+    // No expiration parameter = lifetime access
 
     const addAccessResponse = await fetch('https://www.tradingview.com/pine_perm/add/', {
       method: 'POST',
@@ -148,7 +131,7 @@ export async function assignScriptAccess(
 
     if (responseData.status === 'ok') {
       isSuccess = true;
-      message = `Successfully granted access to ${tradingview_username}`;
+      message = `Successfully granted lifetime access to ${tradingview_username}`;
     } else if (responseData.error) {
       // Check for "user already has access" type errors which we can treat as success
       const errorMsg = responseData.error.toLowerCase();
@@ -177,7 +160,7 @@ export async function assignScriptAccess(
             tradingview_username,
             response: responseData,
             assigned_at: new Date().toISOString(),
-            expiration: expirationString
+            access_type: 'lifetime'
           }
         })
         .eq('id', assignment_id);
@@ -188,7 +171,7 @@ export async function assignScriptAccess(
         assignment_id,
         pine_id,
         tradingview_username,
-        expires_at: expirationString
+        access_type: 'lifetime'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
