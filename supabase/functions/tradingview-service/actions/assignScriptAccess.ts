@@ -96,22 +96,43 @@ export async function assignScriptAccess(
     console.log(`[ASSIGN] Username "${tradingview_username}" validated successfully`);
 
     // Step 2: Get the actual script_id (PUB;xxx format) from our database
-    console.log(`[ASSIGN] Looking up actual script_id for pine_id: ${pine_id}`);
+    // First try to match by pine_id, then fallback to script_id if pine_id is actually the script_id
+    console.log(`[ASSIGN] Looking up script_id for pine_id: ${pine_id}`);
     
-    const { data: scriptData, error: scriptError } = await supabaseAdmin
+    let scriptQuery = supabaseAdmin
       .from('tradingview_scripts')
-      .select('script_id')
-      .eq('user_id', assignment.seller_id)
-      .eq('pine_id', pine_id)
-      .single();
+      .select('script_id, pine_id')
+      .eq('user_id', assignment.seller_id);
 
-    if (scriptError || !scriptData) {
-      console.error(`[ASSIGN] Could not find script with pine_id: ${pine_id}`);
-      throw new Error(`Script not found with pine_id: ${pine_id}`);
+    // Try to find by pine_id first
+    let { data: scriptData, error: scriptError } = await scriptQuery.eq('pine_id', pine_id).maybeSingle();
+
+    // If not found by pine_id, try by script_id (in case pine_id is actually the script_id)
+    if (!scriptData && !scriptError) {
+      console.log(`[ASSIGN] Not found by pine_id, trying by script_id`);
+      const { data: scriptDataById, error: scriptErrorById } = await scriptQuery.eq('script_id', pine_id).maybeSingle();
+      scriptData = scriptDataById;
+      scriptError = scriptErrorById;
+    }
+
+    if (scriptError) {
+      console.error(`[ASSIGN] Database error looking up script:`, scriptError);
+      throw new Error(`Database error: ${scriptError.message}`);
+    }
+
+    if (!scriptData) {
+      console.error(`[ASSIGN] Could not find script with pine_id or script_id: ${pine_id}`);
+      throw new Error(`Script not found with identifier: ${pine_id}`);
     }
 
     const actualScriptId = scriptData.script_id;
-    console.log(`[ASSIGN] Found actual script_id: ${actualScriptId} for pine_id: ${pine_id}`);
+    console.log(`[ASSIGN] Found script_id: ${actualScriptId} for pine_id: ${pine_id}`);
+
+    // Validate that we have a proper script_id format (should start with PUB;)
+    if (!actualScriptId || !actualScriptId.startsWith('PUB;')) {
+      console.error(`[ASSIGN] Invalid script_id format: ${actualScriptId}`);
+      throw new Error(`Invalid script_id format. Expected PUB;xxx format, got: ${actualScriptId}`);
+    }
 
     // Step 3: Add script access using the actual script_id
     console.log(`[ASSIGN] Adding script access for ${tradingview_username} to script_id: ${actualScriptId}`);
@@ -126,7 +147,7 @@ export async function assignScriptAccess(
       headers: {
         'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Referer': `https://www.tradingview.com/script/${pine_id}/`,
+        'Referer': `https://www.tradingview.com/script/${scriptData.pine_id || pine_id}/`,
       },
       body: formData,
     });
@@ -137,7 +158,7 @@ export async function assignScriptAccess(
     if (!addAccessResponse.ok) {
       const errorText = await addAccessResponse.text();
       console.error('[ASSIGN] TradingView add access error response:', errorText);
-      throw new Error(`Failed to add script access: ${addAccessResponse.status}`);
+      throw new Error(`Failed to add script access: ${addAccessResponse.status} - ${errorText}`);
     }
 
     const responseData = await addAccessResponse.json();
@@ -174,7 +195,7 @@ export async function assignScriptAccess(
           status: 'assigned',
           assigned_at: new Date().toISOString(),
           assignment_details: {
-            pine_id,
+            pine_id: scriptData.pine_id || pine_id,
             script_id: actualScriptId,
             tradingview_username,
             response: responseData,
@@ -188,7 +209,7 @@ export async function assignScriptAccess(
         success: true,
         message,
         assignment_id,
-        pine_id,
+        pine_id: scriptData.pine_id || pine_id,
         script_id: actualScriptId,
         tradingview_username,
         access_type: 'lifetime'
