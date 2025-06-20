@@ -153,7 +153,8 @@ export async function syncUserScripts(
       scriptCards = divSections.filter(section => 
         section.includes('tv-widget-idea__title') || 
         section.includes('published_chart_url') ||
-        section.includes('/script/')
+        section.includes('/script/') ||
+        section.includes('data-script-id-part')
       );
       console.log(`Found ${scriptCards.length} potential script sections using fallback`);
     }
@@ -178,7 +179,13 @@ export async function syncUserScripts(
         
         scriptCards.forEach((cardHtml, index) => {
             console.log(`--- Processing card ${index + 1} ---`);
-            console.log(`Card HTML snippet (first 200 chars):`, cardHtml.substring(0, 200));
+            console.log(`Card HTML snippet (first 500 chars):`, cardHtml.substring(0, 500));
+            
+            // Extract script ID from data-script-id-part attribute (this is what we need for API calls)
+            const scriptIdMatch = cardHtml.match(/data-script-id-part="([^"]+)"/);
+            const actualScriptId = scriptIdMatch ? scriptIdMatch[1] : null;
+            
+            console.log(`Found script ID: ${actualScriptId}`);
             
             // Multiple approaches to find the title and URL
             const titlePatterns = [
@@ -218,7 +225,7 @@ export async function syncUserScripts(
               }
             }
 
-            if (titleMatch && titleMatch[1]) {
+            if (titleMatch && titleMatch[1] && actualScriptId) {
                 let scriptUrl = titleMatch[1];
                 if (!scriptUrl.startsWith('http')) {
                   scriptUrl = "https://www.tradingview.com" + scriptUrl;
@@ -233,11 +240,11 @@ export async function syncUserScripts(
                 scriptTitle = scriptTitle.replace(/<[^>]*>/g, '').trim();
                 const likesCount = parseCount(likesMatch ? likesMatch[1] : '0');
 
-                // Extract pine_id from URL (between /script/ and /)
+                // Extract pine_id from URL (between /script/ and /) - this is the slug
                 const pineIdMatch = scriptUrl.match(/\/script\/([^\/]+)\//);
                 const pineId = pineIdMatch ? pineIdMatch[1] : null;
 
-                console.log(`✓ Successfully parsed: Title="${scriptTitle}", Likes=${likesCount}, URL=${scriptUrl}, Pine ID=${pineId}`);
+                console.log(`✓ Successfully parsed: Title="${scriptTitle}", Likes=${likesCount}, URL=${scriptUrl}, Script ID=${actualScriptId}, Pine ID=${pineId}`);
 
                 scriptsData.push({
                     script_name: scriptTitle,
@@ -245,16 +252,21 @@ export async function syncUserScripts(
                     image_url: null,
                     likes_count: likesCount,
                     reviews_count: 0,
-                    script_id_private: null,
-                    pine_id: pineId
+                    script_id_private: actualScriptId, // This is the real script ID for API calls
+                    pine_id: pineId // This is the slug from the URL
                 });
             } else {
                console.log(`✗ Could not extract script info from card ${index + 1}`);
                console.log(`Card content (first 500 chars):`, cardHtml.substring(0, 500));
+               console.log(`Missing: ${!titleMatch ? 'title/URL' : ''} ${!actualScriptId ? 'script ID' : ''}`);
             }
         });
     } else {
         console.log("ERROR: No script cards found with any pattern");
+        console.log("Searching for data-script-id-part attributes...");
+        const scriptIdMatches = htmlContent.match(/data-script-id-part="[^"]+"/g) || [];
+        console.log(`Found ${scriptIdMatches.length} script ID attributes:`, scriptIdMatches.slice(0, 5));
+        
         console.log("Searching for any /script/ URLs in the HTML...");
         const scriptUrlMatches = htmlContent.match(/\/script\/[^"'\s>]+/g) || [];
         console.log(`Found ${scriptUrlMatches.length} script URLs:`, scriptUrlMatches.slice(0, 5));
@@ -262,10 +274,6 @@ export async function syncUserScripts(
         console.log("Searching for tv-widget-idea__title classes...");
         const titleMatches = htmlContent.match(/tv-widget-idea__title/g) || [];
         console.log(`Found ${titleMatches.length} title elements`);
-        
-        console.log("Searching for any div classes containing 'card' or 'item'...");
-        const cardClassMatches = htmlContent.match(/class="[^"]*(?:card|item)[^"]*"/g) || [];
-        console.log(`Found ${cardClassMatches.length} potential card classes:`, cardClassMatches.slice(0, 10));
     }
   } else if (apiData && apiData.results) {
     console.log("Parsing JSON 'results' from TradingView API response.");
@@ -289,8 +297,8 @@ export async function syncUserScripts(
   const scripts = scriptsData.map((script: any) => {
       const publicationUrl = script.url.startsWith('http') ? script.url : `https://www.tradingview.com${script.url}`;
       
-      const scriptIdMatch = publicationUrl.match(/\/script\/([^\/]+)\//);
-      const scriptId = scriptIdMatch ? scriptIdMatch[1] : script.script_id_private;
+      // Use the actual script ID (PUB;xxx format) for the script_id field
+      const scriptId = script.script_id_private || script.pine_id;
       
       return {
         user_id: user_id,
@@ -300,7 +308,7 @@ export async function syncUserScripts(
         image_url: script.image_url,
         likes: script.likes_count || 0,
         reviews_count: script.reviews_count || 0,
-        pine_id: script.pine_id || scriptId, // Use pine_id if available, fallback to script_id
+        pine_id: script.pine_id || scriptId, // Store the slug separately
         last_synced_at: new Date().toISOString(),
       };
     }).filter((script: any) => script.publication_url.includes('/script/'));

@@ -95,11 +95,29 @@ export async function assignScriptAccess(
 
     console.log(`[ASSIGN] Username "${tradingview_username}" validated successfully`);
 
-    // Step 2: Add script access directly via the add endpoint (without expiration for lifetime access)
-    console.log(`[ASSIGN] Adding script access for ${tradingview_username} to ${pine_id}`);
+    // Step 2: Get the actual script_id (PUB;xxx format) from our database
+    console.log(`[ASSIGN] Looking up actual script_id for pine_id: ${pine_id}`);
+    
+    const { data: scriptData, error: scriptError } = await supabaseAdmin
+      .from('tradingview_scripts')
+      .select('script_id')
+      .eq('user_id', assignment.seller_id)
+      .eq('pine_id', pine_id)
+      .single();
+
+    if (scriptError || !scriptData) {
+      console.error(`[ASSIGN] Could not find script with pine_id: ${pine_id}`);
+      throw new Error(`Script not found with pine_id: ${pine_id}`);
+    }
+
+    const actualScriptId = scriptData.script_id;
+    console.log(`[ASSIGN] Found actual script_id: ${actualScriptId} for pine_id: ${pine_id}`);
+
+    // Step 3: Add script access using the actual script_id
+    console.log(`[ASSIGN] Adding script access for ${tradingview_username} to script_id: ${actualScriptId}`);
 
     const formData = new FormData();
-    formData.append('pine_id', pine_id);
+    formData.append('pine_id', actualScriptId); // Use the actual script_id (PUB;xxx format)
     formData.append('username_recip', tradingview_username);
     // No expiration parameter = lifetime access
 
@@ -157,6 +175,7 @@ export async function assignScriptAccess(
           assigned_at: new Date().toISOString(),
           assignment_details: {
             pine_id,
+            script_id: actualScriptId,
             tradingview_username,
             response: responseData,
             assigned_at: new Date().toISOString(),
@@ -170,6 +189,7 @@ export async function assignScriptAccess(
         message,
         assignment_id,
         pine_id,
+        script_id: actualScriptId,
         tradingview_username,
         access_type: 'lifetime'
       }), {
