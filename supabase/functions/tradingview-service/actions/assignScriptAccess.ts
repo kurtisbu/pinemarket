@@ -98,10 +98,22 @@ export async function assignScriptAccess(
     // Step 2: Add script access directly via the add endpoint
     console.log(`[ASSIGN] Adding script access for ${tradingview_username} to ${pine_id}`);
     
-    // Create expiration date (365 days from now)
+    // Create expiration date (365 days from now) - match Python format exactly
     const expirationDate = new Date();
     expirationDate.setDate(expirationDate.getDate() + 365);
-    const expirationString = expirationDate.toISOString().slice(0, -1).slice(0, -3) + 'Z';
+    
+    // Format to match Python: '%Y-%m-%dT%H:%M:%S.%f'[:-3] + 'Z'
+    // This creates: 2025-06-20T15:30:45.123Z (milliseconds, not microseconds)
+    const year = expirationDate.getUTCFullYear();
+    const month = String(expirationDate.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(expirationDate.getUTCDate()).padStart(2, '0');
+    const hours = String(expirationDate.getUTCHours()).padStart(2, '0');
+    const minutes = String(expirationDate.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(expirationDate.getUTCSeconds()).padStart(2, '0');
+    const milliseconds = String(expirationDate.getUTCMilliseconds()).padStart(3, '0');
+    
+    const expirationString = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${milliseconds}Z`;
+    console.log(`[ASSIGN] Expiration date formatted as: ${expirationString}`);
 
     const formData = new FormData();
     formData.append('pine_id', pine_id);
