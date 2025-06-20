@@ -96,33 +96,69 @@ export async function assignScriptAccess(
     console.log(`[ASSIGN] Username "${tradingview_username}" validated successfully`);
 
     // Step 2: Get the actual script_id (PUB;xxx format) from our database
-    // First try to match by pine_id, then fallback to script_id if pine_id is actually the script_id
+    // Use the most recent script entry for this seller and pine_id to avoid duplicates
     console.log(`[ASSIGN] Looking up script_id for pine_id: ${pine_id}`);
     
-    let scriptQuery = supabaseAdmin
+    const { data: scriptData, error: scriptError } = await supabaseAdmin
       .from('tradingview_scripts')
       .select('script_id, pine_id')
-      .eq('user_id', assignment.seller_id);
-
-    // Try to find by pine_id first
-    let { data: scriptData, error: scriptError } = await scriptQuery.eq('pine_id', pine_id).maybeSingle();
-
-    // If not found by pine_id, try by script_id (in case pine_id is actually the script_id)
-    if (!scriptData && !scriptError) {
-      console.log(`[ASSIGN] Not found by pine_id, trying by script_id`);
-      const { data: scriptDataById, error: scriptErrorById } = await scriptQuery.eq('script_id', pine_id).maybeSingle();
-      scriptData = scriptDataById;
-      scriptError = scriptErrorById;
-    }
+      .eq('user_id', assignment.seller_id)
+      .eq('pine_id', pine_id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
 
     if (scriptError) {
       console.error(`[ASSIGN] Database error looking up script:`, scriptError);
+      
+      // If not found by pine_id, try by script_id (in case pine_id is actually the script_id)
+      if (scriptError.code === 'PGRST116') {
+        console.log(`[ASSIGN] Not found by pine_id, trying by script_id`);
+        const { data: scriptDataById, error: scriptErrorById } = await supabaseAdmin
+          .from('tradingview_scripts')
+          .select('script_id, pine_id')
+          .eq('user_id', assignment.seller_id)
+          .eq('script_id', pine_id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (scriptErrorById) {
+          throw new Error(`Database error: ${scriptErrorById.message}`);
+        }
+        
+        if (!scriptDataById) {
+          throw new Error(`Script not found with identifier: ${pine_id}`);
+        }
+        
+        // Use the script found by script_id
+        const actualScriptId = scriptDataById.script_id;
+        console.log(`[ASSIGN] Found script_id: ${actualScriptId} for pine_id: ${pine_id}`);
+
+        // Validate script_id format
+        if (!actualScriptId || !actualScriptId.startsWith('PUB;')) {
+          console.error(`[ASSIGN] Invalid script_id format: ${actualScriptId}`);
+          throw new Error(`Invalid script_id format. Expected PUB;xxx format, got: ${actualScriptId}`);
+        }
+
+        // Continue with the assignment using scriptDataById
+        return await performAssignment(
+          actualScriptId, 
+          scriptDataById.pine_id || pine_id, 
+          tradingview_username, 
+          sessionCookie, 
+          signedSessionCookie, 
+          assignment_id, 
+          supabaseAdmin
+        );
+      }
+      
       throw new Error(`Database error: ${scriptError.message}`);
     }
 
     if (!scriptData) {
-      console.error(`[ASSIGN] Could not find script with pine_id or script_id: ${pine_id}`);
-      throw new Error(`Script not found with identifier: ${pine_id}`);
+      console.error(`[ASSIGN] Could not find script with pine_id: ${pine_id}`);
+      throw new Error(`Script not found with pine_id: ${pine_id}`);
     }
 
     const actualScriptId = scriptData.script_id;
@@ -134,90 +170,15 @@ export async function assignScriptAccess(
       throw new Error(`Invalid script_id format. Expected PUB;xxx format, got: ${actualScriptId}`);
     }
 
-    // Step 3: Add script access using the actual script_id
-    console.log(`[ASSIGN] Adding script access for ${tradingview_username} to script_id: ${actualScriptId}`);
-
-    const formData = new FormData();
-    formData.append('pine_id', actualScriptId); // Use the actual script_id (PUB;xxx format)
-    formData.append('username_recip', tradingview_username);
-    // No expiration parameter = lifetime access
-
-    const addAccessResponse = await fetch('https://www.tradingview.com/pine_perm/add/', {
-      method: 'POST',
-      headers: {
-        'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Referer': `https://www.tradingview.com/script/${scriptData.pine_id || pine_id}/`,
-      },
-      body: formData,
-    });
-
-    console.log(`[ASSIGN] TradingView add access response status: ${addAccessResponse.status}`);
-    console.log(`[ASSIGN] TradingView add access response headers:`, Object.fromEntries(addAccessResponse.headers.entries()));
-
-    if (!addAccessResponse.ok) {
-      const errorText = await addAccessResponse.text();
-      console.error('[ASSIGN] TradingView add access error response:', errorText);
-      throw new Error(`Failed to add script access: ${addAccessResponse.status} - ${errorText}`);
-    }
-
-    const responseData = await addAccessResponse.json();
-    console.log('[ASSIGN] TradingView add access response data:', responseData);
-
-    // Check if the response indicates success
-    let isSuccess = false;
-    let message = '';
-
-    if (responseData.status === 'ok') {
-      isSuccess = true;
-      message = `Successfully granted lifetime access to ${tradingview_username}`;
-    } else if (responseData.error) {
-      // Check for "user already has access" type errors which we can treat as success
-      const errorMsg = responseData.error.toLowerCase();
-      if (errorMsg.includes('already') || errorMsg.includes('exist')) {
-        isSuccess = true;
-        message = `User ${tradingview_username} already has access or access was granted`;
-      } else {
-        throw new Error(`TradingView returned an error: ${responseData.error}`);
-      }
-    } else {
-      // If no clear success/error indicator, log for debugging
-      console.log('[ASSIGN] Unclear response from TradingView, treating as success:', responseData);
-      isSuccess = true;
-      message = `Access request processed for ${tradingview_username}`;
-    }
-
-    if (isSuccess) {
-      // Update assignment as successful
-      await supabaseAdmin
-        .from('script_assignments')
-        .update({
-          status: 'assigned',
-          assigned_at: new Date().toISOString(),
-          assignment_details: {
-            pine_id: scriptData.pine_id || pine_id,
-            script_id: actualScriptId,
-            tradingview_username,
-            response: responseData,
-            assigned_at: new Date().toISOString(),
-            access_type: 'lifetime'
-          }
-        })
-        .eq('id', assignment_id);
-
-      return new Response(JSON.stringify({ 
-        success: true,
-        message,
-        assignment_id,
-        pine_id: scriptData.pine_id || pine_id,
-        script_id: actualScriptId,
-        tradingview_username,
-        access_type: 'lifetime'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      });
-    }
+    return await performAssignment(
+      actualScriptId, 
+      scriptData.pine_id || pine_id, 
+      tradingview_username, 
+      sessionCookie, 
+      signedSessionCookie, 
+      assignment_id, 
+      supabaseAdmin
+    );
 
   } catch (error: any) {
     console.error('[ASSIGN] Script assignment error:', error);
@@ -247,4 +208,101 @@ export async function assignScriptAccess(
       status: 500
     });
   }
+}
+
+async function performAssignment(
+  scriptId: string,
+  pineId: string,
+  tradingviewUsername: string,
+  sessionCookie: string,
+  signedSessionCookie: string,
+  assignmentId: string,
+  supabaseAdmin: SupabaseClient
+): Promise<Response> {
+  // Step 3: Add script access using the actual script_id
+  console.log(`[ASSIGN] Adding script access for ${tradingviewUsername} to script_id: ${scriptId}`);
+
+  const formData = new FormData();
+  formData.append('pine_id', scriptId); // Use the actual script_id (PUB;xxx format)
+  formData.append('username_recip', tradingviewUsername);
+  // No expiration parameter = lifetime access
+
+  const addAccessResponse = await fetch('https://www.tradingview.com/pine_perm/add/', {
+    method: 'POST',
+    headers: {
+      'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      'Referer': `https://www.tradingview.com/script/${pineId}/`,
+    },
+    body: formData,
+  });
+
+  console.log(`[ASSIGN] TradingView add access response status: ${addAccessResponse.status}`);
+  console.log(`[ASSIGN] TradingView add access response headers:`, Object.fromEntries(addAccessResponse.headers.entries()));
+
+  if (!addAccessResponse.ok) {
+    const errorText = await addAccessResponse.text();
+    console.error('[ASSIGN] TradingView add access error response:', errorText);
+    throw new Error(`Failed to add script access: ${addAccessResponse.status} - ${errorText}`);
+  }
+
+  const responseData = await addAccessResponse.json();
+  console.log('[ASSIGN] TradingView add access response data:', responseData);
+
+  // Check if the response indicates success
+  let isSuccess = false;
+  let message = '';
+
+  if (responseData.status === 'ok') {
+    isSuccess = true;
+    message = `Successfully granted lifetime access to ${tradingviewUsername}`;
+  } else if (responseData.error) {
+    // Check for "user already has access" type errors which we can treat as success
+    const errorMsg = responseData.error.toLowerCase();
+    if (errorMsg.includes('already') || errorMsg.includes('exist')) {
+      isSuccess = true;
+      message = `User ${tradingviewUsername} already has access or access was granted`;
+    } else {
+      throw new Error(`TradingView returned an error: ${responseData.error}`);
+    }
+  } else {
+    // If no clear success/error indicator, log for debugging
+    console.log('[ASSIGN] Unclear response from TradingView, treating as success:', responseData);
+    isSuccess = true;
+    message = `Access request processed for ${tradingviewUsername}`;
+  }
+
+  if (isSuccess) {
+    // Update assignment as successful
+    await supabaseAdmin
+      .from('script_assignments')
+      .update({
+        status: 'assigned',
+        assigned_at: new Date().toISOString(),
+        assignment_details: {
+          pine_id: pineId,
+          script_id: scriptId,
+          tradingview_username: tradingviewUsername,
+          response: responseData,
+          assigned_at: new Date().toISOString(),
+          access_type: 'lifetime'
+        }
+      })
+      .eq('id', assignmentId);
+
+    return new Response(JSON.stringify({ 
+      success: true,
+      message,
+      assignment_id: assignmentId,
+      pine_id: pineId,
+      script_id: scriptId,
+      tradingview_username: tradingviewUsername,
+      access_type: 'lifetime'
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200
+    });
+  }
+
+  throw new Error('Assignment failed for unknown reason');
 }
