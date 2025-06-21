@@ -36,6 +36,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+
+        // Handle seller onboarding redirect after email verification
+        if (event === 'SIGNED_IN' && session?.user) {
+          const pendingOnboarding = localStorage.getItem('pendingSellerOnboarding');
+          if (pendingOnboarding === 'true') {
+            localStorage.removeItem('pendingSellerOnboarding');
+            // Use setTimeout to ensure the redirect happens after the current auth flow
+            setTimeout(() => {
+              window.location.href = '/seller/onboarding';
+            }, 1000);
+          }
+        }
       }
     );
 

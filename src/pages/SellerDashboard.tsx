@@ -29,6 +29,7 @@ const SellerDashboard = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showOnboardingPrompt, setShowOnboardingPrompt] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -50,6 +51,11 @@ const SellerDashboard = () => {
 
       if (error) throw error;
       setProfile(data);
+      
+      // Show onboarding prompt if TradingView is not connected
+      if (!data.is_tradingview_connected) {
+        setShowOnboardingPrompt(true);
+      }
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -95,6 +101,34 @@ const SellerDashboard = () => {
               Manage your profile, programs, and settings all in one place
             </p>
           </div>
+
+          {showOnboardingPrompt && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-blue-900">Complete Your Setup</h3>
+                  <p className="text-blue-700 text-sm">
+                    Connect your TradingView account to start selling your scripts.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={() => navigate('/seller/onboarding')}
+                    size="sm"
+                  >
+                    Complete Setup
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setShowOnboardingPrompt(false)}
+                  >
+                    Later
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <Tabs defaultValue="profile" className="space-y-6">
             <TabsList className="grid w-full grid-cols-4">

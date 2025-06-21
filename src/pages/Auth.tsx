@@ -15,6 +15,7 @@ const Auth = () => {
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [wantsToSell, setWantsToSell] = useState(false);
   
   const { signIn, signUp, signInWithProvider, user } = useAuth();
   const { toast } = useToast();
@@ -56,8 +57,16 @@ const Auth = () => {
         } else {
           toast({
             title: "Account created!",
-            description: "Please check your email to verify your account.",
+            description: wantsToSell 
+              ? "Please check your email to verify your account, then you'll be guided through the seller setup."
+              : "Please check your email to verify your account.",
           });
+          
+          // If they want to sell, we'll redirect them to onboarding after verification
+          if (wantsToSell) {
+            // Store intent in localStorage so we can redirect after email verification
+            localStorage.setItem('pendingSellerOnboarding', 'true');
+          }
         }
       }
     } catch (error) {
@@ -173,6 +182,18 @@ const Auth = () => {
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="Enter your display name"
                   />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="wantsToSell"
+                    checked={wantsToSell}
+                    onChange={(e) => setWantsToSell(e.target.checked)}
+                    className="rounded border-gray-300"
+                  />
+                  <label htmlFor="wantsToSell" className="text-sm">
+                    I want to sell Pine Scripts (we'll guide you through the setup)
+                  </label>
                 </div>
               </>
             )}
