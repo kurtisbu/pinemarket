@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import SubscriptionPlanSelector from '@/components/SubscriptionPlanSelector';
 import Header from '@/components/Header';
 import { Upload, X, Plus } from 'lucide-react';
 
@@ -30,7 +31,10 @@ const SellScript = () => {
     price: '',
     category: '',
     tags: [] as string[],
-    tradingview_publication_url: ''
+    tradingview_publication_url: '',
+    pricing_model: 'one_time' as 'one_time' | 'subscription',
+    subscription_plan_id: '',
+    trial_period_days: 0
   });
 
   const categories = [
@@ -48,7 +52,7 @@ const SellScript = () => {
     }
   }, [user, navigate]);
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -117,6 +121,16 @@ const SellScript = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+
+    // Validation for subscription model
+    if (formData.pricing_model === 'subscription' && !formData.subscription_plan_id) {
+      toast({
+        title: 'Subscription plan required',
+        description: 'Please select a subscription plan for subscription-based pricing.',
+        variant: 'destructive',
+      });
+      return;
+    }
     
     setLoading(true);
 
@@ -157,21 +171,31 @@ const SellScript = () => {
       }
 
       // Create program record
+      const programData: any = {
+        seller_id: user.id,
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        tags: formData.tags,
+        image_urls: imageUrls,
+        status: 'draft',
+        script_file_path: scriptPath,
+        tradingview_publication_url: publicationUrl,
+        tradingview_script_id: scriptId,
+        pricing_model: formData.pricing_model,
+      };
+
+      if (formData.pricing_model === 'one_time') {
+        programData.price = parseFloat(formData.price);
+      } else {
+        programData.price = 0; // Subscription pricing is handled by the plan
+        programData.subscription_plan_id = formData.subscription_plan_id;
+        programData.trial_period_days = formData.trial_period_days;
+      }
+
       const { error } = await supabase
         .from('programs')
-        .insert({
-          seller_id: user.id,
-          title: formData.title,
-          description: formData.description,
-          price: parseFloat(formData.price),
-          category: formData.category,
-          tags: formData.tags,
-          image_urls: imageUrls,
-          status: 'draft',
-          script_file_path: scriptPath,
-          tradingview_publication_url: publicationUrl,
-          tradingview_script_id: scriptId,
-        });
+        .insert(programData);
 
       if (error) throw error;
 
@@ -234,19 +258,45 @@ const SellScript = () => {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="price">Price (USD) *</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.price}
-                    onChange={(e) => handleInputChange('price', e.target.value)}
-                    placeholder="0.00"
-                    required
-                  />
+                <div className="space-y-4">
+                  <Label>Pricing Model *</Label>
+                  <RadioGroup 
+                    value={formData.pricing_model} 
+                    onValueChange={(value: 'one_time' | 'subscription') => handleInputChange('pricing_model', value)}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="one_time" id="one_time" />
+                      <Label htmlFor="one_time">One-time Purchase</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="subscription" id="subscription" />
+                      <Label htmlFor="subscription">Subscription</Label>
+                    </div>
+                  </RadioGroup>
                 </div>
+
+                {formData.pricing_model === 'one_time' ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="price">Price (USD) *</Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.price}
+                      onChange={(e) => handleInputChange('price', e.target.value)}
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
+                ) : (
+                  <SubscriptionPlanSelector
+                    selectedPlanId={formData.subscription_plan_id}
+                    onPlanChange={(planId) => handleInputChange('subscription_plan_id', planId)}
+                    trialPeriodDays={formData.trial_period_days}
+                    onTrialPeriodChange={(days) => handleInputChange('trial_period_days', days)}
+                  />
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="description">Description *</Label>
