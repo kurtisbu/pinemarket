@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -54,8 +53,9 @@ const SubscriptionPlans = () => {
       // Transform the data to ensure features is always a string array
       const transformedPlans = (data || []).map(plan => ({
         ...plan,
-        features: Array.isArray(plan.features) ? plan.features : 
-                  typeof plan.features === 'string' ? [plan.features] : []
+        features: Array.isArray(plan.features) 
+          ? plan.features.filter(item => typeof item === 'string') as string[]
+          : typeof plan.features === 'string' ? [plan.features] : []
       }));
       
       setPlans(transformedPlans);

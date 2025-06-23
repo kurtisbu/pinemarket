@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -64,8 +63,9 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
       // Transform the data to ensure features is always a string array
       const transformedPlan = {
         ...data,
-        features: Array.isArray(data.features) ? data.features : 
-                  typeof data.features === 'string' ? [data.features] : []
+        features: Array.isArray(data.features) 
+          ? data.features.filter(item => typeof item === 'string') as string[]
+          : typeof data.features === 'string' ? [data.features] : []
       };
       
       setSubscriptionPlan(transformedPlan);
