@@ -16,6 +16,9 @@ import SellerDashboard from "./pages/SellerDashboard";
 import SellerOnboardingPage from "./pages/SellerOnboarding";
 import EditProgram from "./pages/EditProgram";
 import AdminDashboard from "./pages/AdminDashboard";
+import Subscriptions from "./pages/Subscriptions";
+import SubscriptionSuccess from "./pages/SubscriptionSuccess";
+import SubscriptionCancel from "./pages/SubscriptionCancel";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +42,9 @@ const App = () => (
           <Route path="/my-programs" element={<MyPrograms />} />
           <Route path="/edit-program/:id" element={<EditProgram />} />
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/subscriptions" element={<Subscriptions />} />
+          <Route path="/subscription/success" element={<SubscriptionSuccess />} />
+          <Route path="/subscription/cancel" element={<SubscriptionCancel />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

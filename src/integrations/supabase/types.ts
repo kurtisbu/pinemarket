@@ -76,14 +76,17 @@ export type Database = {
           id: string
           image_urls: string[] | null
           price: number
+          pricing_model: string
           rating_count: number
           script_file_path: string | null
           seller_id: string
           status: string
+          subscription_plan_id: string | null
           tags: string[] | null
           title: string
           tradingview_publication_url: string | null
           tradingview_script_id: string | null
+          trial_period_days: number | null
           updated_at: string
           view_count: number
         }
@@ -96,14 +99,17 @@ export type Database = {
           id?: string
           image_urls?: string[] | null
           price: number
+          pricing_model?: string
           rating_count?: number
           script_file_path?: string | null
           seller_id: string
           status?: string
+          subscription_plan_id?: string | null
           tags?: string[] | null
           title: string
           tradingview_publication_url?: string | null
           tradingview_script_id?: string | null
+          trial_period_days?: number | null
           updated_at?: string
           view_count?: number
         }
@@ -116,14 +122,17 @@ export type Database = {
           id?: string
           image_urls?: string[] | null
           price?: number
+          pricing_model?: string
           rating_count?: number
           script_file_path?: string | null
           seller_id?: string
           status?: string
+          subscription_plan_id?: string | null
           tags?: string[] | null
           title?: string
           tradingview_publication_url?: string | null
           tradingview_script_id?: string | null
+          trial_period_days?: number | null
           updated_at?: string
           view_count?: number
         }
@@ -133,6 +142,13 @@ export type Database = {
             columns: ["seller_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programs_subscription_plan_id_fkey"
+            columns: ["subscription_plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
             referencedColumns: ["id"]
           },
         ]
@@ -296,6 +312,87 @@ export type Database = {
           },
         ]
       }
+      subscription_access: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          granted_at: string
+          id: string
+          program_id: string
+          user_subscription_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          granted_at?: string
+          id?: string
+          program_id: string
+          user_subscription_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          granted_at?: string
+          id?: string
+          program_id?: string
+          user_subscription_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_access_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_access_user_subscription_id_fkey"
+            columns: ["user_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "user_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscription_plans: {
+        Row: {
+          created_at: string
+          description: string | null
+          features: Json | null
+          id: string
+          interval: string
+          is_active: boolean
+          name: string
+          price: number
+          stripe_price_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          features?: Json | null
+          id?: string
+          interval: string
+          is_active?: boolean
+          name: string
+          price: number
+          stripe_price_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          features?: Json | null
+          id?: string
+          interval?: string
+          is_active?: boolean
+          name?: string
+          price?: number
+          stripe_price_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tradingview_scripts: {
         Row: {
           created_at: string
@@ -342,6 +439,63 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "tradingview_scripts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          subscription_plan_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          status: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_plan_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_plan_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_subscriptions_subscription_plan_id_fkey"
+            columns: ["subscription_plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_subscriptions_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
