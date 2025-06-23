@@ -22,7 +22,13 @@ const ProgramPurchaseSection: React.FC<ProgramPurchaseSectionProps> = ({ program
     return <SubscriptionPurchaseCard program={program} />;
   }
 
-  return <PurchaseCard program={program} />;
+  return (
+    <PurchaseCard 
+      price={program.price}
+      programId={program.id}
+      sellerId={program.seller_id}
+    />
+  );
 };
 
 export default ProgramPurchaseSection;

@@ -60,7 +60,15 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
         .single();
 
       if (error) throw error;
-      setSubscriptionPlan(data);
+      
+      // Transform the data to ensure features is always a string array
+      const transformedPlan = {
+        ...data,
+        features: Array.isArray(data.features) ? data.features : 
+                  typeof data.features === 'string' ? [data.features] : []
+      };
+      
+      setSubscriptionPlan(transformedPlan);
     } catch (error: any) {
       console.error('Error fetching subscription plan:', error);
     }

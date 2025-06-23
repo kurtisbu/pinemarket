@@ -50,7 +50,15 @@ const SubscriptionPlans = () => {
         .order('price');
 
       if (error) throw error;
-      setPlans(data || []);
+      
+      // Transform the data to ensure features is always a string array
+      const transformedPlans = (data || []).map(plan => ({
+        ...plan,
+        features: Array.isArray(plan.features) ? plan.features : 
+                  typeof plan.features === 'string' ? [plan.features] : []
+      }));
+      
+      setPlans(transformedPlans);
     } catch (error: any) {
       toast({
         title: 'Error',
