@@ -65,6 +65,21 @@ const SubscriptionPlanSelector: React.FC<SubscriptionPlanSelectorProps> = ({
 
   const selectedPlan = plans.find(plan => plan.id === selectedPlanId);
 
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label>Subscription Plan *</Label>
+          <div className="h-10 bg-gray-100 rounded animate-pulse"></div>
+        </div>
+        <div className="space-y-2">
+          <Label>Free Trial Period (days)</Label>
+          <div className="h-10 bg-gray-100 rounded animate-pulse"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -74,15 +89,11 @@ const SubscriptionPlanSelector: React.FC<SubscriptionPlanSelectorProps> = ({
             <SelectValue placeholder="Select a subscription plan" />
           </SelectTrigger>
           <SelectContent>
-            {loading ? (
-              <SelectItem value="" disabled>Loading plans...</SelectItem>
-            ) : (
-              plans.map((plan) => (
-                <SelectItem key={plan.id} value={plan.id}>
-                  {plan.name} - ${plan.price}/{plan.interval}
-                </SelectItem>
-              ))
-            )}
+            {plans.map((plan) => (
+              <SelectItem key={plan.id} value={plan.id}>
+                {plan.name} - ${plan.price}/{plan.interval}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
