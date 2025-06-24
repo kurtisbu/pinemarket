@@ -6,7 +6,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Check } from 'lucide-react';
+import { Loader2, Check, RefreshCw, Star } from 'lucide-react';
 
 interface Program {
   id: string;
@@ -40,13 +40,22 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
   const [hasAccess, setHasAccess] = useState(false);
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState(false);
+  const [selectedInterval, setSelectedInterval] = useState<'month' | 'year'>('month');
 
   useEffect(() => {
+    console.log('SubscriptionPurchaseCard - Program received:', {
+      id: program.id,
+      pricing_model: program.pricing_model,
+      monthly_price: program.monthly_price,
+      yearly_price: program.yearly_price,
+      billing_interval: program.billing_interval,
+      subscription_plan_id: program.subscription_plan_id
+    });
+
     if (program.pricing_model === 'subscription') {
       if (program.subscription_plan_id) {
         fetchSubscriptionPlan();
       } else {
-        // If no subscription_plan_id, create a virtual plan from program data
         createVirtualPlan();
       }
       if (user) {
@@ -58,32 +67,44 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
   }, [program, user]);
 
   const createVirtualPlan = () => {
-    // Create a virtual subscription plan from the program's pricing data
-    let price = 0;
-    let interval = 'month';
-    let description = 'Access to this script';
-
+    console.log('Creating virtual plan from program data');
+    
+    // Determine default interval and price
+    let defaultPrice = 0;
+    let defaultInterval = 'month';
+    
     if (program.billing_interval === 'month' && program.monthly_price) {
-      price = program.monthly_price;
-      interval = 'month';
+      defaultPrice = program.monthly_price;
+      defaultInterval = 'month';
     } else if (program.billing_interval === 'year' && program.yearly_price) {
-      price = program.yearly_price;
-      interval = 'year';
+      defaultPrice = program.yearly_price;
+      defaultInterval = 'year';
     } else if (program.billing_interval === 'both') {
       // Default to monthly if both are available
-      price = program.monthly_price || program.yearly_price || 0;
-      interval = program.monthly_price ? 'month' : 'year';
+      if (program.monthly_price) {
+        defaultPrice = program.monthly_price;
+        defaultInterval = 'month';
+      } else if (program.yearly_price) {
+        defaultPrice = program.yearly_price;
+        defaultInterval = 'year';
+      }
     }
 
     const virtualPlan: SubscriptionPlan = {
       id: `virtual-${program.id}`,
-      name: `${program.title} Subscription`,
-      description,
-      price,
-      interval,
-      features: ['Access to this script', 'Regular updates', 'Support']
+      name: `${program.title} Access`,
+      description: 'Subscribe to access this Pine Script',
+      price: defaultPrice,
+      interval: defaultInterval,
+      features: [
+        'Full access to this Pine Script',
+        'Automatic updates and improvements',
+        'Direct assignment to your TradingView account',
+        'Priority support from the script author'
+      ]
     };
 
+    console.log('Virtual plan created:', virtualPlan);
     setSubscriptionPlan(virtualPlan);
     setLoading(false);
   };
@@ -92,6 +113,8 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
     if (!program.subscription_plan_id) return;
 
     try {
+      console.log('Fetching subscription plan:', program.subscription_plan_id);
+      
       const { data, error } = await supabase
         .from('subscription_plans')
         .select('*')
@@ -100,7 +123,6 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
 
       if (error) throw error;
       
-      // Transform the data to ensure features is always a string array
       const transformedPlan = {
         ...data,
         features: Array.isArray(data.features) 
@@ -108,10 +130,10 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
           : typeof data.features === 'string' ? [data.features] : []
       };
       
+      console.log('Subscription plan fetched:', transformedPlan);
       setSubscriptionPlan(transformedPlan);
     } catch (error: any) {
       console.error('Error fetching subscription plan:', error);
-      // Fallback to virtual plan if fetching fails
       createVirtualPlan();
     } finally {
       setLoading(false);
@@ -122,7 +144,6 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
     if (!user || !program.subscription_plan_id) return;
 
     try {
-      // Check if user has active subscription to this plan
       const { data, error } = await supabase
         .from('user_subscriptions')
         .select('*')
@@ -138,6 +159,18 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
     }
   };
 
+  const getCurrentPrice = () => {
+    if (!program) return 0;
+    
+    if (selectedInterval === 'month' && program.monthly_price) {
+      return program.monthly_price;
+    } else if (selectedInterval === 'year' && program.yearly_price) {
+      return program.yearly_price;
+    }
+    
+    return subscriptionPlan?.price || 0;
+  };
+
   const handleSubscribe = async () => {
     if (!user) {
       toast({
@@ -151,26 +184,24 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
     setSubscribing(true);
 
     try {
-      let functionName = 'create-subscription';
-      let requestBody: any = {
+      const currentPrice = getCurrentPrice();
+      const requestBody: any = {
         successUrl: `${window.location.origin}/subscription/success`,
         cancelUrl: `${window.location.origin}/subscription/cancel`,
       };
 
       if (program.subscription_plan_id) {
-        // Use existing subscription plan
         requestBody.planId = program.subscription_plan_id;
       } else {
-        // Create subscription for individual program
         requestBody.programId = program.id;
-        requestBody.price = subscriptionPlan?.price || 0;
-        requestBody.interval = subscriptionPlan?.interval || 'month';
+        requestBody.price = currentPrice;
+        requestBody.interval = selectedInterval;
         requestBody.productName = program.title;
       }
 
       console.log('Creating subscription with:', requestBody);
 
-      const { data, error } = await supabase.functions.invoke(functionName, {
+      const { data, error } = await supabase.functions.invoke('create-subscription', {
         body: requestBody,
       });
 
@@ -191,6 +222,17 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
     }
   };
 
+  const getIntervalOptions = () => {
+    const options = [];
+    if (program.monthly_price && (program.billing_interval === 'month' || program.billing_interval === 'both')) {
+      options.push({ value: 'month' as const, label: 'Monthly', price: program.monthly_price });
+    }
+    if (program.yearly_price && (program.billing_interval === 'year' || program.billing_interval === 'both')) {
+      options.push({ value: 'year' as const, label: 'Yearly', price: program.yearly_price });
+    }
+    return options;
+  };
+
   if (program.pricing_model !== 'subscription') {
     return null;
   }
@@ -207,76 +249,107 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
     );
   }
 
+  const intervalOptions = getIntervalOptions();
+  const currentPrice = getCurrentPrice();
+
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>Subscription Required</CardTitle>
-          {hasAccess && <Badge variant="default">Subscribed</Badge>}
+          <CardTitle className="flex items-center gap-2">
+            <RefreshCw className="w-5 h-5" />
+            Subscription Required
+          </CardTitle>
+          {hasAccess && <Badge variant="default">Active Subscriber</Badge>}
         </div>
-        {subscriptionPlan && (
-          <CardDescription>
-            This script requires a {subscriptionPlan.name} subscription
-          </CardDescription>
-        )}
+        <CardDescription>
+          Subscribe to get access to this Pine Script
+        </CardDescription>
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        {subscriptionPlan && (
+      <CardContent className="space-y-6">
+        {/* Pricing Options */}
+        {intervalOptions.length > 1 && (
           <div className="space-y-3">
-            <div>
-              <div className="text-2xl font-bold">
-                ${subscriptionPlan.price}
-                <span className="text-sm font-normal text-muted-foreground">
-                  /{subscriptionPlan.interval}
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground">{subscriptionPlan.description}</p>
-            </div>
-
-            {program.trial_period_days && program.trial_period_days > 0 && (
-              <Badge variant="secondary">
-                {program.trial_period_days} day free trial
-              </Badge>
-            )}
-
-            <div className="space-y-2">
-              <h4 className="font-medium">Includes:</h4>
-              <ul className="space-y-1">
-                {subscriptionPlan.features.map((feature, index) => (
-                  <li key={index} className="flex items-center gap-2 text-sm">
-                    <Check className="w-4 h-4 text-primary" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
+            <h4 className="font-medium">Choose your billing interval:</h4>
+            <div className="grid gap-2">
+              {intervalOptions.map((option) => (
+                <Button
+                  key={option.value}
+                  variant={selectedInterval === option.value ? "default" : "outline"}
+                  className="justify-between h-auto p-4"
+                  onClick={() => setSelectedInterval(option.value)}
+                >
+                  <div className="text-left">
+                    <div className="font-medium">{option.label}</div>
+                    <div className="text-sm text-muted-foreground">
+                      ${option.price}/{option.value}
+                    </div>
+                  </div>
+                  {selectedInterval === option.value && <Check className="w-4 h-4" />}
+                </Button>
+              ))}
             </div>
           </div>
         )}
 
+        {/* Current Price Display */}
+        <div className="text-center p-4 bg-muted/50 rounded-lg">
+          <div className="text-3xl font-bold text-green-600">
+            ${currentPrice}
+            <span className="text-lg font-normal text-muted-foreground">
+              /{selectedInterval}
+            </span>
+          </div>
+          {program.trial_period_days && program.trial_period_days > 0 && (
+            <Badge variant="secondary" className="mt-2">
+              {program.trial_period_days} day free trial
+            </Badge>
+          )}
+        </div>
+
+        {/* Features */}
+        {subscriptionPlan && subscriptionPlan.features.length > 0 && (
+          <div className="space-y-3">
+            <h4 className="font-medium">What's included:</h4>
+            <ul className="space-y-2">
+              {subscriptionPlan.features.map((feature, index) => (
+                <li key={index} className="flex items-center gap-2 text-sm">
+                  <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                  {feature}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Action Button */}
         {hasAccess ? (
-          <div className="text-center">
-            <Badge variant="default" className="mb-2">You have access to this script</Badge>
+          <div className="text-center space-y-2">
+            <Badge variant="default" className="mb-2 flex items-center gap-2 justify-center">
+              <Star className="w-4 h-4" />
+              You have access to this script
+            </Badge>
             <p className="text-sm text-muted-foreground">
-              Your subscription includes access to this and other premium scripts.
+              Your subscription includes access to this Pine Script.
             </p>
           </div>
         ) : (
           <Button 
             onClick={handleSubscribe} 
             disabled={subscribing}
-            className="w-full"
+            className="w-full h-12 text-lg font-semibold"
           >
             {subscribing ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Processing...
               </>
             ) : (
               <>
-                Subscribe to {subscriptionPlan?.name || 'Plan'}
+                Subscribe for ${currentPrice}/{selectedInterval}
                 {program.trial_period_days && program.trial_period_days > 0 && (
-                  <span className="ml-2 text-xs">
+                  <span className="ml-2 text-sm font-normal">
                     ({program.trial_period_days} day trial)
                   </span>
                 )}
@@ -287,7 +360,7 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
 
         <div className="text-center">
           <Button variant="link" onClick={() => window.open('/subscriptions', '_blank')}>
-            View All Plans
+            View All Subscription Plans
           </Button>
         </div>
       </CardContent>

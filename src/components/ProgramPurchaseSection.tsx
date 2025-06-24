@@ -21,10 +21,20 @@ interface ProgramPurchaseSectionProps {
 }
 
 const ProgramPurchaseSection: React.FC<ProgramPurchaseSectionProps> = ({ program }) => {
+  console.log('ProgramPurchaseSection - Program data:', {
+    id: program.id,
+    pricing_model: program.pricing_model,
+    price: program.price,
+    monthly_price: program.monthly_price,
+    yearly_price: program.yearly_price,
+    billing_interval: program.billing_interval
+  });
+
   if (program.pricing_model === 'subscription') {
     return <SubscriptionPurchaseCard program={program} />;
   }
 
+  // For one-time purchases, use the regular purchase card
   return (
     <PurchaseCard 
       price={program.price}
