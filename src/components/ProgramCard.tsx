@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
@@ -62,9 +61,9 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
       } else {
         return 'Subscription';
       }
+    } else {
+      return `$${price}`;
     }
-    // Only return the price field for non-subscription models
-    return `$${price}`;
   };
 
   return (
