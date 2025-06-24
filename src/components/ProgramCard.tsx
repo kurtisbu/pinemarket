@@ -63,6 +63,7 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
         return 'Subscription';
       }
     }
+    // Only return the price field for non-subscription models
     return `$${price}`;
   };
 
