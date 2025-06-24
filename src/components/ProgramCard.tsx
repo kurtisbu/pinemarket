@@ -55,6 +55,10 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
         return `$${monthly_price}/month`;
       } else if (billing_interval === 'year' && yearly_price) {
         return `$${yearly_price}/year`;
+      } else if (monthly_price) {
+        return `$${monthly_price}/month`;
+      } else if (yearly_price) {
+        return `$${yearly_price}/year`;
       } else {
         return 'Subscription';
       }
