@@ -8,7 +8,7 @@ import Footer from '@/components/Footer';
 import ImageGallery from '@/components/ImageGallery';
 import DeliveryInfo from '@/components/DeliveryInfo';
 import SellerInfo from '@/components/SellerInfo';
-import PurchaseCard from '@/components/PurchaseCard';
+import ProgramPurchaseSection from '@/components/ProgramPurchaseSection';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -166,11 +166,7 @@ const ProgramDetail = () => {
           {/* Sidebar */}
           <div className="space-y-6">
             <DeliveryInfo program={program} />
-            <PurchaseCard 
-              price={program.price} 
-              programId={program.id}
-              sellerId={program.seller_id}
-            />
+            <ProgramPurchaseSection program={program} />
             <SellerInfo program={program} onViewProfile={handleViewProfile} />
           </div>
         </div>

@@ -11,6 +11,9 @@ interface Program {
   subscription_plan_id: string | null;
   trial_period_days: number | null;
   seller_id: string;
+  monthly_price: number | null;
+  yearly_price: number | null;
+  billing_interval: string | null;
 }
 
 interface ProgramPurchaseSectionProps {
