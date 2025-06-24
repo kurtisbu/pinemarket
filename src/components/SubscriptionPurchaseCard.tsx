@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,6 +15,9 @@ interface Program {
   pricing_model: string;
   subscription_plan_id: string | null;
   trial_period_days: number | null;
+  monthly_price: number | null;
+  yearly_price: number | null;
+  billing_interval: string | null;
 }
 
 interface SubscriptionPlan {
@@ -38,8 +42,13 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
   const [subscribing, setSubscribing] = useState(false);
 
   useEffect(() => {
-    if (program.pricing_model === 'subscription' && program.subscription_plan_id) {
-      fetchSubscriptionPlan();
+    if (program.pricing_model === 'subscription') {
+      if (program.subscription_plan_id) {
+        fetchSubscriptionPlan();
+      } else {
+        // If no subscription_plan_id, create a virtual plan from program data
+        createVirtualPlan();
+      }
       if (user) {
         checkUserAccess();
       }
@@ -47,6 +56,37 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
       setLoading(false);
     }
   }, [program, user]);
+
+  const createVirtualPlan = () => {
+    // Create a virtual subscription plan from the program's pricing data
+    let price = 0;
+    let interval = 'month';
+    let description = 'Access to this script';
+
+    if (program.billing_interval === 'month' && program.monthly_price) {
+      price = program.monthly_price;
+      interval = 'month';
+    } else if (program.billing_interval === 'year' && program.yearly_price) {
+      price = program.yearly_price;
+      interval = 'year';
+    } else if (program.billing_interval === 'both') {
+      // Default to monthly if both are available
+      price = program.monthly_price || program.yearly_price || 0;
+      interval = program.monthly_price ? 'month' : 'year';
+    }
+
+    const virtualPlan: SubscriptionPlan = {
+      id: `virtual-${program.id}`,
+      name: `${program.title} Subscription`,
+      description,
+      price,
+      interval,
+      features: ['Access to this script', 'Regular updates', 'Support']
+    };
+
+    setSubscriptionPlan(virtualPlan);
+    setLoading(false);
+  };
 
   const fetchSubscriptionPlan = async () => {
     if (!program.subscription_plan_id) return;
@@ -71,6 +111,10 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
       setSubscriptionPlan(transformedPlan);
     } catch (error: any) {
       console.error('Error fetching subscription plan:', error);
+      // Fallback to virtual plan if fetching fails
+      createVirtualPlan();
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -91,8 +135,6 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
       setHasAccess(!!data);
     } catch (error: any) {
       console.error('Error checking user access:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -106,17 +148,30 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
       return;
     }
 
-    if (!program.subscription_plan_id) return;
-
     setSubscribing(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('create-subscription', {
-        body: {
-          planId: program.subscription_plan_id,
-          successUrl: `${window.location.origin}/subscription/success`,
-          cancelUrl: `${window.location.origin}/subscription/cancel`,
-        },
+      let functionName = 'create-subscription';
+      let requestBody: any = {
+        successUrl: `${window.location.origin}/subscription/success`,
+        cancelUrl: `${window.location.origin}/subscription/cancel`,
+      };
+
+      if (program.subscription_plan_id) {
+        // Use existing subscription plan
+        requestBody.planId = program.subscription_plan_id;
+      } else {
+        // Create subscription for individual program
+        requestBody.programId = program.id;
+        requestBody.price = subscriptionPlan?.price || 0;
+        requestBody.interval = subscriptionPlan?.interval || 'month';
+        requestBody.productName = program.title;
+      }
+
+      console.log('Creating subscription with:', requestBody);
+
+      const { data, error } = await supabase.functions.invoke(functionName, {
+        body: requestBody,
       });
 
       if (error) throw error;
@@ -125,6 +180,7 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
         window.location.href = data.url;
       }
     } catch (error: any) {
+      console.error('Subscription error:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to create subscription',

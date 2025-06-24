@@ -23,6 +23,10 @@ interface Program {
   average_rating: number;
   rating_count: number;
   created_at: string;
+  pricing_model: string;
+  monthly_price: number | null;
+  yearly_price: number | null;
+  billing_interval: string | null;
   seller: {
     display_name: string;
     username: string;
@@ -168,6 +172,10 @@ const Browse = () => {
                 author={program.seller?.display_name || 'Unknown'}
                 image={program.image_urls?.[0] || '/placeholder.svg'}
                 tags={program.tags || []}
+                pricing_model={program.pricing_model}
+                monthly_price={program.monthly_price}
+                yearly_price={program.yearly_price}
+                billing_interval={program.billing_interval}
               />
             ))}
           </div>
