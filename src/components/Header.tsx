@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { Search, User, ShoppingCart, LogOut, LayoutDashboard, Settings } from 'lucide-react';
+import { Search, User, ShoppingCart, LogOut, LayoutDashboard, Settings, UserCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
@@ -92,6 +91,16 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
     }
   };
 
+  const handleMyProfile = () => {
+    if (profile?.username) {
+      navigate(`/profile/${profile.username}`);
+    }
+  };
+
+  const handleMyPurchases = () => {
+    navigate('/my-purchases');
+  };
+
   return (
     <header className="bg-background border-b border-border sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4">
@@ -145,6 +154,15 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={handleMyProfile}>
+                    <UserCircle className="w-4 h-4 mr-2" />
+                    My Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleMyPurchases}>
+                    <ShoppingCart className="w-4 h-4 mr-2" />
+                    My Purchases
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate('/settings/profile')}>
                     <Settings className="w-4 h-4 mr-2" />
                     Profile Settings

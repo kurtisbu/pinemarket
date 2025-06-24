@@ -12,6 +12,7 @@ import Profile from "./pages/Profile";
 import ProfileSettings from "./pages/ProfileSettings";
 import SellScript from "./pages/SellScript";
 import MyPrograms from "./pages/MyPrograms";
+import MyPurchases from "./pages/MyPurchases";
 import SellerDashboard from "./pages/SellerDashboard";
 import SellerOnboardingPage from "./pages/SellerOnboarding";
 import EditProgram from "./pages/EditProgram";
@@ -40,6 +41,7 @@ const App = () => (
           <Route path="/seller/onboarding" element={<SellerOnboardingPage />} />
           <Route path="/sell-script" element={<SellScript />} />
           <Route path="/my-programs" element={<MyPrograms />} />
+          <Route path="/my-purchases" element={<MyPurchases />} />
           <Route path="/edit-program/:id" element={<EditProgram />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/subscriptions" element={<Subscriptions />} />
