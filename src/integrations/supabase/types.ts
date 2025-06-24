@@ -69,12 +69,14 @@ export type Database = {
       programs: {
         Row: {
           average_rating: number
+          billing_interval: string | null
           category: string
           created_at: string
           description: string
           download_count: number
           id: string
           image_urls: string[] | null
+          monthly_price: number | null
           price: number
           pricing_model: string
           rating_count: number
@@ -89,15 +91,18 @@ export type Database = {
           trial_period_days: number | null
           updated_at: string
           view_count: number
+          yearly_price: number | null
         }
         Insert: {
           average_rating?: number
+          billing_interval?: string | null
           category: string
           created_at?: string
           description: string
           download_count?: number
           id?: string
           image_urls?: string[] | null
+          monthly_price?: number | null
           price: number
           pricing_model?: string
           rating_count?: number
@@ -112,15 +117,18 @@ export type Database = {
           trial_period_days?: number | null
           updated_at?: string
           view_count?: number
+          yearly_price?: number | null
         }
         Update: {
           average_rating?: number
+          billing_interval?: string | null
           category?: string
           created_at?: string
           description?: string
           download_count?: number
           id?: string
           image_urls?: string[] | null
+          monthly_price?: number | null
           price?: number
           pricing_model?: string
           rating_count?: number
@@ -135,6 +143,7 @@ export type Database = {
           trial_period_days?: number | null
           updated_at?: string
           view_count?: number
+          yearly_price?: number | null
         }
         Relationships: [
           {
