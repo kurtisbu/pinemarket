@@ -9,15 +9,14 @@ interface Assignment {
 }
 
 interface AssignmentStatusBadgeProps {
-  assignments?: Assignment[];
+  assignment?: Assignment;
 }
 
-const AssignmentStatusBadge: React.FC<AssignmentStatusBadgeProps> = ({ assignments }) => {
-  if (!assignments || assignments.length === 0) {
+const AssignmentStatusBadge: React.FC<AssignmentStatusBadgeProps> = ({ assignment }) => {
+  if (!assignment) {
     return <Badge variant="secondary">No Assignment</Badge>;
   }
 
-  const assignment = assignments[0];
   const statusConfig = {
     assigned: { variant: 'default' as const, text: 'Script Delivered', color: 'text-green-600' },
     pending: { variant: 'secondary' as const, text: 'Delivery Pending', color: 'text-yellow-600' },

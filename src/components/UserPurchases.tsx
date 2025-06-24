@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,7 +22,7 @@ interface Purchase {
     status: string;
     assigned_at: string | null;
     error_message: string | null;
-  }[];
+  };
 }
 
 interface UserPurchasesProps {

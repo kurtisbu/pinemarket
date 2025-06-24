@@ -2,7 +2,7 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, ExternalLink, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Calendar, ExternalLink } from 'lucide-react';
 import PurchaseStatusBadge from './PurchaseStatusBadge';
 import AssignmentStatusBadge from './AssignmentStatusBadge';
 
@@ -23,7 +23,7 @@ interface Purchase {
     status: string;
     assigned_at: string | null;
     error_message: string | null;
-  }[];
+  };
 }
 
 interface PurchaseItemProps {
@@ -42,7 +42,7 @@ const PurchaseItem: React.FC<PurchaseItemProps> = ({ purchase }) => {
           <div className="flex items-center gap-2 mt-2">
             <Badge variant="outline">{purchase.programs.category}</Badge>
             <PurchaseStatusBadge status={purchase.status} />
-            <AssignmentStatusBadge assignments={purchase.script_assignments} />
+            <AssignmentStatusBadge assignment={purchase.script_assignments} />
           </div>
         </div>
         {purchase.programs.image_urls && purchase.programs.image_urls[0] && (
@@ -83,10 +83,10 @@ const PurchaseItem: React.FC<PurchaseItemProps> = ({ purchase }) => {
         </Button>
       </div>
 
-      {purchase.script_assignments && purchase.script_assignments[0]?.error_message && (
+      {purchase.script_assignments?.error_message && (
         <div className="bg-red-50 border border-red-200 rounded p-3 mt-2">
           <p className="text-sm text-red-700">
-            <strong>Delivery Error:</strong> {purchase.script_assignments[0].error_message}
+            <strong>Delivery Error:</strong> {purchase.script_assignments.error_message}
           </p>
         </div>
       )}
