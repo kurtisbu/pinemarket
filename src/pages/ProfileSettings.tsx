@@ -253,6 +253,19 @@ const ProfileSettings = () => {
                   rows={4}
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="tradingview_username">TradingView Username</Label>
+                <Input
+                  id="tradingview_username"
+                  value={formData.tradingview_username}
+                  onChange={(e) => handleInputChange('tradingview_username', e.target.value)}
+                  placeholder="Your TradingView username"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Set your TradingView username to automatically populate it when purchasing scripts.
+                </p>
+              </div>
             </CardContent>
           </Card>
 
@@ -261,7 +274,7 @@ const ProfileSettings = () => {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>TradingView Integration</CardTitle>
+                <CardTitle>TradingView Integration (Sellers Only)</CardTitle>
                 <Badge variant={formData.is_tradingview_connected ? 'default' : 'destructive'}>
                   {formData.is_tradingview_connected ? 'Connected' : 'Not Connected'}
                 </Badge>
@@ -270,18 +283,8 @@ const ProfileSettings = () => {
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
                 Connect your TradingView account to automate script assignments for your buyers.
-                Your credentials will be securely stored.
+                Your credentials will be securely stored. This is only required for sellers.
               </p>
-              <div className="space-y-2">
-                <Label htmlFor="tradingview_username">TradingView Username</Label>
-                <Input
-                  id="tradingview_username"
-                  value={formData.tradingview_username}
-                  onChange={(e) => handleInputChange('tradingview_username', e.target.value)}
-                  placeholder="Your TradingView username"
-                  disabled={loading}
-                />
-              </div>
               <div className="space-y-2">
                 <Label htmlFor="session_cookie">Session Cookie (sessionid)</Label>
                 <Input
