@@ -171,6 +171,10 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
     return subscriptionPlan?.price || 0;
   };
 
+  const getIntervalDisplay = () => {
+    return selectedInterval === 'month' ? 'month' : 'year';
+  };
+
   const handleSubscribe = async () => {
     if (!user) {
       toast({
@@ -251,6 +255,7 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
 
   const intervalOptions = getIntervalOptions();
   const currentPrice = getCurrentPrice();
+  const intervalDisplay = getIntervalDisplay();
 
   return (
     <Card>
@@ -298,7 +303,7 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
           <div className="text-3xl font-bold text-green-600">
             ${currentPrice}
             <span className="text-lg font-normal text-muted-foreground">
-              /{selectedInterval}
+              /{intervalDisplay}
             </span>
           </div>
           {program.trial_period_days && program.trial_period_days > 0 && (
@@ -347,7 +352,7 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
               </>
             ) : (
               <>
-                Subscribe for ${currentPrice}/{selectedInterval}
+                Subscribe for ${currentPrice}/{intervalDisplay}
                 {program.trial_period_days && program.trial_period_days > 0 && (
                   <span className="ml-2 text-sm font-normal">
                     ({program.trial_period_days} day trial)
