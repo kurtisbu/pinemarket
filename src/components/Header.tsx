@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Search, User, ShoppingCart, LogOut, LayoutDashboard } from 'lucide-react';
+import { Search, User, ShoppingCart, LogOut, LayoutDashboard, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,7 +25,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [profile, setProfile] = useState<{ username: string; avatar_url: string; display_name: string } | null>(null);
+  const [profile, setProfile] = useState<{ username: string; avatar_url: string; display_name: string; is_tradingview_connected: boolean } | null>(null);
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
 
   useEffect(() => {
@@ -33,7 +33,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
       const fetchProfile = async () => {
         const { data } = await supabase
           .from('profiles')
-          .select('username, avatar_url, display_name')
+          .select('username, avatar_url, display_name, is_tradingview_connected')
           .eq('id', user.id)
           .single();
         
@@ -55,11 +55,19 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
   };
 
   const handleDashboard = () => {
-    navigate('/dashboard');
+    if (profile?.is_tradingview_connected) {
+      navigate('/dashboard');
+    } else {
+      navigate('/settings/profile');
+    }
   };
 
   const handleSellScript = () => {
-    navigate('/sell-script');
+    if (profile?.is_tradingview_connected) {
+      navigate('/sell-script');
+    } else {
+      navigate('/seller/onboarding');
+    }
   };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -137,10 +145,16 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem onClick={handleDashboard}>
-                    <LayoutDashboard className="w-4 h-4 mr-2" />
-                    Dashboard
+                  <DropdownMenuItem onClick={() => navigate('/settings/profile')}>
+                    <Settings className="w-4 h-4 mr-2" />
+                    Profile Settings
                   </DropdownMenuItem>
+                  {profile?.is_tradingview_connected && (
+                    <DropdownMenuItem onClick={handleDashboard}>
+                      <LayoutDashboard className="w-4 h-4 mr-2" />
+                      Seller Dashboard
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut}>
                     <LogOut className="w-4 h-4 mr-2" />
@@ -155,7 +169,9 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
             )}
             
             {user ? (
-              <Button onClick={handleSellScript}>Sell Your Script</Button>
+              <Button onClick={handleSellScript}>
+                {profile?.is_tradingview_connected ? 'Sell Your Script' : 'Become a Seller'}
+              </Button>
             ) : (
               <Button onClick={() => navigate('/auth')}>Join PineMarket</Button>
             )}

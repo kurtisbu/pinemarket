@@ -1,69 +1,80 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import type { Database } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/Header';
-import StripeConnectSettings from '@/components/StripeConnectSettings';
 import ProfileBasicInfo from '@/components/ProfileBasicInfo';
 import TradingViewUsernameField from '@/components/TradingViewUsernameField';
-import SellerTradingViewIntegration from '@/components/SellerTradingViewIntegration';
+
+interface Profile {
+  id: string;
+  username: string;
+  display_name: string;
+  avatar_url: string;
+  bio: string;
+  tradingview_username: string;
+  is_tradingview_connected: boolean;
+}
 
 const ProfileSettings = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  
-  const [loading, setLoading] = useState(false);
-  const [testingConnection, setTestingConnection] = useState(false);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+
   const [formData, setFormData] = useState({
     display_name: '',
     bio: '',
     avatar_url: '',
     tradingview_username: '',
-    tradingview_session_cookie: '',
-    tradingview_signed_session_cookie: '',
-    is_tradingview_connected: false,
   });
-
-  const fetchProfile = useCallback(async () => {
-    if (!user) return;
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('display_name, bio, avatar_url, tradingview_username, is_tradingview_connected')
-      .eq('id', user.id)
-      .single();
-
-    if (data) {
-      setFormData(prev => ({
-        ...prev,
-        display_name: data.display_name || '',
-        bio: data.bio || '',
-        avatar_url: data.avatar_url || '',
-        tradingview_username: data.tradingview_username || '',
-        is_tradingview_connected: data.is_tradingview_connected || false,
-      }));
-    }
-  }, [user]);
 
   useEffect(() => {
     if (!user) {
       navigate('/auth');
       return;
     }
-
     fetchProfile();
-  }, [user, navigate, fetchProfile]);
+  }, [user, navigate]);
+
+  const fetchProfile = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+      
+      setProfile(data);
+      setFormData({
+        display_name: data.display_name || '',
+        bio: data.bio || '',
+        avatar_url: data.avatar_url || '',
+        tradingview_username: data.tradingview_username || '',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch profile data',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -73,31 +84,29 @@ const ProfileSettings = () => {
     setUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(fileName, file, { upsert: true });
+        .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
+      const { data } = supabase.storage
         .from('avatars')
-        .getPublicUrl(fileName);
+        .getPublicUrl(filePath);
 
-      setFormData(prev => ({
-        ...prev,
-        avatar_url: publicUrl
-      }));
-
+      handleInputChange('avatar_url', data.publicUrl);
+      
       toast({
-        title: 'Avatar uploaded',
-        description: 'Your profile picture has been updated.',
+        title: 'Success',
+        description: 'Avatar uploaded successfully',
       });
     } catch (error: any) {
       toast({
-        title: 'Upload failed',
-        description: error.message,
+        title: 'Error',
+        description: 'Failed to upload avatar',
         variant: 'destructive',
       });
     } finally {
@@ -105,107 +114,76 @@ const ProfileSettings = () => {
     }
   };
 
-  const handleTestConnection = async () => {
-    if (!user) return;
-    setTestingConnection(true);
-
-    try {
-      const { data, error } = await supabase.functions.invoke('tradingview-service', {
-        body: {
-          action: 'test-connection',
-          credentials: {
-            tradingview_session_cookie: formData.tradingview_session_cookie,
-            tradingview_signed_session_cookie: formData.tradingview_signed_session_cookie,
-          },
-          user_id: user.id,
-          tradingview_username: formData.tradingview_username,
-        },
-      });
-
-      if (error) throw new Error(error.message);
-
-      if (data.error) throw new Error(data.error);
-
-      toast({
-        title: 'Success!',
-        description: data.message,
-      });
-
-      setFormData(prev => ({
-        ...prev,
-        tradingview_session_cookie: '',
-        tradingview_signed_session_cookie: '',
-      }));
-
-      await fetchProfile();
-
-    } catch (error: any) {
-      toast({
-        title: 'Connection Test Failed',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setTestingConnection(false);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async () => {
     if (!user) return;
 
-    setLoading(true);
+    setSaving(true);
     try {
-      const updateData: Database['public']['Tables']['profiles']['Insert'] = {
-        id: user.id,
-        display_name: formData.display_name,
-        bio: formData.bio,
-        avatar_url: formData.avatar_url,
-        tradingview_username: formData.tradingview_username,
-        updated_at: new Date().toISOString(),
-      };
-
       const { error } = await supabase
         .from('profiles')
-        .upsert(updateData);
+        .update({
+          display_name: formData.display_name,
+          bio: formData.bio,
+          avatar_url: formData.avatar_url,
+          tradingview_username: formData.tradingview_username,
+        })
+        .eq('id', user.id);
 
       if (error) throw error;
 
       toast({
-        title: 'Settings updated',
-        description: 'Your profile settings have been successfully updated.',
+        title: 'Success',
+        description: 'Profile updated successfully',
       });
 
-      setFormData(prev => ({
-        ...prev,
-        tradingview_session_cookie: '',
-        tradingview_signed_session_cookie: '',
-      }));
-
+      fetchProfile();
     } catch (error: any) {
       toast({
-        title: 'Update failed',
-        description: error.message,
+        title: 'Error',
+        description: 'Failed to update profile',
         variant: 'destructive',
       });
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
+  const handleBecomeSeller = () => {
+    navigate('/seller/onboarding');
+  };
+
   if (!user) return null;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-2xl mx-auto">
+            <div className="animate-pulse">
+              <div className="h-8 bg-muted rounded w-1/3 mb-6"></div>
+              <div className="h-32 bg-muted rounded mb-6"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <div className="container mx-auto px-4 py-8">
-        <form onSubmit={handleSubmit} className="max-w-2xl mx-auto space-y-8">
+        <div className="max-w-2xl mx-auto space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold">Profile Settings</h1>
+            <p className="text-muted-foreground">
+              Manage your account settings and preferences
+            </p>
+          </div>
+
           <ProfileBasicInfo
-            formData={{
-              display_name: formData.display_name,
-              bio: formData.bio,
-              avatar_url: formData.avatar_url,
-            }}
+            formData={formData}
             onInputChange={handleInputChange}
             onAvatarUpload={handleAvatarUpload}
             uploading={uploading}
@@ -216,24 +194,24 @@ const ProfileSettings = () => {
             onChange={handleInputChange}
           />
 
-          <StripeConnectSettings />
+          {!profile?.is_tradingview_connected && (
+            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+              <h3 className="font-semibold text-blue-900 mb-2">Want to sell your Pine Scripts?</h3>
+              <p className="text-blue-700 text-sm mb-4">
+                Join our seller program to monetize your TradingView Pine Scripts and reach thousands of traders.
+              </p>
+              <Button onClick={handleBecomeSeller} variant="outline">
+                Become a Seller
+              </Button>
+            </div>
+          )}
 
-          <SellerTradingViewIntegration
-            formData={{
-              tradingview_session_cookie: formData.tradingview_session_cookie,
-              tradingview_signed_session_cookie: formData.tradingview_signed_session_cookie,
-              is_tradingview_connected: formData.is_tradingview_connected,
-            }}
-            onInputChange={handleInputChange}
-            onTestConnection={handleTestConnection}
-            loading={loading}
-            testingConnection={testingConnection}
-          />
-
-          <Button type="submit" disabled={loading || uploading || testingConnection} className="w-full">
-            {loading ? 'Saving Settings...' : 'Save All Settings'}
-          </Button>
-        </form>
+          <div className="flex justify-end">
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
