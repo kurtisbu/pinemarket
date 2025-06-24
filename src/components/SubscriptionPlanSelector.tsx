@@ -1,126 +1,107 @@
 
-import React, { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import React from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Check } from 'lucide-react';
-
-interface SubscriptionPlan {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  interval: string;
-  features: string[];
-  is_active: boolean;
-}
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface SubscriptionPlanSelectorProps {
-  selectedPlanId: string;
-  onPlanChange: (planId: string) => void;
+  monthlyPrice: string;
+  onMonthlyPriceChange: (price: string) => void;
+  yearlyPrice: string;
+  onYearlyPriceChange: (price: string) => void;
+  interval: string;
+  onIntervalChange: (interval: string) => void;
   trialPeriodDays: number;
   onTrialPeriodChange: (days: number) => void;
 }
 
 const SubscriptionPlanSelector: React.FC<SubscriptionPlanSelectorProps> = ({
-  selectedPlanId,
-  onPlanChange,
+  monthlyPrice,
+  onMonthlyPriceChange,
+  yearlyPrice,
+  onYearlyPriceChange,
+  interval,
+  onIntervalChange,
   trialPeriodDays,
   onTrialPeriodChange,
 }) => {
-  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchPlans();
-  }, []);
-
-  const fetchPlans = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('subscription_plans')
-        .select('*')
-        .eq('is_active', true)
-        .order('price');
-
-      if (error) throw error;
-      
-      const transformedPlans = (data || []).map(plan => ({
-        ...plan,
-        features: Array.isArray(plan.features) 
-          ? plan.features.filter(item => typeof item === 'string') as string[]
-          : typeof plan.features === 'string' ? [plan.features] : []
-      }));
-      
-      setPlans(transformedPlans);
-    } catch (error) {
-      console.error('Error fetching subscription plans:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const selectedPlan = plans.find(plan => plan.id === selectedPlanId);
-
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label>Subscription Plan *</Label>
-          <div className="h-10 bg-gray-100 rounded animate-pulse"></div>
-        </div>
-        <div className="space-y-2">
-          <Label>Free Trial Period (days)</Label>
-          <div className="h-10 bg-gray-100 rounded animate-pulse"></div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="subscription-plan">Subscription Plan *</Label>
-        <Select value={selectedPlanId} onValueChange={onPlanChange} required>
+        <Label htmlFor="billing-interval">Billing Interval *</Label>
+        <Select value={interval} onValueChange={onIntervalChange} required>
           <SelectTrigger>
-            <SelectValue placeholder="Select a subscription plan" />
+            <SelectValue placeholder="Select billing interval" />
           </SelectTrigger>
           <SelectContent>
-            {plans.map((plan) => (
-              <SelectItem key={plan.id} value={plan.id}>
-                {plan.name} - ${plan.price}/{plan.interval}
-              </SelectItem>
-            ))}
+            <SelectItem value="month">Monthly</SelectItem>
+            <SelectItem value="year">Yearly</SelectItem>
+            <SelectItem value="both">Both Monthly and Yearly</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      {selectedPlan && (
+      {(interval === 'month' || interval === 'both') && (
+        <div className="space-y-2">
+          <Label htmlFor="monthly-price">Monthly Price (USD) *</Label>
+          <Input
+            id="monthly-price"
+            type="number"
+            step="0.01"
+            min="0"
+            value={monthlyPrice}
+            onChange={(e) => onMonthlyPriceChange(e.target.value)}
+            placeholder="9.99"
+            required
+          />
+        </div>
+      )}
+
+      {(interval === 'year' || interval === 'both') && (
+        <div className="space-y-2">
+          <Label htmlFor="yearly-price">Yearly Price (USD) *</Label>
+          <Input
+            id="yearly-price"
+            type="number"
+            step="0.01"
+            min="0"
+            value={yearlyPrice}
+            onChange={(e) => onYearlyPriceChange(e.target.value)}
+            placeholder="99.99"
+            required
+          />
+          {interval === 'both' && monthlyPrice && (
+            <p className="text-sm text-muted-foreground">
+              Monthly equivalent: ${(parseFloat(yearlyPrice) / 12).toFixed(2)}/month
+              {parseFloat(yearlyPrice) < parseFloat(monthlyPrice) * 12 && 
+                ` (Save ${(parseFloat(monthlyPrice) * 12 - parseFloat(yearlyPrice)).toFixed(2)} per year)`
+              }
+            </p>
+          )}
+        </div>
+      )}
+
+      {interval && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">{selectedPlan.name}</CardTitle>
-            <CardDescription>{selectedPlan.description}</CardDescription>
-            <div className="text-2xl font-bold">
-              ${selectedPlan.price}
-              <span className="text-sm font-normal text-muted-foreground">
-                /{selectedPlan.interval}
-              </span>
-            </div>
+            <CardTitle className="text-lg">Subscription Summary</CardTitle>
+            <CardDescription>Your subscription pricing options</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              <h4 className="font-medium">Plan includes:</h4>
-              <ul className="space-y-1">
-                {selectedPlan.features.map((feature, index) => (
-                  <li key={index} className="flex items-center gap-2 text-sm">
-                    <Check className="w-4 h-4 text-primary" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
+              {(interval === 'month' || interval === 'both') && monthlyPrice && (
+                <div className="flex justify-between">
+                  <span>Monthly:</span>
+                  <span className="font-medium">${monthlyPrice}/month</span>
+                </div>
+              )}
+              {(interval === 'year' || interval === 'both') && yearlyPrice && (
+                <div className="flex justify-between">
+                  <span>Yearly:</span>
+                  <span className="font-medium">${yearlyPrice}/year</span>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

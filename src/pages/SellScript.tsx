@@ -33,7 +33,9 @@ const SellScript = () => {
     tags: [] as string[],
     tradingview_publication_url: '',
     pricing_model: 'one_time' as 'one_time' | 'subscription',
-    subscription_plan_id: '',
+    monthly_price: '',
+    yearly_price: '',
+    billing_interval: '',
     trial_period_days: 0
   });
 
@@ -123,13 +125,33 @@ const SellScript = () => {
     if (!user) return;
 
     // Validation for subscription model
-    if (formData.pricing_model === 'subscription' && !formData.subscription_plan_id) {
-      toast({
-        title: 'Subscription plan required',
-        description: 'Please select a subscription plan for subscription-based pricing.',
-        variant: 'destructive',
-      });
-      return;
+    if (formData.pricing_model === 'subscription') {
+      if (!formData.billing_interval) {
+        toast({
+          title: 'Billing interval required',
+          description: 'Please select a billing interval for subscription pricing.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      if ((formData.billing_interval === 'month' || formData.billing_interval === 'both') && !formData.monthly_price) {
+        toast({
+          title: 'Monthly price required',
+          description: 'Please set a monthly price for your subscription.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      if ((formData.billing_interval === 'year' || formData.billing_interval === 'both') && !formData.yearly_price) {
+        toast({
+          title: 'Yearly price required',
+          description: 'Please set a yearly price for your subscription.',
+          variant: 'destructive',
+        });
+        return;
+      }
     }
     
     setLoading(true);
@@ -188,8 +210,10 @@ const SellScript = () => {
       if (formData.pricing_model === 'one_time') {
         programData.price = parseFloat(formData.price);
       } else {
-        programData.price = 0; // Subscription pricing is handled by the plan
-        programData.subscription_plan_id = formData.subscription_plan_id;
+        programData.price = 0; // Subscription pricing stored separately
+        programData.monthly_price = formData.monthly_price ? parseFloat(formData.monthly_price) : null;
+        programData.yearly_price = formData.yearly_price ? parseFloat(formData.yearly_price) : null;
+        programData.billing_interval = formData.billing_interval;
         programData.trial_period_days = formData.trial_period_days;
       }
 
@@ -291,8 +315,12 @@ const SellScript = () => {
                   </div>
                 ) : (
                   <SubscriptionPlanSelector
-                    selectedPlanId={formData.subscription_plan_id}
-                    onPlanChange={(planId) => handleInputChange('subscription_plan_id', planId)}
+                    monthlyPrice={formData.monthly_price}
+                    onMonthlyPriceChange={(price) => handleInputChange('monthly_price', price)}
+                    yearlyPrice={formData.yearly_price}
+                    onYearlyPriceChange={(price) => handleInputChange('yearly_price', price)}
+                    interval={formData.billing_interval}
+                    onIntervalChange={(interval) => handleInputChange('billing_interval', interval)}
                     trialPeriodDays={formData.trial_period_days}
                     onTrialPeriodChange={(days) => handleInputChange('trial_period_days', days)}
                   />
