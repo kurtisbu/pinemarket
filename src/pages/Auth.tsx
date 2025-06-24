@@ -12,8 +12,7 @@ const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [username, setUsername] = useState('');
-  const [displayName, setDisplayName] = useState('');
+  const [tradingviewUsername, setTradingviewUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const [wantsToSell, setWantsToSell] = useState(false);
   
@@ -47,7 +46,7 @@ const Auth = () => {
           });
         }
       } else {
-        const { error } = await signUp(email, password, username, displayName);
+        const { error } = await signUp(email, password, tradingviewUsername);
         if (error) {
           toast({
             title: "Error signing up",
@@ -156,47 +155,6 @@ const Auth = () => {
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
-            {!isLogin && (
-              <>
-                <div>
-                  <label htmlFor="username" className="block text-sm font-medium mb-2">
-                    Username
-                  </label>
-                  <Input
-                    id="username"
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Enter your username"
-                    required={!isLogin}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="displayName" className="block text-sm font-medium mb-2">
-                    Display Name
-                  </label>
-                  <Input
-                    id="displayName"
-                    type="text"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="Enter your display name"
-                  />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="wantsToSell"
-                    checked={wantsToSell}
-                    onChange={(e) => setWantsToSell(e.target.checked)}
-                    className="rounded border-gray-300"
-                  />
-                  <label htmlFor="wantsToSell" className="text-sm">
-                    I want to sell Pine Scripts (we'll guide you through the setup)
-                  </label>
-                </div>
-              </>
-            )}
             <div>
               <label htmlFor="email" className="block text-sm font-medium mb-2">
                 Email address
@@ -223,6 +181,38 @@ const Auth = () => {
                 required
               />
             </div>
+            {!isLogin && (
+              <>
+                <div>
+                  <label htmlFor="tradingviewUsername" className="block text-sm font-medium mb-2">
+                    TradingView Username
+                  </label>
+                  <Input
+                    id="tradingviewUsername"
+                    type="text"
+                    value={tradingviewUsername}
+                    onChange={(e) => setTradingviewUsername(e.target.value)}
+                    placeholder="Your TradingView username"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This will be used to grant you access to purchased Pine Scripts
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="wantsToSell"
+                    checked={wantsToSell}
+                    onChange={(e) => setWantsToSell(e.target.checked)}
+                    className="rounded border-gray-300"
+                  />
+                  <label htmlFor="wantsToSell" className="text-sm">
+                    I want to sell Pine Scripts (we'll guide you through the setup)
+                  </label>
+                </div>
+              </>
+            )}
           </div>
 
           <Button
