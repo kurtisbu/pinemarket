@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -5,15 +6,11 @@ import type { Database } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Header from '@/components/Header';
 import StripeConnectSettings from '@/components/StripeConnectSettings';
-import { Upload, User, Loader2 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import ProfileBasicInfo from '@/components/ProfileBasicInfo';
+import TradingViewUsernameField from '@/components/TradingViewUsernameField';
+import SellerTradingViewIntegration from '@/components/SellerTradingViewIntegration';
 
 const ProfileSettings = () => {
   const { user } = useAuth();
@@ -203,116 +200,35 @@ const ProfileSettings = () => {
       <Header />
       <div className="container mx-auto px-4 py-8">
         <form onSubmit={handleSubmit} className="max-w-2xl mx-auto space-y-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Profile Settings</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex flex-col items-center space-y-4">
-                <Avatar className="w-24 h-24">
-                  <AvatarImage src={formData.avatar_url} alt="Profile picture" />
-                  <AvatarFallback className="text-2xl">
-                    <User className="w-8 h-8" />
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <Label htmlFor="avatar" className="cursor-pointer">
-                    <div className="flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors">
-                      <Upload className="w-4 h-4" />
-                      {uploading ? 'Uploading...' : 'Change Avatar'}
-                    </div>
-                  </Label>
-                  <Input
-                    id="avatar"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleAvatarUpload}
-                    disabled={uploading}
-                    className="hidden"
-                  />
-                </div>
-              </div>
+          <ProfileBasicInfo
+            formData={{
+              display_name: formData.display_name,
+              bio: formData.bio,
+              avatar_url: formData.avatar_url,
+            }}
+            onInputChange={handleInputChange}
+            onAvatarUpload={handleAvatarUpload}
+            uploading={uploading}
+          />
 
-              <div className="space-y-2">
-                <Label htmlFor="display_name">Display Name</Label>
-                <Input
-                  id="display_name"
-                  value={formData.display_name}
-                  onChange={(e) => handleInputChange('display_name', e.target.value)}
-                  placeholder="Your display name"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="bio">Bio</Label>
-                <Textarea
-                  id="bio"
-                  value={formData.bio}
-                  onChange={(e) => handleInputChange('bio', e.target.value)}
-                  placeholder="Tell us about yourself..."
-                  rows={4}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="tradingview_username">TradingView Username</Label>
-                <Input
-                  id="tradingview_username"
-                  value={formData.tradingview_username}
-                  onChange={(e) => handleInputChange('tradingview_username', e.target.value)}
-                  placeholder="Your TradingView username"
-                />
-                <p className="text-sm text-muted-foreground">
-                  Set your TradingView username to automatically populate it when purchasing scripts.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <TradingViewUsernameField
+            value={formData.tradingview_username}
+            onChange={handleInputChange}
+          />
 
           <StripeConnectSettings />
 
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>TradingView Integration (Sellers Only)</CardTitle>
-                <Badge variant={formData.is_tradingview_connected ? 'default' : 'destructive'}>
-                  {formData.is_tradingview_connected ? 'Connected' : 'Not Connected'}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Connect your TradingView account to automate script assignments for your buyers.
-                Your credentials will be securely stored. This is only required for sellers.
-              </p>
-              <div className="space-y-2">
-                <Label htmlFor="session_cookie">Session Cookie (sessionid)</Label>
-                <Input
-                  id="session_cookie"
-                  type="password"
-                  value={formData.tradingview_session_cookie}
-                  onChange={(e) => handleInputChange('tradingview_session_cookie', e.target.value)}
-                  placeholder="Value is hidden for security"
-                  disabled={loading}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="signed_session_cookie">Signed Session Cookie (sessionid_sign)</Label>
-                <Input
-                  id="signed_session_cookie"
-                  type="password"
-                  value={formData.tradingview_signed_session_cookie}
-                  onChange={(e) => handleInputChange('tradingview_signed_session_cookie', e.target.value)}
-                  placeholder="Value is hidden for security"
-                  disabled={loading}
-                />
-              </div>
-              <Button type="button" onClick={handleTestConnection} variant="outline" disabled={loading || testingConnection}>
-                {testingConnection ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {testingConnection ? 'Testing...' : 'Test & Save Connection'}
-              </Button>
-            </CardContent>
-          </Card>
+          <SellerTradingViewIntegration
+            formData={{
+              tradingview_session_cookie: formData.tradingview_session_cookie,
+              tradingview_signed_session_cookie: formData.tradingview_signed_session_cookie,
+              is_tradingview_connected: formData.is_tradingview_connected,
+            }}
+            onInputChange={handleInputChange}
+            onTestConnection={handleTestConnection}
+            loading={loading}
+            testingConnection={testingConnection}
+          />
 
           <Button type="submit" disabled={loading || uploading || testingConnection} className="w-full">
             {loading ? 'Saving Settings...' : 'Save All Settings'}
