@@ -9,6 +9,7 @@ import Header from '@/components/Header';
 import { User, Calendar } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import UserTradingViewScripts from '@/components/UserTradingViewScripts';
+import UserPurchases from '@/components/UserPurchases';
 
 interface Profile {
   id: string;
@@ -91,7 +92,7 @@ const Profile = () => {
     <div className="min-h-screen bg-background">
       <Header />
       <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-4xl mx-auto space-y-6">
           <Card>
             <CardHeader className="pb-4">
               <div className="flex items-start gap-6">
@@ -132,19 +133,28 @@ const Profile = () => {
                   <p>This user hasn't added a bio yet.</p>
                 </div>
               )}
-              
-              <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold mb-4">Pine Script Programs for Sale</h3>
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>No programs available yet. Check back later!</p>
-                </div>
-              </div>
-
-              {profile.is_tradingview_connected && (
-                <UserTradingViewScripts profileId={profile.id} isOwner={isOwner} />
-              )}
             </CardContent>
           </Card>
+
+          {/* Show purchases only to the profile owner */}
+          {isOwner && (
+            <UserPurchases userId={profile.id} />
+          )}
+
+          <Card>
+            <CardHeader>
+              <h3 className="text-lg font-semibold">Pine Script Programs for Sale</h3>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No programs available yet. Check back later!</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {profile.is_tradingview_connected && (
+            <UserTradingViewScripts profileId={profile.id} isOwner={isOwner} />
+          )}
         </div>
       </div>
     </div>
