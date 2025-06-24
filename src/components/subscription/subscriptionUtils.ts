@@ -79,7 +79,15 @@ export const getCurrentPrice = (program: Program, selectedInterval: 'month' | 'y
     return program.yearly_price;
   }
   
-  return subscriptionPlan?.price || 0;
+  // Fallback to subscription plan price, but only if it's not 0
+  if (subscriptionPlan?.price && subscriptionPlan.price > 0) {
+    return subscriptionPlan.price;
+  }
+  
+  // Final fallback - return the appropriate price based on interval
+  return selectedInterval === 'month' 
+    ? (program.monthly_price || 0)
+    : (program.yearly_price || 0);
 };
 
 export const getIntervalDisplay = (selectedInterval: 'month' | 'year'): string => {
