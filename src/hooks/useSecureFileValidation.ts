@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSecurityAudit } from './useSecurityAudit';
@@ -44,7 +43,18 @@ export const useSecureFileValidation = () => {
         };
       }
 
-      const result = data as FileValidationResult;
+      // Properly cast and validate the result
+      const result = data as unknown as FileValidationResult;
+      
+      // Validate the result structure
+      if (!result || typeof result !== 'object' || typeof result.valid !== 'boolean') {
+        console.error('Invalid file validation result structure:', result);
+        await logFileUploadAttempt(file.name, file.size, 'failed', 'Invalid validation response');
+        return {
+          valid: false,
+          error: 'Invalid validation response'
+        };
+      }
       
       if (!result.valid) {
         await logFileUploadAttempt(file.name, file.size, 'failed', result.error);

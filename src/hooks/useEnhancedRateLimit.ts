@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -42,7 +41,14 @@ export const useEnhancedRateLimit = () => {
         return null;
       }
 
-      const result = data as RateLimitResult;
+      // Properly cast the result with type checking
+      const result = data as unknown as RateLimitResult;
+
+      // Validate the result structure before using it
+      if (!result || typeof result !== 'object') {
+        console.error('Invalid rate limit result structure:', result);
+        return null;
+      }
 
       // Log suspicious activity if rate limit is exceeded
       if (!result.allowed) {

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,9 +11,9 @@ interface SecurityAuditLog {
   id: string;
   action: string;
   resource_type: string;
-  resource_id?: string;
-  risk_level: 'low' | 'medium' | 'high' | 'critical';
-  details?: Record<string, any>;
+  resource_id?: string | null;
+  risk_level: string; // Changed from union type to string to match database
+  details?: any; // Changed from Record<string, any> to any to match Json type
   created_at: string;
 }
 
@@ -62,7 +61,18 @@ const SecurityAuditDashboard: React.FC = () => {
         return;
       }
 
-      setLogs(data || []);
+      // Cast the data to our interface type
+      const typedLogs = (data || []).map(log => ({
+        id: log.id,
+        action: log.action,
+        resource_type: log.resource_type,
+        resource_id: log.resource_id,
+        risk_level: log.risk_level || 'low',
+        details: log.details,
+        created_at: log.created_at
+      })) as SecurityAuditLog[];
+
+      setLogs(typedLogs);
     } catch (error) {
       console.error('Error fetching security logs:', error);
     } finally {
