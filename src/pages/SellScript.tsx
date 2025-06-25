@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,7 +21,7 @@ const SellScript = () => {
   
   const [loading, setLoading] = useState(false);
   const [scriptFile, setScriptFile] = useState<File | null>(null);
-  const [scriptType, setScriptType] = useState<'file' | 'link'>('file');
+  const [scriptType, setScriptType] = useState<'file' | 'link'>('link'); // Changed default to 'link'
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [currentTag, setCurrentTag] = useState('');
   const [formData, setFormData] = useState({
@@ -310,16 +309,27 @@ const SellScript = () => {
                   <Label>Pine Script *</Label>
                   <RadioGroup value={scriptType} onValueChange={(value: 'file' | 'link') => setScriptType(value)}>
                     <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="file" id="file" />
-                      <Label htmlFor="file">Upload .txt file</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
                       <RadioGroupItem value="link" id="link" />
                       <Label htmlFor="link">TradingView publication link</Label>
                     </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="file" id="file" />
+                      <Label htmlFor="file">Upload .txt file</Label>
+                    </div>
                   </RadioGroup>
 
-                  {scriptType === 'file' ? (
+                  {scriptType === 'link' ? (
+                    <div className="space-y-2">
+                      <Input
+                        value={formData.tradingview_publication_url}
+                        onChange={(e) => handleInputChange('tradingview_publication_url', e.target.value)}
+                        placeholder="https://www.tradingview.com/script/..."
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Provide a link to your published Pine Script on TradingView
+                      </p>
+                    </div>
+                  ) : (
                     <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
                       <div className="text-center">
                         <Upload className="mx-auto h-12 w-12 text-gray-400" />
@@ -337,18 +347,10 @@ const SellScript = () => {
                             className="hidden"
                           />
                         </div>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          .txt files are delivered as downloadable files to buyers after purchase
+                        </p>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <Input
-                        value={formData.tradingview_publication_url}
-                        onChange={(e) => handleInputChange('tradingview_publication_url', e.target.value)}
-                        placeholder="https://www.tradingview.com/script/..."
-                      />
-                      <p className="text-sm text-muted-foreground">
-                        Provide a link to your published Pine Script on TradingView
-                      </p>
                     </div>
                   )}
                 </div>
