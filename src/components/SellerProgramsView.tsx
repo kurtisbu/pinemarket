@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -98,21 +99,6 @@ const SellerProgramsView: React.FC = () => {
     }
   };
 
-  const renderProgramPrice = (program: Program) => {
-    if (program.pricing_model === 'subscription') {
-      const prices = [];
-      if (program.monthly_price) {
-        prices.push(`$${program.monthly_price}/mo`);
-      }
-      if (program.yearly_price) {
-        prices.push(`$${program.yearly_price}/yr`);
-      }
-      return prices.length > 0 ? prices.join(' or ') : 'Subscription';
-    } else {
-      return `$${program.price}`;
-    }
-  };
-
   const filteredPrograms = programs.filter(program => 
     statusFilter === 'all' || program.status === statusFilter
   );
@@ -184,7 +170,7 @@ const SellerProgramsView: React.FC = () => {
                   <div className="flex-1">
                     <CardTitle className="text-lg">{program.title}</CardTitle>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {program.category} • {renderProgramPrice(program)}
+                      {program.category} • ${program.price}
                     </p>
                   </div>
                   <DropdownMenu>

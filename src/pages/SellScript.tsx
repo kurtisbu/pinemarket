@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,7 +12,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import SubscriptionPlanSelector from '@/components/SubscriptionPlanSelector';
 import Header from '@/components/Header';
 import { Upload, X, Plus } from 'lucide-react';
 
@@ -31,12 +31,7 @@ const SellScript = () => {
     price: '',
     category: '',
     tags: [] as string[],
-    tradingview_publication_url: '',
-    pricing_model: 'one_time' as 'one_time' | 'subscription',
-    monthly_price: '',
-    yearly_price: '',
-    billing_interval: '',
-    trial_period_days: 0
+    tradingview_publication_url: ''
   });
 
   const categories = [
@@ -124,34 +119,13 @@ const SellScript = () => {
     e.preventDefault();
     if (!user) return;
 
-    // Validation for subscription model
-    if (formData.pricing_model === 'subscription') {
-      if (!formData.billing_interval) {
-        toast({
-          title: 'Billing interval required',
-          description: 'Please select a billing interval for subscription pricing.',
-          variant: 'destructive',
-        });
-        return;
-      }
-      
-      if ((formData.billing_interval === 'month' || formData.billing_interval === 'both') && !formData.monthly_price) {
-        toast({
-          title: 'Monthly price required',
-          description: 'Please set a monthly price for your subscription.',
-          variant: 'destructive',
-        });
-        return;
-      }
-      
-      if ((formData.billing_interval === 'year' || formData.billing_interval === 'both') && !formData.yearly_price) {
-        toast({
-          title: 'Yearly price required',
-          description: 'Please set a yearly price for your subscription.',
-          variant: 'destructive',
-        });
-        return;
-      }
+    if (!formData.price) {
+      toast({
+        title: 'Price required',
+        description: 'Please set a price for your program.',
+        variant: 'destructive',
+      });
+      return;
     }
     
     setLoading(true);
@@ -192,8 +166,8 @@ const SellScript = () => {
         imageUrls.push(url);
       }
 
-      // Create program record
-      const programData: any = {
+      // Create program record with one-time pricing only
+      const programData = {
         seller_id: user.id,
         title: formData.title,
         description: formData.description,
@@ -204,18 +178,13 @@ const SellScript = () => {
         script_file_path: scriptPath,
         tradingview_publication_url: publicationUrl,
         tradingview_script_id: scriptId,
-        pricing_model: formData.pricing_model,
+        pricing_model: 'one_time',
+        price: parseFloat(formData.price),
+        monthly_price: null,
+        yearly_price: null,
+        billing_interval: null,
+        trial_period_days: 0
       };
-
-      if (formData.pricing_model === 'one_time') {
-        programData.price = parseFloat(formData.price);
-      } else {
-        programData.price = 0; // Subscription pricing stored separately
-        programData.monthly_price = formData.monthly_price ? parseFloat(formData.monthly_price) : null;
-        programData.yearly_price = formData.yearly_price ? parseFloat(formData.yearly_price) : null;
-        programData.billing_interval = formData.billing_interval;
-        programData.trial_period_days = formData.trial_period_days;
-      }
 
       const { error } = await supabase
         .from('programs')
@@ -282,49 +251,22 @@ const SellScript = () => {
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <Label>Pricing Model *</Label>
-                  <RadioGroup 
-                    value={formData.pricing_model} 
-                    onValueChange={(value: 'one_time' | 'subscription') => handleInputChange('pricing_model', value)}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="one_time" id="one_time" />
-                      <Label htmlFor="one_time">One-time Purchase</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="subscription" id="subscription" />
-                      <Label htmlFor="subscription">Subscription</Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-
-                {formData.pricing_model === 'one_time' ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="price">Price (USD) *</Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.price}
-                      onChange={(e) => handleInputChange('price', e.target.value)}
-                      placeholder="0.00"
-                      required
-                    />
-                  </div>
-                ) : (
-                  <SubscriptionPlanSelector
-                    monthlyPrice={formData.monthly_price}
-                    onMonthlyPriceChange={(price) => handleInputChange('monthly_price', price)}
-                    yearlyPrice={formData.yearly_price}
-                    onYearlyPriceChange={(price) => handleInputChange('yearly_price', price)}
-                    interval={formData.billing_interval}
-                    onIntervalChange={(interval) => handleInputChange('billing_interval', interval)}
-                    trialPeriodDays={formData.trial_period_days}
-                    onTrialPeriodChange={(days) => handleInputChange('trial_period_days', days)}
+                <div className="space-y-2">
+                  <Label htmlFor="price">Price (USD) *</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.price}
+                    onChange={(e) => handleInputChange('price', e.target.value)}
+                    placeholder="0.00"
+                    required
                   />
-                )}
+                  <p className="text-sm text-muted-foreground">
+                    One-time payment for lifetime access to your Pine Script
+                  </p>
+                </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="description">Description *</Label>

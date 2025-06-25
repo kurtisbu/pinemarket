@@ -1,7 +1,6 @@
 
 import React from 'react';
 import PurchaseCard from '@/components/PurchaseCard';
-import SubscriptionPurchaseCard from '@/components/SubscriptionPurchaseCard';
 
 interface Program {
   id: string;
@@ -24,17 +23,10 @@ const ProgramPurchaseSection: React.FC<ProgramPurchaseSectionProps> = ({ program
   console.log('ProgramPurchaseSection - Program data:', {
     id: program.id,
     pricing_model: program.pricing_model,
-    price: program.price,
-    monthly_price: program.monthly_price,
-    yearly_price: program.yearly_price,
-    billing_interval: program.billing_interval
+    price: program.price
   });
 
-  if (program.pricing_model === 'subscription') {
-    return <SubscriptionPurchaseCard program={program} />;
-  }
-
-  // For one-time purchases, use the regular purchase card
+  // Always use the regular purchase card for one-time purchases
   return (
     <PurchaseCard 
       price={program.price}

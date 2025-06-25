@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
@@ -34,36 +35,12 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
   category,
   author,
   image,
-  tags,
-  pricing_model = 'one_time',
-  monthly_price,
-  yearly_price,
-  billing_interval
+  tags
 }) => {
   const navigate = useNavigate();
 
   const handleViewDetails = () => {
     navigate(`/program/${id}`);
-  };
-
-  const renderPrice = () => {
-    if (pricing_model === 'subscription') {
-      if (billing_interval === 'both' && monthly_price && yearly_price) {
-        return `$${monthly_price}/mo or $${yearly_price}/yr`;
-      } else if (billing_interval === 'month' && monthly_price) {
-        return `$${monthly_price}/month`;
-      } else if (billing_interval === 'year' && yearly_price) {
-        return `$${yearly_price}/year`;
-      } else if (monthly_price) {
-        return `$${monthly_price}/month`;
-      } else if (yearly_price) {
-        return `$${yearly_price}/year`;
-      } else {
-        return 'Subscription';
-      }
-    } else {
-      return `$${price}`;
-    }
   };
 
   return (
@@ -80,7 +57,7 @@ const ProgramCard: React.FC<ProgramCardProps> = ({
             {category}
           </Badge>
           <div className="absolute top-3 right-3 bg-black/50 text-white px-2 py-1 rounded text-sm">
-            {renderPrice()}
+            ${price}
           </div>
         </div>
       </CardHeader>

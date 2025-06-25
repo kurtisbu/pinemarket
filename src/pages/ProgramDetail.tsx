@@ -12,7 +12,7 @@ import ProgramPurchaseSection from '@/components/ProgramPurchaseSection';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Star, Download, Eye, Calendar, CreditCard, RefreshCw } from 'lucide-react';
+import { Star, Download, Eye, Calendar, CreditCard } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 
 const ProgramDetail = () => {
@@ -68,23 +68,6 @@ const ProgramDetail = () => {
     });
   };
 
-  const getPricingDisplay = () => {
-    if (!program) return null;
-
-    if (program.pricing_model === 'subscription') {
-      const prices = [];
-      if (program.monthly_price) {
-        prices.push(`$${program.monthly_price}/month`);
-      }
-      if (program.yearly_price) {
-        prices.push(`$${program.yearly_price}/year`);
-      }
-      return prices.length > 0 ? prices.join(' or ') : 'Subscription pricing available';
-    } else {
-      return `$${program.price}`;
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -132,18 +115,9 @@ const ProgramDetail = () => {
                 <Badge className="bg-blue-500 hover:bg-blue-600">
                   {program.category}
                 </Badge>
-                <Badge variant={program.pricing_model === 'subscription' ? 'default' : 'secondary'}>
-                  {program.pricing_model === 'subscription' ? (
-                    <>
-                      <RefreshCw className="w-3 h-3 mr-1" />
-                      Subscription
-                    </>
-                  ) : (
-                    <>
-                      <CreditCard className="w-3 h-3 mr-1" />
-                      One-time Purchase
-                    </>
-                  )}
+                <Badge variant="secondary">
+                  <CreditCard className="w-3 h-3 mr-1" />
+                  One-time Purchase
                 </Badge>
                 <div className="flex items-center space-x-1 text-sm text-muted-foreground">
                   <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
@@ -157,13 +131,11 @@ const ProgramDetail = () => {
               {/* Pricing Display */}
               <div className="mb-4">
                 <div className="text-2xl font-bold text-green-600">
-                  {getPricingDisplay()}
+                  ${program.price}
                 </div>
-                {program.pricing_model === 'subscription' && program.trial_period_days && program.trial_period_days > 0 && (
-                  <div className="text-sm text-muted-foreground">
-                    {program.trial_period_days} day free trial available
-                  </div>
-                )}
+                <div className="text-sm text-muted-foreground">
+                  One-time payment for lifetime access
+                </div>
               </div>
               
               <div className="flex items-center gap-6 text-sm text-muted-foreground mb-6">
@@ -193,32 +165,14 @@ const ProgramDetail = () => {
               {/* Pricing Model Information */}
               <div className="mt-6 p-4 bg-muted/50 rounded-lg">
                 <h3 className="text-lg font-semibold mb-2">Pricing Details</h3>
-                {program.pricing_model === 'subscription' ? (
-                  <div className="space-y-2 text-sm">
-                    <p className="flex items-center gap-2">
-                      <RefreshCw className="w-4 h-4" />
-                      <strong>Subscription Model:</strong> Access this script through a recurring subscription
-                    </p>
-                    {program.billing_interval && (
-                      <p>
-                        <strong>Billing:</strong> {program.billing_interval === 'both' ? 'Monthly or Yearly options available' : `${program.billing_interval}ly billing`}
-                      </p>
-                    )}
-                    {program.trial_period_days && program.trial_period_days > 0 && (
-                      <p>
-                        <strong>Free Trial:</strong> {program.trial_period_days} days at no cost
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-2 text-sm">
-                    <p className="flex items-center gap-2">
-                      <CreditCard className="w-4 h-4" />
-                      <strong>One-time Purchase:</strong> Pay once and own this script forever
-                    </p>
-                    <p>No recurring charges or subscription fees</p>
-                  </div>
-                )}
+                <div className="space-y-2 text-sm">
+                  <p className="flex items-center gap-2">
+                    <CreditCard className="w-4 h-4" />
+                    <strong>One-time Purchase:</strong> Pay once and own this script forever
+                  </p>
+                  <p>No recurring charges or subscription fees</p>
+                  <p>Lifetime access to updates and improvements</p>
+                </div>
               </div>
               
               {program.tags && program.tags.length > 0 && (
