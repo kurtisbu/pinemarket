@@ -4,7 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
-import { Download, Lock, Loader2 } from 'lucide-react';
+import { Download, Lock, Loader2, Shield } from 'lucide-react';
+import { useSecurityAudit } from '@/hooks/useSecurityAudit';
 
 interface SecureScriptDownloadProps {
   programId: string;
@@ -21,10 +22,16 @@ const SecureScriptDownload: React.FC<SecureScriptDownloadProps> = ({
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { logScriptDownload, logSuspiciousActivity } = useSecurityAudit();
   const [downloading, setDownloading] = useState(false);
 
   const handleDownload = async () => {
     if (!user) {
+      await logSuspiciousActivity('unauthorized_download_attempt', {
+        program_id: programId,
+        user_id: null
+      });
+      
       toast({
         title: 'Authentication required',
         description: 'Please log in to download scripts',
@@ -34,6 +41,11 @@ const SecureScriptDownload: React.FC<SecureScriptDownloadProps> = ({
     }
 
     if (!hasPurchased && !isOwner) {
+      await logSuspiciousActivity('unpurchased_download_attempt', {
+        program_id: programId,
+        user_id: user.id
+      });
+      
       toast({
         title: 'Purchase required',
         description: 'You must purchase this program to download the script',
@@ -53,6 +65,11 @@ const SecureScriptDownload: React.FC<SecureScriptDownloadProps> = ({
 
       if (error) {
         console.error('Download access denied:', error);
+        await logSuspiciousActivity('download_access_denied', {
+          program_id: programId,
+          error: error.message,
+          user_id: user.id
+        });
         throw new Error(error.message || 'Access denied');
       }
 
@@ -61,6 +78,9 @@ const SecureScriptDownload: React.FC<SecureScriptDownloadProps> = ({
       }
 
       console.log('Download authorized, script path:', data);
+      
+      // Log successful download authorization
+      await logScriptDownload(programId, data);
 
       // Get signed URL for download
       const { data: signedUrl, error: urlError } = await supabase.storage
@@ -72,7 +92,7 @@ const SecureScriptDownload: React.FC<SecureScriptDownloadProps> = ({
         throw urlError;
       }
 
-      console.log('Creating download link...');
+      console.log('Creating secure download link...');
       
       // Trigger download
       const link = document.createElement('a');
@@ -83,11 +103,11 @@ const SecureScriptDownload: React.FC<SecureScriptDownloadProps> = ({
       document.body.removeChild(link);
 
       toast({
-        title: 'Download started',
-        description: 'Your Pine Script is downloading...',
+        title: 'Secure download started',
+        description: 'Your Pine Script is downloading securely...',
       });
     } catch (error: any) {
-      console.error('Download failed:', error);
+      console.error('Secure download failed:', error);
       toast({
         title: 'Download failed',
         description: error.message || 'Failed to download script',
@@ -110,11 +130,14 @@ const SecureScriptDownload: React.FC<SecureScriptDownloadProps> = ({
       {downloading ? (
         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
       ) : canDownload ? (
-        <Download className="w-4 h-4 mr-2" />
+        <>
+          <Shield className="w-4 h-4 mr-2" />
+          <Download className="w-4 h-4 mr-2" />
+        </>
       ) : (
         <Lock className="w-4 h-4 mr-2" />
       )}
-      {downloading ? 'Downloading...' : canDownload ? 'Download Script' : 'Purchase Required'}
+      {downloading ? 'Downloading Securely...' : canDownload ? 'Secure Download' : 'Purchase Required'}
     </Button>
   );
 };

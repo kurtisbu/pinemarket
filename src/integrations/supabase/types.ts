@@ -432,6 +432,45 @@ export type Database = {
           },
         ]
       }
+      security_audit_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          ip_address: unknown | null
+          resource_id: string | null
+          resource_type: string
+          risk_level: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: unknown | null
+          resource_id?: string | null
+          resource_type: string
+          risk_level?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: unknown | null
+          resource_id?: string | null
+          resource_type?: string
+          risk_level?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       subscription_access: {
         Row: {
           created_at: string
@@ -638,6 +677,16 @@ export type Database = {
         }
         Returns: Json
       }
+      check_rate_limit_secure: {
+        Args: {
+          p_user_id?: string
+          p_ip_address?: unknown
+          p_endpoint?: string
+          p_limit?: number
+          p_window_minutes?: number
+        }
+        Returns: Json
+      }
       get_script_download_url: {
         Args: { program_id_param: string }
         Returns: string
@@ -645,6 +694,25 @@ export type Database = {
       increment_program_view_count: {
         Args: { program_uuid: string }
         Returns: undefined
+      }
+      log_security_event: {
+        Args: {
+          p_action: string
+          p_resource_type: string
+          p_resource_id?: string
+          p_details?: Json
+          p_risk_level?: string
+        }
+        Returns: string
+      }
+      validate_file_upload: {
+        Args: {
+          p_file_name: string
+          p_file_size: number
+          p_mime_type: string
+          p_bucket_name: string
+        }
+        Returns: Json
       }
     }
     Enums: {

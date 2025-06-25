@@ -6,7 +6,10 @@ import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Upload, FileText, Loader2 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Upload, FileText, Loader2, Shield, AlertTriangle } from 'lucide-react';
+import { useSecureFileValidation } from '@/hooks/useSecureFileValidation';
+import { useSecurityAudit } from '@/hooks/useSecurityAudit';
 
 interface SecureFileUploadProps {
   bucketName: 'pine-scripts' | 'program-media';
@@ -27,39 +30,40 @@ const SecureFileUpload: React.FC<SecureFileUploadProps> = ({
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { validateFile, validating } = useSecureFileValidation();
+  const { logFileUploadAttempt } = useSecurityAudit();
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [validationResult, setValidationResult] = useState<{
+    valid: boolean;
+    error?: string;
+  } | null>(null);
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    if (!allowedTypes.includes(file.type)) {
-      toast({
-        title: 'Invalid file type',
-        description: `Please select a file of type: ${allowedTypes.join(', ')}`,
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Validate file size
-    const maxSizeBytes = maxSizeMB * 1024 * 1024;
-    if (file.size > maxSizeBytes) {
-      toast({
-        title: 'File too large',
-        description: `File must be smaller than ${maxSizeMB}MB`,
-        variant: 'destructive',
-      });
+    if (!file) {
+      setSelectedFile(null);
+      setValidationResult(null);
       return;
     }
 
     setSelectedFile(file);
+    
+    // Perform security validation
+    const result = await validateFile(file, bucketName);
+    setValidationResult(result);
+
+    if (!result.valid) {
+      toast({
+        title: 'File validation failed',
+        description: result.error || 'Invalid file selected',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleUpload = async () => {
-    if (!selectedFile || !user) return;
+    if (!selectedFile || !user || !validationResult?.valid) return;
 
     setUploading(true);
     try {
@@ -79,10 +83,12 @@ const SecureFileUpload: React.FC<SecureFileUploadProps> = ({
 
       if (error) {
         console.error('Upload error:', error);
+        await logFileUploadAttempt(selectedFile.name, selectedFile.size, 'failed', error.message);
         throw error;
       }
 
       console.log('Upload successful:', data);
+      await logFileUploadAttempt(selectedFile.name, selectedFile.size, 'success');
 
       // Get public URL for program media, private path for pine scripts
       let fileUrl = '';
@@ -98,10 +104,11 @@ const SecureFileUpload: React.FC<SecureFileUploadProps> = ({
 
       onUploadComplete(filePath, fileUrl);
       setSelectedFile(null);
+      setValidationResult(null);
       
       toast({
         title: 'Upload successful',
-        description: `${label} uploaded successfully`,
+        description: `${label} uploaded securely`,
       });
     } catch (error: any) {
       console.error('Upload failed:', error);
@@ -118,38 +125,76 @@ const SecureFileUpload: React.FC<SecureFileUploadProps> = ({
   return (
     <div className="space-y-4">
       <div>
-        <Label htmlFor="file-upload">{label}</Label>
+        <Label htmlFor="file-upload" className="flex items-center gap-2">
+          <Shield className="w-4 h-4" />
+          {label} (Secure Upload)
+        </Label>
         <Input
           id="file-upload"
           type="file"
           accept={accept}
           onChange={handleFileSelect}
-          disabled={uploading}
+          disabled={uploading || validating}
           className="mt-1"
         />
+        <p className="text-xs text-muted-foreground mt-1">
+          Files are validated for security before upload. Max size: {maxSizeMB}MB
+        </p>
       </div>
       
       {selectedFile && (
-        <div className="flex items-center gap-2 p-3 bg-muted rounded">
-          <FileText className="w-4 h-4" />
-          <span className="text-sm truncate">{selectedFile.name}</span>
-          <span className="text-xs text-muted-foreground">
-            ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
-          </span>
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 p-3 bg-muted rounded">
+            <FileText className="w-4 h-4" />
+            <span className="text-sm truncate">{selectedFile.name}</span>
+            <span className="text-xs text-muted-foreground">
+              ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+            </span>
+          </div>
+          
+          {validating && (
+            <Alert>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <AlertDescription>
+                Validating file for security threats...
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {validationResult && !validating && (
+            <Alert variant={validationResult.valid ? 'default' : 'destructive'}>
+              {validationResult.valid ? (
+                <Shield className="w-4 h-4" />
+              ) : (
+                <AlertTriangle className="w-4 h-4" />
+              )}
+              <AlertDescription>
+                {validationResult.valid 
+                  ? 'File passed security validation and is safe to upload'
+                  : `Security validation failed: ${validationResult.error}`
+                }
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
       )}
       
       <Button 
         onClick={handleUpload} 
-        disabled={!selectedFile || uploading}
+        disabled={!selectedFile || uploading || validating || !validationResult?.valid}
         className="w-full"
       >
         {uploading ? (
           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+        ) : validating ? (
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
         ) : (
-          <Upload className="w-4 h-4 mr-2" />
+          <>
+            <Shield className="w-4 h-4 mr-2" />
+            <Upload className="w-4 h-4 mr-2" />
+          </>
         )}
-        {uploading ? 'Uploading...' : `Upload ${label}`}
+        {uploading ? 'Uploading Securely...' : validating ? 'Validating...' : `Secure Upload ${label}`}
       </Button>
     </div>
   );
