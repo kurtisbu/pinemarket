@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -36,6 +35,9 @@ interface Program {
   created_at: string;
   image_urls: string[];
   tradingview_publication_url: string | null;
+  pricing_model: string;
+  monthly_price: number | null;
+  yearly_price: number | null;
 }
 
 const MyPrograms = () => {
@@ -103,6 +105,21 @@ const MyPrograms = () => {
         description: 'Failed to update program status',
         variant: 'destructive',
       });
+    }
+  };
+
+  const renderProgramPrice = (program: Program) => {
+    if (program.pricing_model === 'subscription') {
+      const prices = [];
+      if (program.monthly_price) {
+        prices.push(`$${program.monthly_price}/mo`);
+      }
+      if (program.yearly_price) {
+        prices.push(`$${program.yearly_price}/yr`);
+      }
+      return prices.length > 0 ? prices.join(' or ') : 'Subscription';
+    } else {
+      return `$${program.price}`;
     }
   };
 
@@ -186,7 +203,7 @@ const MyPrograms = () => {
                           <div className="flex-1">
                             <CardTitle className="text-lg">{program.title}</CardTitle>
                             <p className="text-sm text-muted-foreground mt-1">
-                              {program.category} • ${program.price}
+                              {program.category} • {renderProgramPrice(program)}
                             </p>
                           </div>
                           <DropdownMenu>
