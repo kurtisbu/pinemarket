@@ -38,7 +38,13 @@ export const useAssignmentLogs = (assignmentId: string) => {
         return;
       }
 
-      setLogs(data || []);
+      // Type-safe transformation of the data
+      const typedLogs: AssignmentLog[] = (data || []).map(log => ({
+        ...log,
+        log_level: log.log_level as AssignmentLog['log_level']
+      }));
+
+      setLogs(typedLogs);
     } catch (err: any) {
       console.error('Failed to fetch assignment logs:', err);
       setError(err.message);
