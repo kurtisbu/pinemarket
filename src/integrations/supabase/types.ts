@@ -705,6 +705,10 @@ export type Database = {
         }
         Returns: string
       }
+      sanitize_user_content: {
+        Args: { content: string; max_length?: number }
+        Returns: string
+      }
       validate_file_upload: {
         Args: {
           p_file_name: string
@@ -713,6 +717,10 @@ export type Database = {
           p_bucket_name: string
         }
         Returns: Json
+      }
+      validate_tradingview_url: {
+        Args: { url: string }
+        Returns: boolean
       }
     }
     Enums: {

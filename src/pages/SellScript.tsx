@@ -11,15 +11,19 @@ import ProgramBasicForm from '@/components/SellScript/ProgramBasicForm';
 import TagManager from '@/components/SellScript/TagManager';
 import ScriptUploadSection from '@/components/SellScript/ScriptUploadSection';
 import MediaUploadSection from '@/components/SellScript/MediaUploadSection';
+import { useSecurityValidation } from '@/hooks/useSecurityValidation';
+import { useSecureFileValidation } from '@/hooks/useSecureFileValidation';
 
 const SellScript = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { validateProgramData, validating: securityValidating } = useSecurityValidation();
+  const { validateFile } = useSecureFileValidation();
   
   const [loading, setLoading] = useState(false);
   const [scriptFile, setScriptFile] = useState<File | null>(null);
-  const [scriptType, setScriptType] = useState<'file' | 'link'>('link'); // Changed default to 'link'
+  const [scriptType, setScriptType] = useState<'file' | 'link'>('link');
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [currentTag, setCurrentTag] = useState('');
   const [formData, setFormData] = useState({
@@ -71,6 +75,12 @@ const SellScript = () => {
   };
 
   const uploadFile = async (file: File, bucket: string, folder: string) => {
+    // Validate file security first
+    const validation = await validateFile(file, bucket as 'pine-scripts' | 'program-media');
+    if (!validation.valid) {
+      throw new Error(validation.error);
+    }
+
     const fileName = `${folder}/${Date.now()}-${file.name}`;
     const { error } = await supabase.storage
       .from(bucket)
@@ -100,6 +110,22 @@ const SellScript = () => {
       });
       return;
     }
+
+    // Security validation
+    const validationResult = await validateProgramData({
+      title: formData.title,
+      description: formData.description,
+      tradingview_publication_url: formData.tradingview_publication_url
+    });
+
+    if (!validationResult.valid) {
+      toast({
+        title: 'Validation failed',
+        description: validationResult.error,
+        variant: 'destructive',
+      });
+      return;
+    }
     
     setLoading(true);
 
@@ -114,7 +140,7 @@ const SellScript = () => {
           setLoading(false);
           return;
         }
-        scriptPath = await uploadFile(scriptFile, 'scripts', user.id);
+        scriptPath = await uploadFile(scriptFile, 'pine-scripts', user.id);
       } else if (scriptType === 'link') {
         if (!formData.tradingview_publication_url.trim()) {
           toast({ title: 'TradingView link required', description: 'Please provide a TradingView publication link.', variant: 'destructive' });
@@ -132,14 +158,24 @@ const SellScript = () => {
         }
       }
 
-      // Upload media files
+      // Upload media files with security validation
       const imageUrls: string[] = [];
       for (const file of mediaFiles) {
-        const url = await uploadFile(file, 'program-media', user.id);
-        imageUrls.push(url);
+        try {
+          const url = await uploadFile(file, 'program-media', user.id);
+          imageUrls.push(url);
+        } catch (error: any) {
+          toast({
+            title: 'Media upload failed',
+            description: `Failed to upload ${file.name}: ${error.message}`,
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
       }
 
-      // Create program record with one-time pricing only
+      // Note: The database trigger will automatically validate and sanitize the data
       const programData = {
         seller_id: user.id,
         title: formData.title,
@@ -166,15 +202,16 @@ const SellScript = () => {
       if (error) throw error;
 
       toast({
-        title: 'Program created',
-        description: 'Your Pine Script program has been successfully uploaded as a draft.',
+        title: 'Program created successfully',
+        description: 'Your Pine Script program has been uploaded with enhanced security validation.',
       });
 
       navigate('/my-programs');
     } catch (error: any) {
+      console.error('Secure program creation failed:', error);
       toast({
         title: 'Operation failed',
-        description: error.message,
+        description: error.message || 'Failed to create program securely',
         variant: 'destructive',
       });
     } finally {
@@ -184,6 +221,9 @@ const SellScript = () => {
 
   if (!user) return null;
 
+  const isFormValid = formData.title.trim() && formData.description.trim() && formData.price && formData.category;
+  const isSubmitDisabled = loading || securityValidating || !isFormValid;
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -191,7 +231,12 @@ const SellScript = () => {
         <div className="max-w-4xl mx-auto">
           <Card>
             <CardHeader>
-              <CardTitle>Sell Your Pine Script</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                Sell Your Pine Script
+                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                  Enhanced Security
+                </span>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
@@ -224,13 +269,23 @@ const SellScript = () => {
                 />
 
                 <div className="flex gap-4">
-                  <Button type="submit" disabled={loading} className="flex-1">
-                    {loading ? 'Creating...' : 'Create Program (Draft)'}
+                  <Button 
+                    type="submit" 
+                    disabled={isSubmitDisabled} 
+                    className="flex-1"
+                  >
+                    {loading || securityValidating ? 'Creating Securely...' : 'Create Program (Draft)'}
                   </Button>
                   <Button type="button" variant="outline" onClick={() => navigate('/')}>
                     Cancel
                   </Button>
                 </div>
+
+                {securityValidating && (
+                  <p className="text-sm text-muted-foreground text-center">
+                    Running security validation...
+                  </p>
+                )}
               </form>
             </CardContent>
           </Card>

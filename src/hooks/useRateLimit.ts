@@ -23,8 +23,38 @@ export const useRateLimit = () => {
   const { user } = useAuth();
   const [configs, setConfigs] = useState<RateLimitConfig[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Check if user is admin to access rate limit configs
+  const checkAdminAccess = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      if (!error && data?.role === 'admin') {
+        setIsAdmin(true);
+      }
+    } catch (error) {
+      console.error('Error checking admin access:', error);
+    }
+  };
 
   const fetchRateLimitConfigs = async () => {
+    if (!isAdmin) {
+      // Use default configs if not admin
+      setConfigs([
+        { endpoint: 'general', requests_per_hour: 1000, requests_per_minute: 100, burst_limit: 200, enabled: true },
+        { endpoint: 'payment', requests_per_hour: 5, requests_per_minute: 1, burst_limit: 3, enabled: true },
+        { endpoint: 'script-download', requests_per_hour: 30, requests_per_minute: 2, burst_limit: 5, enabled: true }
+      ]);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('rate_limit_configs')
@@ -35,6 +65,12 @@ export const useRateLimit = () => {
       setConfigs(data || []);
     } catch (error) {
       console.error('Failed to fetch rate limit configs:', error);
+      // Fallback to default configs
+      setConfigs([
+        { endpoint: 'general', requests_per_hour: 1000, requests_per_minute: 100, burst_limit: 200, enabled: true },
+        { endpoint: 'payment', requests_per_hour: 5, requests_per_minute: 1, burst_limit: 3, enabled: true },
+        { endpoint: 'script-download', requests_per_hour: 30, requests_per_minute: 2, burst_limit: 5, enabled: true }
+      ]);
     }
   };
 
@@ -53,8 +89,8 @@ export const useRateLimit = () => {
       const ipResponse = await fetch('https://api.ipify.org?format=json');
       const { ip } = await ipResponse.json();
 
-      // Call the rate limit function
-      const { data, error } = await supabase.rpc('check_rate_limit', {
+      // Call the enhanced secure rate limit function
+      const { data, error } = await supabase.rpc('check_rate_limit_secure', {
         p_user_id: user?.id || null,
         p_ip_address: ip,
         p_endpoint: endpoint,
@@ -92,12 +128,19 @@ export const useRateLimit = () => {
   };
 
   useEffect(() => {
-    fetchRateLimitConfigs();
-  }, []);
+    checkAdminAccess();
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchRateLimitConfigs();
+    }
+  }, [isAdmin]);
 
   return {
     configs,
     loading,
+    isAdmin,
     checkRateLimit,
     isRateLimited,
     getRemainingRequests,
