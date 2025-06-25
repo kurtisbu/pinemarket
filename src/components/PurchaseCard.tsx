@@ -1,14 +1,7 @@
-
-import React, { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { ShoppingCart, Loader2 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
+import React from 'react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Shield } from 'lucide-react';
+import SecurePaymentCard from './SecurePaymentCard';
 
 interface PurchaseCardProps {
   price: number;
@@ -16,175 +9,17 @@ interface PurchaseCardProps {
   sellerId: string;
 }
 
-const PurchaseCard: React.FC<PurchaseCardProps> = ({ price, programId, sellerId }) => {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [tradingviewUsername, setTradingviewUsername] = useState('');
-
-  // Calculate fees for display
-  const serviceFee = Math.round(price * 0.05 * 100) / 100; // 5% service fee
-  const totalPrice = price + serviceFee;
-
-  const handlePurchase = async () => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please log in to purchase this script.',
-        variant: 'destructive',
-      });
-      navigate('/auth');
-      return;
-    }
-
-    if (user.id === sellerId) {
-      toast({
-        title: 'Cannot purchase',
-        description: 'You cannot purchase your own script.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (!tradingviewUsername.trim()) {
-      toast({
-        title: 'TradingView username required',
-        description: 'Please enter your TradingView username to receive script access.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      console.log('Creating payment intent...', { programId, price, totalPrice });
-      
-      // Create payment intent with TradingView username
-      const { data, error } = await supabase.functions.invoke('stripe-connect', {
-        body: {
-          action: 'create-payment-intent',
-          program_id: programId,
-          amount: price, // Original price (before service fee)
-          tradingview_username: tradingviewUsername.trim(),
-        },
-      });
-
-      if (error) {
-        console.error('Payment intent creation error:', error);
-        throw error;
-      }
-
-      console.log('Payment intent created:', data);
-
-      // In a real implementation, you would integrate with Stripe Elements
-      // For now, we'll simulate the payment process with better UX
-      const confirmPayment = confirm(
-        `Confirm Purchase Details:\n\n` +
-        `Script Price: $${price.toFixed(2)}\n` +
-        `Service Fee (5%): $${serviceFee.toFixed(2)}\n` +
-        `Total Amount: $${totalPrice.toFixed(2)}\n\n` +
-        `TradingView Username: ${tradingviewUsername}\n\n` +
-        `Click OK to proceed with payment.`
-      );
-
-      if (confirmPayment) {
-        console.log('Confirming purchase...', data.payment_intent_id);
-        
-        // Simulate successful payment
-        const { data: confirmData, error: confirmError } = await supabase.functions.invoke('stripe-connect', {
-          body: {
-            action: 'confirm-purchase',
-            payment_intent_id: data.payment_intent_id,
-            program_id: programId,
-            tradingview_username: tradingviewUsername.trim(),
-          },
-        });
-
-        if (confirmError) {
-          console.error('Purchase confirmation error:', confirmError);
-          throw confirmError;
-        }
-
-        console.log('Purchase confirmed:', confirmData);
-
-        toast({
-          title: 'Purchase successful!',
-          description: 'Your script access is being processed. You will receive TradingView access shortly.',
-        });
-
-        // Clear the form
-        setTradingviewUsername('');
-        
-        // Optional: Refresh the page or redirect to purchases
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-      }
-    } catch (error: any) {
-      console.error('Purchase error:', error);
-      toast({
-        title: 'Purchase failed',
-        description: error.message || 'An unexpected error occurred during purchase.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
+const PurchaseCard: React.FC<PurchaseCardProps> = (props) => {
   return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="text-center mb-6">
-          <div className="text-3xl font-bold text-green-600 mb-2">
-            ${price}
-          </div>
-          <div className="text-sm text-muted-foreground space-y-1">
-            <div>Script Price: ${price.toFixed(2)}</div>
-            <div>Service Fee (5%): ${serviceFee.toFixed(2)}</div>
-            <div className="border-t pt-1 font-semibold">
-              Total: ${totalPrice.toFixed(2)}
-            </div>
-            <p className="text-xs">One-time purchase</p>
-          </div>
-        </div>
-        
-        <div className="space-y-4 mb-6">
-          <div>
-            <Label htmlFor="tradingview-username">TradingView Username</Label>
-            <Input
-              id="tradingview-username"
-              placeholder="Enter your TradingView username"
-              value={tradingviewUsername}
-              onChange={(e) => setTradingviewUsername(e.target.value)}
-              disabled={loading}
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Required to grant you access to the script
-            </p>
-          </div>
-        </div>
-        
-        <Button 
-          className="w-full mb-4 bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600"
-          onClick={handlePurchase}
-          disabled={loading || !tradingviewUsername.trim()}
-        >
-          {loading ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            <ShoppingCart className="w-4 h-4 mr-2" />
-          )}
-          {loading ? 'Processing...' : `Buy Now - $${totalPrice.toFixed(2)}`}
-        </Button>
-        
-        <div className="text-xs text-muted-foreground text-center">
-          <p>Secure payment processing powered by Stripe</p>
-          <p className="mt-1">For testing: Use any username, payment will be simulated</p>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="space-y-4">
+      <Alert>
+        <Shield className="h-4 w-4" />
+        <AlertDescription>
+          This purchase is now processed through our enhanced security system for your protection.
+        </AlertDescription>
+      </Alert>
+      <SecurePaymentCard {...props} />
+    </div>
   );
 };
 
