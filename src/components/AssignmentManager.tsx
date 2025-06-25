@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AssignmentDetails from './AssignmentDetails';
 import ManualAssignmentForm from './ManualAssignmentForm';
-import AssignmentLogs from './AssignmentLogs';
-import { ScriptAssignment, AssignmentLog } from '@/types/assignment';
+import AssignmentLogViewer from './AssignmentLogViewer';
+import { ScriptAssignment } from '@/types/assignment';
+import { useAssignmentLogs } from '@/hooks/useAssignmentLogs';
 
 interface AssignmentManagerProps {
   assignmentId: string;
@@ -19,9 +20,9 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({ assignmentId, onC
   const { user } = useAuth();
   const { toast } = useToast();
   const [assignment, setAssignment] = useState<ScriptAssignment | null>(null);
-  const [logs, setLogs] = useState<AssignmentLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const { addLog } = useAssignmentLogs(assignmentId);
 
   const fetchAssignmentDetails = async () => {
     if (!user) return;
@@ -46,25 +47,8 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({ assignmentId, onC
       if (assignmentError) throw assignmentError;
       setAssignment(assignmentData);
 
-      // Fetch assignment logs - using any to bypass type issues temporarily
-      try {
-        const { data: logsData, error: logsError } = await (supabase as any)
-          .from('assignment_logs')
-          .select('*')
-          .eq('assignment_id', assignmentId)
-          .order('created_at', { ascending: false });
-
-        if (logsError) {
-          console.warn('Could not fetch logs:', logsError.message);
-          setLogs([]);
-        } else {
-          setLogs(logsData || []);
-        }
-      } catch (logError) {
-        console.warn('Logs table may not exist yet:', logError);
-        setLogs([]);
-      }
     } catch (error: any) {
+      console.error('Failed to fetch assignment:', error);
       toast({
         title: 'Error',
         description: error.message,
@@ -87,6 +71,18 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({ assignmentId, onC
 
     setProcessing(true);
     try {
+      // Log the manual assignment attempt
+      await addLog(
+        assignment.purchase_id,
+        'info',
+        'Manual assignment initiated by seller',
+        { 
+          username: manualUsername.trim(),
+          notes: manualNotes.trim() || null,
+          triggered_by: user.id
+        }
+      );
+
       // Update assignment with new username if changed
       if (manualUsername.trim() !== assignment.tradingview_username) {
         const { error: updateError } = await supabase
@@ -119,27 +115,26 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({ assignmentId, onC
         description: 'The script assignment has been queued for processing.',
       });
 
-      // Add manual assignment log - using any to bypass type issues temporarily
-      try {
-        await (supabase as any)
-          .from('assignment_logs')
-          .insert({
-            assignment_id: assignmentId,
-            purchase_id: assignment.purchase_id,
-            log_level: 'info',
-            message: 'Manual assignment triggered by seller',
-            details: { 
-              username: manualUsername.trim(),
-              notes: manualNotes.trim() || null,
-              triggered_by: user.id
-            }
-          });
-      } catch (logError) {
-        console.warn('Could not insert log:', logError);
-      }
+      // Log successful trigger
+      await addLog(
+        assignment.purchase_id,
+        'success',
+        'TradingView service invoked successfully',
+        { service_response: data }
+      );
 
       await fetchAssignmentDetails();
     } catch (error: any) {
+      console.error('Assignment failed:', error);
+      
+      // Log the failure
+      await addLog(
+        assignment.purchase_id,
+        'error',
+        `Manual assignment failed: ${error.message}`,
+        { error: error.message, stack: error.stack }
+      );
+
       toast({
         title: 'Assignment Failed',
         description: error.message,
@@ -176,7 +171,7 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({ assignmentId, onC
       <Tabs defaultValue="manual" className="space-y-4">
         <TabsList>
           <TabsTrigger value="manual">Manual Assignment</TabsTrigger>
-          <TabsTrigger value="logs">Activity Logs ({logs.length})</TabsTrigger>
+          <TabsTrigger value="logs">Activity Logs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="manual" className="space-y-4">
@@ -188,7 +183,7 @@ const AssignmentManager: React.FC<AssignmentManagerProps> = ({ assignmentId, onC
         </TabsContent>
 
         <TabsContent value="logs" className="space-y-4">
-          <AssignmentLogs logs={logs} />
+          <AssignmentLogViewer assignmentId={assignmentId} />
         </TabsContent>
       </Tabs>
     </div>

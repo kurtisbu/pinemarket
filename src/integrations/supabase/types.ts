@@ -9,6 +9,51 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      assignment_logs: {
+        Row: {
+          assignment_id: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          log_level: string
+          message: string
+          purchase_id: string
+        }
+        Insert: {
+          assignment_id: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          log_level: string
+          message: string
+          purchase_id: string
+        }
+        Update: {
+          assignment_id?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          log_level?: string
+          message?: string
+          purchase_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignment_logs_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "script_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_logs_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -517,6 +562,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_script_download_url: {
+        Args: { program_id_param: string }
+        Returns: string
+      }
       increment_program_view_count: {
         Args: { program_uuid: string }
         Returns: undefined

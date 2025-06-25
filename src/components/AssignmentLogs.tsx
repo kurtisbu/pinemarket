@@ -1,7 +1,5 @@
-
 import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { AlertCircle, CheckCircle, Activity } from 'lucide-react';
+import AssignmentLogViewer from './AssignmentLogViewer';
 import { AssignmentLog } from '@/types/assignment';
 
 interface AssignmentLogsProps {
@@ -9,58 +7,37 @@ interface AssignmentLogsProps {
 }
 
 const AssignmentLogs: React.FC<AssignmentLogsProps> = ({ logs }) => {
-  const getLogIcon = (level: string) => {
-    switch (level) {
-      case 'error':
-        return <AlertCircle className="w-4 h-4 text-red-500" />;
-      case 'warning':
-        return <AlertCircle className="w-4 h-4 text-yellow-500" />;
-      case 'info':
-        return <CheckCircle className="w-4 h-4 text-blue-500" />;
-      default:
-        return <Activity className="w-4 h-4 text-gray-500" />;
-    }
-  };
-
-  if (logs.length === 0) {
-    return (
-      <Card>
-        <CardContent className="text-center py-8 text-muted-foreground">
-          No activity logs available for this assignment.
-        </CardContent>
-      </Card>
-    );
-  }
-
+  // This component is being replaced by AssignmentLogViewer
+  // Keep for backwards compatibility but recommend using AssignmentLogViewer
   return (
-    <div className="space-y-3">
-      {logs.map((log) => (
-        <Card key={log.id}>
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              {getLogIcon(log.log_level)}
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <p className="font-medium">{log.message}</p>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(log.created_at).toLocaleString()}
-                  </span>
-                </div>
-                {log.details && Object.keys(log.details).length > 0 && (
-                  <details className="mt-2">
-                    <summary className="text-sm text-muted-foreground cursor-pointer">
-                      View Details
-                    </summary>
-                    <pre className="mt-2 text-xs bg-gray-50 p-2 rounded overflow-x-auto">
-                      {JSON.stringify(log.details, null, 2)}
-                    </pre>
-                  </details>
-                )}
+    <div className="space-y-4">
+      <div className="text-muted-foreground text-sm">
+        Note: This view shows cached logs. For real-time logs, use the Assignment Log Viewer.
+      </div>
+      {logs.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground">
+          No assignment logs available.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {logs.map((log) => (
+            <div key={log.id} className="p-3 border rounded-lg">
+              <div className="flex justify-between items-start mb-2">
+                <span className="text-sm font-medium">{log.log_level}</span>
+                <span className="text-xs text-muted-foreground">
+                  {new Date(log.created_at).toLocaleString()}
+                </span>
               </div>
+              <p className="text-sm">{log.message}</p>
+              {log.details && (
+                <pre className="mt-2 text-xs bg-muted p-2 rounded overflow-x-auto">
+                  {JSON.stringify(log.details, null, 2)}
+                </pre>
+              )}
             </div>
-          </CardContent>
-        </Card>
-      ))}
+          ))}
+        </div>
+      )}
     </div>
   );
 };
