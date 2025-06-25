@@ -67,7 +67,7 @@ export const useRateLimit = () => {
         return null;
       }
 
-      return data as RateLimitResult;
+      return data as unknown as RateLimitResult;
     } catch (error) {
       console.error('Rate limit check failed:', error);
       return null;
