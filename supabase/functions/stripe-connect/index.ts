@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.21.0';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -6,6 +7,44 @@ import { corsHeaders } from '../_shared/cors.ts';
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
   apiVersion: '2023-10-16',
 });
+
+// Rate limiting helper function
+async function checkRateLimit(supabaseAdmin: any, req: Request, endpoint: string) {
+  try {
+    // Get client IP
+    const clientIp = req.headers.get('x-forwarded-for') || 
+                     req.headers.get('x-real-ip') || 
+                     'unknown';
+    
+    // Get user ID from auth header
+    let userId = null;
+    const authHeader = req.headers.get('Authorization');
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+      userId = user?.id;
+    }
+
+    // Check rate limit using the database function
+    const { data: rateLimitResult, error } = await supabaseAdmin.rpc('check_rate_limit', {
+      p_user_id: userId,
+      p_ip_address: clientIp,
+      p_endpoint: endpoint,
+      p_limit: endpoint === 'payment' ? 10 : 100, // Payment endpoint has stricter limits
+      p_window_minutes: 60
+    });
+
+    if (error) {
+      console.error('Rate limit check error:', error);
+      return { allowed: true }; // Allow on error to prevent service interruption
+    }
+
+    return rateLimitResult;
+  } catch (error) {
+    console.error('Rate limit check failed:', error);
+    return { allowed: true }; // Allow on error
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -20,8 +59,41 @@ serve(async (req) => {
 
     const { action, ...payload } = await req.json();
 
+    // Apply rate limiting to payment-related actions
+    if (['create-payment-intent', 'confirm-purchase'].includes(action)) {
+      const rateLimitResult = await checkRateLimit(supabaseAdmin, req, 'payment');
+      
+      if (!rateLimitResult.allowed) {
+        console.log(`[RATE LIMIT] Payment action blocked: ${action}`);
+        return new Response(JSON.stringify({
+          error: 'Rate limit exceeded',
+          message: `Too many payment requests. Please wait before trying again.`,
+          reset_time: rateLimitResult.reset_time,
+          current_count: rateLimitResult.current_count,
+          limit: rateLimitResult.limit
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 429,
+        });
+      }
+
+      console.log(`[RATE LIMIT] Payment action allowed: ${action} (${rateLimitResult.current_count}/${rateLimitResult.limit})`);
+    }
+
     switch (action) {
       case 'create-connect-account': {
+        // Apply rate limiting for account creation
+        const rateLimitResult = await checkRateLimit(supabaseAdmin, req, 'general');
+        if (!rateLimitResult.allowed) {
+          return new Response(JSON.stringify({
+            error: 'Rate limit exceeded',
+            message: 'Too many requests. Please wait before trying again.'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 429,
+          });
+        }
+
         const { country = 'US' } = payload;
         
         console.log(`[STRIPE CONNECT] Creating account for country: ${country}`);
@@ -153,7 +225,9 @@ serve(async (req) => {
       }
 
       case 'create-payment-intent': {
-        const { program_id, amount, tradingview_username } = payload;
+        const { program_id, amount, tradingview_username, security_validation } = payload;
+        
+        console.log(`[PAYMENT INTENT] Creating with rate limit protection`);
         
         // Get program and seller details
         const { data: program, error: programError } = await supabaseAdmin
@@ -167,8 +241,6 @@ serve(async (req) => {
         }
 
         // Calculate fees with new 5% structure
-        // Buyer pays: original price + 5% service fee
-        // Seller receives: original price - 5% platform fee
         const originalPrice = Math.round(amount * 100); // Convert to cents
         const serviceFee = Math.round(originalPrice * 0.05); // 5% service fee
         const totalAmount = originalPrice + serviceFee; // Total amount buyer pays
@@ -176,11 +248,11 @@ serve(async (req) => {
 
         console.log(`[PAYMENT INTENT] Original price: $${amount}, Service fee: $${serviceFee/100}, Total: $${totalAmount/100}, Platform fee: $${platformFee/100}`);
 
-        // Create Stripe payment intent
+        // Create Stripe payment intent with security metadata
         const paymentIntent = await stripe.paymentIntents.create({
-          amount: totalAmount, // Total amount including service fee
+          amount: totalAmount,
           currency: 'usd',
-          application_fee_amount: platformFee, // Platform fee (5% of original price)
+          application_fee_amount: platformFee,
           transfer_data: {
             destination: program.profiles.stripe_account_id,
           },
@@ -191,13 +263,15 @@ serve(async (req) => {
             original_price: originalPrice.toString(),
             service_fee: serviceFee.toString(),
             platform_fee: platformFee.toString(),
+            security_risk_score: security_validation?.risk_score?.toString() || '0',
+            rate_limited: 'true'
           },
         });
 
         return new Response(JSON.stringify({
           payment_intent_id: paymentIntent.id,
           client_secret: paymentIntent.client_secret,
-          total_amount: totalAmount / 100, // Return in dollars for display
+          total_amount: totalAmount / 100,
           service_fee: serviceFee / 100,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -206,10 +280,9 @@ serve(async (req) => {
       }
 
       case 'confirm-purchase': {
-        const { payment_intent_id, program_id, tradingview_username } = payload;
+        const { payment_intent_id, program_id, tradingview_username, security_context } = payload;
 
-        // Enhanced logging for debugging
-        console.log(`[PURCHASE CONFIRMATION] Starting purchase confirmation for payment_intent: ${payment_intent_id}, program: ${program_id}, username: ${tradingview_username}`);
+        console.log(`[PURCHASE CONFIRMATION] Starting with rate limit protection for payment_intent: ${payment_intent_id}`);
 
         // Get current user
         const authHeader = req.headers.get('Authorization')!;
@@ -435,7 +508,7 @@ serve(async (req) => {
         return new Response(JSON.stringify({
           success: true,
           purchase_id: purchase.id,
-          message: 'Purchase completed successfully',
+          message: 'Purchase completed successfully with rate limiting protection',
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,

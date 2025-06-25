@@ -11,7 +11,10 @@ import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { usePaymentSecurity } from '@/hooks/usePaymentSecurity';
+import { useRateLimitedAction } from '@/hooks/useRateLimitedAction';
 import PaymentSecurityValidator from './PaymentSecurityValidator';
+import RateLimitStatus from './RateLimitStatus';
+import RateLimitGuard from './RateLimitGuard';
 
 interface SecurePaymentCardProps {
   price: number;
@@ -31,6 +34,18 @@ const SecurePaymentCard: React.FC<SecurePaymentCardProps> = ({ price, programId,
     checks: any[];
   }>({ isValid: false, checks: [] });
 
+  // Rate limiting for payment actions
+  const { executeAction: executePayment, loading: rateLimitLoading } = useRateLimitedAction({
+    endpoint: 'payment',
+    onRateLimited: () => {
+      toast({
+        title: 'Payment rate limit exceeded',
+        description: 'You have made too many payment attempts. Please wait before trying again.',
+        variant: 'destructive',
+      });
+    }
+  });
+
   // Calculate fees for display
   const serviceFee = Math.round(price * 0.05 * 100) / 100; // 5% service fee
   const totalPrice = price + serviceFee;
@@ -39,7 +54,7 @@ const SecurePaymentCard: React.FC<SecurePaymentCardProps> = ({ price, programId,
     setSecurityValidation({ isValid, checks });
   };
 
-  const handleSecurePurchase = async () => {
+  const performSecurePurchase = async () => {
     if (!user) {
       toast({
         title: 'Authentication required',
@@ -172,96 +187,107 @@ const SecurePaymentCard: React.FC<SecurePaymentCardProps> = ({ price, programId,
     }
   };
 
+  const handleSecurePurchase = () => {
+    executePayment(performSecurePurchase);
+  };
+
   return (
     <div className="space-y-6">
-      {/* Security Validation */}
-      {user && (
-        <PaymentSecurityValidator
-          amount={price}
-          buyerId={user.id}
-          sellerId={sellerId}
-          programId={programId}
-          onValidationComplete={handleSecurityValidation}
-        />
-      )}
+      {/* Rate Limit Guard */}
+      <RateLimitGuard endpoint="payment">
+        {/* Security Validation */}
+        {user && (
+          <PaymentSecurityValidator
+            amount={price}
+            buyerId={user.id}
+            sellerId={sellerId}
+            programId={programId}
+            onValidationComplete={handleSecurityValidation}
+          />
+        )}
 
-      {/* Payment Card */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center mb-6">
-            <div className="text-3xl font-bold text-green-600 mb-2">
-              ${price}
-            </div>
-            <div className="text-sm text-muted-foreground space-y-1">
-              <div>Script Price: ${price.toFixed(2)}</div>
-              <div>Service Fee (5%): ${serviceFee.toFixed(2)}</div>
-              <div className="border-t pt-1 font-semibold">
-                Total: ${totalPrice.toFixed(2)}
-              </div>
-              <p className="text-xs">One-time secure purchase</p>
-            </div>
-          </div>
+        {/* Rate Limit Status */}
+        <RateLimitStatus endpoint="payment" showDetails compact />
 
-          {/* Security Status */}
-          {user && (
-            <div className="mb-4 p-3 bg-muted rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Shield className="w-4 h-4" />
-                <span className="text-sm font-medium">Security Status</span>
+        {/* Payment Card */}
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center mb-6">
+              <div className="text-3xl font-bold text-green-600 mb-2">
+                ${price}
               </div>
-              {securityValidation.isValid ? (
-                <div className="text-xs text-green-600">
-                  ✓ Payment security validation passed
+              <div className="text-sm text-muted-foreground space-y-1">
+                <div>Script Price: ${price.toFixed(2)}</div>
+                <div>Service Fee (5%): ${serviceFee.toFixed(2)}</div>
+                <div className="border-t pt-1 font-semibold">
+                  Total: ${totalPrice.toFixed(2)}
                 </div>
-              ) : (
-                <div className="text-xs text-red-600">
-                  ⚠ Security validation required before purchase
+                <p className="text-xs">One-time secure purchase</p>
+              </div>
+            </div>
+
+            {/* Security Status */}
+            {user && (
+              <div className="mb-4 p-3 bg-muted rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield className="w-4 h-4" />
+                  <span className="text-sm font-medium">Security Status</span>
                 </div>
-              )}
-            </div>
-          )}
-          
-          <div className="space-y-4 mb-6">
-            <div>
-              <Label htmlFor="tradingview-username">TradingView Username</Label>
-              <Input
-                id="tradingview-username"
-                placeholder="Enter your TradingView username"
-                value={tradingviewUsername}
-                onChange={(e) => setTradingviewUsername(e.target.value)}
-                disabled={loading}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Required to grant you secure access to the script
-              </p>
-            </div>
-          </div>
-          
-          <Button 
-            className="w-full mb-4 bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600"
-            onClick={handleSecurePurchase}
-            disabled={loading || !tradingviewUsername.trim() || !securityValidation.isValid}
-          >
-            {loading ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <>
-                <Shield className="w-4 h-4 mr-2" />
-                <ShoppingCart className="w-4 h-4 mr-2" />
-              </>
+                {securityValidation.isValid ? (
+                  <div className="text-xs text-green-600">
+                    ✓ Payment security validation passed
+                  </div>
+                ) : (
+                  <div className="text-xs text-red-600">
+                    ⚠ Security validation required before purchase
+                  </div>
+                )}
+              </div>
             )}
-            {loading ? 'Processing Securely...' : `Secure Purchase - $${totalPrice.toFixed(2)}`}
-          </Button>
-          
-          <div className="text-xs text-muted-foreground text-center">
-            <p className="flex items-center justify-center gap-1">
-              <Shield className="w-3 h-3" />
-              Enhanced security protection powered by Stripe
-            </p>
-            <p className="mt-1">Advanced fraud detection and payment validation</p>
-          </div>
-        </CardContent>
-      </Card>
+            
+            <div className="space-y-4 mb-6">
+              <div>
+                <Label htmlFor="tradingview-username">TradingView Username</Label>
+                <Input
+                  id="tradingview-username"
+                  placeholder="Enter your TradingView username"
+                  value={tradingviewUsername}
+                  onChange={(e) => setTradingviewUsername(e.target.value)}
+                  disabled={loading || rateLimitLoading}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Required to grant you secure access to the script
+                </p>
+              </div>
+            </div>
+            
+            <Button 
+              className="w-full mb-4 bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600"
+              onClick={handleSecurePurchase}
+              disabled={loading || rateLimitLoading || !tradingviewUsername.trim() || !securityValidation.isValid}
+            >
+              {loading || rateLimitLoading ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <>
+                  <Shield className="w-4 h-4 mr-2" />
+                  <ShoppingCart className="w-4 h-4 mr-2" />
+                </>
+              )}
+              {loading || rateLimitLoading ? 'Processing Securely...' : `Secure Purchase - $${totalPrice.toFixed(2)}`}
+            </Button>
+            
+            <div className="text-xs text-muted-foreground text-center">
+              <p className="flex items-center justify-center gap-1">
+                <Shield className="w-3 h-3" />
+                Enhanced security protection powered by Stripe
+              </p>
+              <p className="mt-1">Advanced fraud detection and payment validation</p>
+              <p className="mt-1">Rate limiting enabled for secure transactions</p>
+            </div>
+          </CardContent>
+        </Card>
+      </RateLimitGuard>
     </div>
   );
 };

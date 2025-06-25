@@ -277,6 +277,72 @@ export type Database = {
           },
         ]
       }
+      rate_limit_configs: {
+        Row: {
+          burst_limit: number
+          created_at: string
+          enabled: boolean
+          endpoint: string
+          id: string
+          requests_per_hour: number
+          requests_per_minute: number
+          updated_at: string
+        }
+        Insert: {
+          burst_limit?: number
+          created_at?: string
+          enabled?: boolean
+          endpoint: string
+          id?: string
+          requests_per_hour?: number
+          requests_per_minute?: number
+          updated_at?: string
+        }
+        Update: {
+          burst_limit?: number
+          created_at?: string
+          enabled?: boolean
+          endpoint?: string
+          id?: string
+          requests_per_hour?: number
+          requests_per_minute?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      rate_limits: {
+        Row: {
+          created_at: string
+          endpoint: string
+          id: string
+          ip_address: unknown | null
+          request_count: number
+          updated_at: string
+          user_id: string | null
+          window_start: string
+        }
+        Insert: {
+          created_at?: string
+          endpoint: string
+          id?: string
+          ip_address?: unknown | null
+          request_count?: number
+          updated_at?: string
+          user_id?: string | null
+          window_start?: string
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string
+          id?: string
+          ip_address?: unknown | null
+          request_count?: number
+          updated_at?: string
+          user_id?: string | null
+          window_start?: string
+        }
+        Relationships: []
+      }
       script_assignments: {
         Row: {
           assigned_at: string | null
@@ -562,6 +628,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_rate_limit: {
+        Args: {
+          p_user_id?: string
+          p_ip_address?: unknown
+          p_endpoint?: string
+          p_limit?: number
+          p_window_minutes?: number
+        }
+        Returns: Json
+      }
       get_script_download_url: {
         Args: { program_id_param: string }
         Returns: string
