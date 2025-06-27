@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
-import { Github, Mail, Chrome } from 'lucide-react';
+import { Mail, Chrome } from 'lucide-react';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -79,13 +79,13 @@ const Auth = () => {
     }
   };
 
-  const handleSocialLogin = async (provider: 'google' | 'github') => {
+  const handleGoogleLogin = async () => {
     setLoading(true);
     try {
-      const { error } = await signInWithProvider(provider);
+      const { error } = await signInWithProvider('google');
       if (error) {
         toast({
-          title: `Error signing in with ${provider}`,
+          title: "Error signing in with Google",
           description: error.message,
           variant: "destructive",
         });
@@ -121,26 +121,15 @@ const Auth = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Button
-            variant="outline"
-            className="w-full"
-            disabled={loading}
-            onClick={() => handleSocialLogin('google')}
-          >
-            <Chrome className="mr-2 h-4 w-4" />
-            Google
-          </Button>
-          <Button
-            variant="outline"
-            className="w-full"
-            disabled={loading}
-            onClick={() => handleSocialLogin('github')}
-          >
-            <Github className="mr-2 h-4 w-4" />
-            GitHub
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          className="w-full"
+          disabled={loading}
+          onClick={handleGoogleLogin}
+        >
+          <Chrome className="mr-2 h-4 w-4" />
+          Continue with Google
+        </Button>
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
