@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -10,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { CheckCircle, Circle, ExternalLink, Copy, Loader2, ArrowRight } from 'lucide-react';
+import TradingViewVendorDisclaimer from '@/components/TradingViewVendorDisclaimer';
 
 interface SellerOnboardingProps {
   onComplete: () => void;
@@ -18,7 +18,7 @@ interface SellerOnboardingProps {
 const SellerOnboarding: React.FC<SellerOnboardingProps> = ({ onComplete }) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(0); // Start at 0 for disclaimer
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     tradingview_username: '',
@@ -27,6 +27,7 @@ const SellerOnboarding: React.FC<SellerOnboardingProps> = ({ onComplete }) => {
   });
 
   const steps = [
+    { id: 0, title: 'Vendor Rules', description: 'TradingView requirements' },
     { id: 1, title: 'Welcome', description: 'Get started as a seller' },
     { id: 2, title: 'TradingView Setup', description: 'Connect your TradingView account' },
     { id: 3, title: 'Get Cookies', description: 'Extract session cookies' },
@@ -44,6 +45,19 @@ const SellerOnboarding: React.FC<SellerOnboardingProps> = ({ onComplete }) => {
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleDisclaimerAccept = () => {
+    setCurrentStep(1);
+  };
+
+  const handleDisclaimerDecline = () => {
+    toast({
+      title: 'Setup Cancelled',
+      description: 'You must agree to TradingView vendor requirements to sell scripts.',
+      variant: 'destructive',
+    });
+    onComplete(); // Return to dashboard
   };
 
   const handleTestConnection = async () => {
@@ -112,6 +126,14 @@ const SellerOnboarding: React.FC<SellerOnboardingProps> = ({ onComplete }) => {
 
   const renderStep = () => {
     switch (currentStep) {
+      case 0:
+        return (
+          <TradingViewVendorDisclaimer
+            onAccept={handleDisclaimerAccept}
+            onDecline={handleDisclaimerDecline}
+          />
+        );
+
       case 1:
         return (
           <div className="text-center space-y-6">
@@ -375,16 +397,20 @@ const SellerOnboarding: React.FC<SellerOnboardingProps> = ({ onComplete }) => {
           ))}
         </div>
         <div className="text-center">
-          <h3 className="font-semibold">{steps[currentStep - 1]?.title}</h3>
-          <p className="text-sm text-muted-foreground">{steps[currentStep - 1]?.description}</p>
+          <h3 className="font-semibold">{steps[currentStep]?.title}</h3>
+          <p className="text-sm text-muted-foreground">{steps[currentStep]?.description}</p>
         </div>
       </div>
 
-      <Card>
-        <CardContent className="p-6">
-          {renderStep()}
-        </CardContent>
-      </Card>
+      {currentStep === 0 ? (
+        renderStep()
+      ) : (
+        <Card>
+          <CardContent className="p-6">
+            {renderStep()}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
