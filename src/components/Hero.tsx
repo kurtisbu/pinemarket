@@ -37,8 +37,8 @@ const Hero = () => {
               <div className="bg-green-500/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Shield className="w-8 h-8 text-green-500" />
               </div>
-              <h3 className="text-lg font-semibold mb-2">Secure & Verified</h3>
-              <p className="text-muted-foreground">All scripts are reviewed and verified for quality and security</p>
+              <h3 className="text-lg font-semibold mb-2">Secure Platform</h3>
+              <p className="text-muted-foreground">Built with security best practices and automated safety checks to protect your investments</p>
             </div>
             
             <div className="text-center">
