@@ -11,10 +11,13 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
 // Rate limiting helper function
 async function checkRateLimit(supabaseAdmin: any, req: Request, endpoint: string) {
   try {
-    // Get client IP
-    const clientIp = req.headers.get('x-forwarded-for') || 
-                     req.headers.get('x-real-ip') || 
-                     'unknown';
+    // Get client IP and clean it up
+    const forwardedFor = req.headers.get('x-forwarded-for') || 
+                        req.headers.get('x-real-ip') || 
+                        'unknown';
+    
+    // Extract the first IP from comma-separated list
+    const clientIp = forwardedFor.split(',')[0].trim();
     
     // Get user ID from auth header
     let userId = null;
@@ -28,7 +31,7 @@ async function checkRateLimit(supabaseAdmin: any, req: Request, endpoint: string
     // Check rate limit using the database function
     const { data: rateLimitResult, error } = await supabaseAdmin.rpc('check_rate_limit', {
       p_user_id: userId,
-      p_ip_address: clientIp,
+      p_ip_address: clientIp === 'unknown' ? null : clientIp,
       p_endpoint: endpoint,
       p_limit: endpoint === 'payment' ? 10 : 100, // Payment endpoint has stricter limits
       p_window_minutes: 60
@@ -238,6 +241,22 @@ serve(async (req) => {
 
         if (programError || !program) {
           throw new Error('Program not found');
+        }
+
+        // Check if seller has a valid Stripe account
+        if (!program.profiles.stripe_account_id) {
+          throw new Error('Seller has not set up their payment account');
+        }
+
+        // Verify the Stripe account exists and is active
+        try {
+          const account = await stripe.accounts.retrieve(program.profiles.stripe_account_id);
+          if (!account.charges_enabled) {
+            throw new Error('Seller payment account is not ready to receive payments');
+          }
+        } catch (stripeError: any) {
+          console.error('Stripe account verification failed:', stripeError);
+          throw new Error('Seller payment account is not available');
         }
 
         // Calculate fees with new 5% structure
