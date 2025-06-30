@@ -1,8 +1,9 @@
-
 import React, { useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/components/ui/use-toast';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ImageGallery from '@/components/ImageGallery';
@@ -18,8 +19,11 @@ import { Loader2 } from 'lucide-react';
 const ProgramDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const { toast } = useToast();
 
-  const { data: program, isLoading, error } = useQuery({
+  const { data: program, isLoading, error, refetch } = useQuery({
     queryKey: ['program', id],
     queryFn: async () => {
       if (!id) throw new Error('Program ID is required');
@@ -46,6 +50,60 @@ const ProgramDetail = () => {
     },
     enabled: !!id,
   });
+
+  // Handle Stripe success callback
+  useEffect(() => {
+    const handleStripeSuccess = async () => {
+      const success = searchParams.get('success');
+      const sessionId = searchParams.get('session_id');
+      
+      if (success === 'true' && sessionId && user && id) {
+        console.log('Stripe success detected, processing purchase completion...', { sessionId, programId: id });
+        
+        try {
+          // Call the stripe-connect function to complete the purchase
+          const { data, error } = await supabase.functions.invoke('stripe-connect', {
+            body: {
+              action: 'complete-stripe-purchase',
+              session_id: sessionId,
+              program_id: id,
+            },
+          });
+
+          if (error) {
+            console.error('Purchase completion error:', error);
+            toast({
+              title: 'Payment processed, but setup incomplete',
+              description: 'Your payment was successful, but there was an issue setting up script access. Please contact support.',
+              variant: 'destructive',
+            });
+          } else {
+            console.log('Purchase completion successful:', data);
+            toast({
+              title: 'Purchase successful!',
+              description: 'Your payment has been processed and script access is being set up.',
+            });
+            
+            // Refetch program data to update UI
+            refetch();
+          }
+        } catch (error: any) {
+          console.error('Purchase completion failed:', error);
+          toast({
+            title: 'Payment processed, but setup incomplete',
+            description: 'Your payment was successful, but there was an issue setting up script access. Please contact support.',
+            variant: 'destructive',
+          });
+        }
+
+        // Clean up URL parameters
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    };
+
+    handleStripeSuccess();
+  }, [searchParams, user, id, toast, refetch]);
 
   // Increment view count when program is loaded
   useEffect(() => {
