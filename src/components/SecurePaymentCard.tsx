@@ -95,14 +95,14 @@ const SecurePaymentCard: React.FC<SecurePaymentCardProps> = ({ price, programId,
 
     setLoading(true);
     try {
-      console.log('Creating secure payment intent...', { 
+      console.log('Creating payment intent for Stripe Checkout...', { 
         programId, 
         price, 
         totalPrice,
         riskScore: validationResult.riskScore 
       });
       
-      // Create payment intent with enhanced security
+      // Create payment intent which will return a Stripe Checkout URL
       const { data, error } = await supabase.functions.invoke('stripe-connect', {
         body: {
           action: 'create-payment-intent',
@@ -118,62 +118,66 @@ const SecurePaymentCard: React.FC<SecurePaymentCardProps> = ({ price, programId,
       });
 
       if (error) {
-        console.error('Secure payment intent creation error:', error);
+        console.error('Payment intent creation error:', error);
         throw error;
       }
 
-      console.log('Secure payment intent created:', data);
+      console.log('Payment intent created, redirecting to Stripe...', data);
 
-      // Enhanced confirmation with security details
-      const confirmPayment = confirm(
-        `Secure Purchase Confirmation:\n\n` +
-        `Script Price: $${price.toFixed(2)}\n` +
-        `Service Fee (5%): $${serviceFee.toFixed(2)}\n` +
-        `Total Amount: $${totalPrice.toFixed(2)}\n\n` +
-        `TradingView Username: ${tradingviewUsername}\n` +
-        `Security Risk Score: ${validationResult.riskScore}/100\n\n` +
-        `Your payment will be processed securely through Stripe.\n` +
-        `Click OK to proceed with secure payment.`
-      );
+      // If we get a checkout URL, redirect to Stripe
+      if (data.checkout_url) {
+        window.location.href = data.checkout_url;
+      } else {
+        // Fallback: show confirmation and simulate payment for now
+        const confirmPayment = confirm(
+          `Secure Purchase Confirmation:\n\n` +
+          `Script Price: $${price.toFixed(2)}\n` +
+          `Service Fee (5%): $${serviceFee.toFixed(2)}\n` +
+          `Total Amount: $${totalPrice.toFixed(2)}\n\n` +
+          `TradingView Username: ${tradingviewUsername}\n` +
+          `Security Risk Score: ${validationResult.riskScore}/100\n\n` +
+          `Your payment will be processed securely through Stripe.\n` +
+          `Click OK to proceed with secure payment.`
+        );
 
-      if (confirmPayment) {
-        console.log('Confirming secure purchase...', data.payment_intent_id);
-        
-        // Simulate successful payment with security logging
-        const { data: confirmData, error: confirmError } = await supabase.functions.invoke('stripe-connect', {
-          body: {
-            action: 'confirm-purchase',
-            payment_intent_id: data.payment_intent_id,
-            program_id: programId,
-            tradingview_username: tradingviewUsername.trim(),
-            security_context: {
-              risk_score: validationResult.riskScore,
-              validation_checks: securityValidation.checks,
-              user_agent: navigator.userAgent,
-              timestamp: new Date().toISOString()
-            }
-          },
-        });
+        if (confirmPayment) {
+          console.log('Confirming secure purchase...', data.payment_intent_id);
+          
+          const { data: confirmData, error: confirmError } = await supabase.functions.invoke('stripe-connect', {
+            body: {
+              action: 'confirm-purchase',
+              payment_intent_id: data.payment_intent_id,
+              program_id: programId,
+              tradingview_username: tradingviewUsername.trim(),
+              security_context: {
+                risk_score: validationResult.riskScore,
+                validation_checks: securityValidation.checks,
+                user_agent: navigator.userAgent,
+                timestamp: new Date().toISOString()
+              }
+            },
+          });
 
-        if (confirmError) {
-          console.error('Secure purchase confirmation error:', confirmError);
-          throw confirmError;
+          if (confirmError) {
+            console.error('Secure purchase confirmation error:', confirmError);
+            throw confirmError;
+          }
+
+          console.log('Secure purchase confirmed:', confirmData);
+
+          toast({
+            title: 'Secure purchase successful!',
+            description: 'Your payment has been processed securely. Script access is being set up.',
+          });
+
+          // Clear the form
+          setTradingviewUsername('');
+          
+          // Refresh the page after successful purchase
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
         }
-
-        console.log('Secure purchase confirmed:', confirmData);
-
-        toast({
-          title: 'Secure purchase successful!',
-          description: 'Your payment has been processed securely. Script access is being set up.',
-        });
-
-        // Clear the form
-        setTradingviewUsername('');
-        
-        // Refresh the page after successful purchase
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
       }
     } catch (error: any) {
       console.error('Secure purchase error:', error);

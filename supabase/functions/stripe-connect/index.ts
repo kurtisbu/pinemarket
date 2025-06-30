@@ -230,7 +230,7 @@ serve(async (req) => {
       case 'create-payment-intent': {
         const { program_id, amount, tradingview_username, security_validation } = payload;
         
-        console.log(`[PAYMENT INTENT] Creating with rate limit protection`);
+        console.log(`[PAYMENT INTENT] Creating Stripe Checkout session with rate limit protection`);
         
         // Get program and seller details
         const { data: program, error: programError } = await supabaseAdmin
@@ -265,31 +265,53 @@ serve(async (req) => {
         const totalAmount = originalPrice + serviceFee; // Total amount buyer pays
         const platformFee = Math.round(originalPrice * 0.05); // 5% platform fee
 
-        console.log(`[PAYMENT INTENT] Original price: $${amount}, Service fee: $${serviceFee/100}, Total: $${totalAmount/100}, Platform fee: $${platformFee/100}`);
+        console.log(`[PAYMENT INTENT] Creating Checkout session - Original: $${amount}, Service fee: $${serviceFee/100}, Total: $${totalAmount/100}, Platform fee: $${platformFee/100}`);
 
-        // Create Stripe payment intent with security metadata
-        const paymentIntent = await stripe.paymentIntents.create({
-          amount: totalAmount,
-          currency: 'usd',
-          application_fee_amount: platformFee,
-          transfer_data: {
-            destination: program.profiles.stripe_account_id,
-          },
-          metadata: {
-            program_id,
-            seller_id: program.seller_id,
-            tradingview_username: tradingview_username || '',
-            original_price: originalPrice.toString(),
-            service_fee: serviceFee.toString(),
-            platform_fee: platformFee.toString(),
-            security_risk_score: security_validation?.risk_score?.toString() || '0',
-            rate_limited: 'true'
+        // Get origin for success/cancel URLs
+        const origin = req.headers.get('origin') || 'http://localhost:3000';
+
+        // Create Stripe Checkout session instead of payment intent
+        const session = await stripe.checkout.sessions.create({
+          payment_method_types: ['card'],
+          line_items: [
+            {
+              price_data: {
+                currency: 'usd',
+                product_data: {
+                  name: program.title,
+                  description: `Pine Script: ${program.title}`,
+                },
+                unit_amount: totalAmount,
+              },
+              quantity: 1,
+            },
+          ],
+          mode: 'payment',
+          success_url: `${origin}/program/${program_id}?success=true`,
+          cancel_url: `${origin}/program/${program_id}?canceled=true`,
+          payment_intent_data: {
+            application_fee_amount: platformFee,
+            transfer_data: {
+              destination: program.profiles.stripe_account_id,
+            },
+            metadata: {
+              program_id,
+              seller_id: program.seller_id,
+              tradingview_username: tradingview_username || '',
+              original_price: originalPrice.toString(),
+              service_fee: serviceFee.toString(),
+              platform_fee: platformFee.toString(),
+              security_risk_score: security_validation?.risk_score?.toString() || '0',
+              rate_limited: 'true'
+            },
           },
         });
 
+        console.log(`[PAYMENT INTENT] Checkout session created: ${session.id}`);
+
         return new Response(JSON.stringify({
-          payment_intent_id: paymentIntent.id,
-          client_secret: paymentIntent.client_secret,
+          checkout_url: session.url,
+          session_id: session.id,
           total_amount: totalAmount / 100,
           service_fee: serviceFee / 100,
         }), {
