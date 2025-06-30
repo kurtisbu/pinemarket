@@ -6,12 +6,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ExternalLink, CreditCard, DollarSign, Loader2 } from 'lucide-react';
+import { ExternalLink, CreditCard, DollarSign, Loader2, AlertTriangle } from 'lucide-react';
 
 const StripeConnectSettings = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [stripeStatus, setStripeStatus] = useState({
     account_id: null,
     onboarding_completed: false,
@@ -70,6 +71,44 @@ const StripeConnectSettings = () => {
       }));
     } catch (error) {
       console.error('Error checking account status:', error);
+      // If account check fails, it might be inaccessible with current API key
+    }
+  };
+
+  const resetStripeConnection = async () => {
+    setResetting(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          stripe_account_id: null,
+          stripe_onboarding_completed: false,
+          stripe_charges_enabled: false,
+          stripe_payouts_enabled: false,
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setStripeStatus({
+        account_id: null,
+        onboarding_completed: false,
+        charges_enabled: false,
+        payouts_enabled: false,
+      });
+
+      toast({
+        title: 'Stripe connection reset',
+        description: 'You can now create a new Stripe Connect account.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -189,6 +228,22 @@ const StripeConnectSettings = () => {
           </ul>
         </div>
 
+        {/* Show warning if account exists but might be inaccessible */}
+        {stripeStatus.account_id && !stripeStatus.charges_enabled && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-yellow-800">Connection Issue Detected</h4>
+                <p className="text-sm text-yellow-700 mt-1">
+                  Your Stripe account may not be accessible with the current API key. 
+                  Try resetting the connection to create a new account.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${stripeStatus.account_id ? 'bg-green-500' : 'bg-gray-400'}`} />
@@ -204,7 +259,7 @@ const StripeConnectSettings = () => {
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {!stripeStatus.account_id ? (
             <Button 
               onClick={createStripeAccount}
@@ -237,15 +292,37 @@ const StripeConnectSettings = () => {
           )}
           
           {stripeStatus.account_id && (
-            <Button 
-              onClick={() => checkAccountStatus(stripeStatus.account_id)}
-              variant="ghost"
-              size="sm"
-            >
-              Refresh Status
-            </Button>
+            <>
+              <Button 
+                onClick={() => checkAccountStatus(stripeStatus.account_id)}
+                variant="ghost"
+                size="sm"
+              >
+                Refresh Status
+              </Button>
+              
+              <Button 
+                onClick={resetStripeConnection}
+                disabled={resetting}
+                variant="destructive"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                {resetting ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
+                Reset Connection
+              </Button>
+            </>
           )}
         </div>
+
+        {stripeStatus.account_id && (
+          <div className="text-xs text-muted-foreground">
+            <p>Account ID: {stripeStatus.account_id}</p>
+            <p className="mt-1">
+              If you're having connection issues, try resetting and creating a new account.
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
