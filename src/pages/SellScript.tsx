@@ -22,6 +22,7 @@ const SellScript = () => {
   const { validateFile } = useSecureFileValidation();
   
   const [loading, setLoading] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
   const [scriptFile, setScriptFile] = useState<File | null>(null);
   const [scriptType, setScriptType] = useState<'file' | 'link'>('link');
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
@@ -160,19 +161,29 @@ const SellScript = () => {
 
       // Upload media files with security validation
       const imageUrls: string[] = [];
-      for (const file of mediaFiles) {
-        try {
-          const url = await uploadFile(file, 'program-media', user.id);
-          imageUrls.push(url);
-        } catch (error: any) {
-          toast({
-            title: 'Media upload failed',
-            description: `Failed to upload ${file.name}: ${error.message}`,
-            variant: 'destructive',
-          });
-          setLoading(false);
-          return;
+      if (mediaFiles.length > 0) {
+        setUploadingMedia(true);
+        toast({
+          title: 'Processing images',
+          description: `Uploading and optimizing ${mediaFiles.length} image${mediaFiles.length > 1 ? 's' : ''}...`,
+        });
+        
+        for (const file of mediaFiles) {
+          try {
+            const url = await uploadFile(file, 'program-media', user.id);
+            imageUrls.push(url);
+          } catch (error: any) {
+            toast({
+              title: 'Media upload failed',
+              description: `Failed to upload ${file.name}: ${error.message}`,
+              variant: 'destructive',
+            });
+            setLoading(false);
+            setUploadingMedia(false);
+            return;
+          }
         }
+        setUploadingMedia(false);
       }
 
       // Note: The database trigger will automatically validate and sanitize the data
@@ -203,7 +214,7 @@ const SellScript = () => {
 
       toast({
         title: 'Program created successfully',
-        description: 'Your Pine Script program has been uploaded with enhanced security validation.',
+        description: `Your Pine Script program has been created with ${imageUrls.length} optimized image${imageUrls.length !== 1 ? 's' : ''}.`,
       });
 
       navigate('/my-programs');
@@ -216,13 +227,14 @@ const SellScript = () => {
       });
     } finally {
       setLoading(false);
+      setUploadingMedia(false);
     }
   };
 
   if (!user) return null;
 
   const isFormValid = formData.title.trim() && formData.description.trim() && formData.price && formData.category;
-  const isSubmitDisabled = loading || securityValidating || !isFormValid;
+  const isSubmitDisabled = loading || securityValidating || uploadingMedia || !isFormValid;
 
   return (
     <div className="min-h-screen bg-background">
@@ -274,16 +286,24 @@ const SellScript = () => {
                     disabled={isSubmitDisabled} 
                     className="flex-1"
                   >
-                    {loading || securityValidating ? 'Creating Securely...' : 'Create Program (Draft)'}
+                    {uploadingMedia 
+                      ? 'Processing Images...' 
+                      : loading || securityValidating 
+                        ? 'Creating Securely...' 
+                        : 'Create Program (Draft)'
+                    }
                   </Button>
                   <Button type="button" variant="outline" onClick={() => navigate('/')}>
                     Cancel
                   </Button>
                 </div>
 
-                {securityValidating && (
+                {(securityValidating || uploadingMedia) && (
                   <p className="text-sm text-muted-foreground text-center">
-                    Running security validation...
+                    {uploadingMedia 
+                      ? 'Optimizing and uploading images...' 
+                      : 'Running security validation...'
+                    }
                   </p>
                 )}
               </form>
