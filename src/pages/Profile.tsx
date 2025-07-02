@@ -10,6 +10,7 @@ import { User, Calendar } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import UserTradingViewScripts from '@/components/UserTradingViewScripts';
 import UserPurchases from '@/components/UserPurchases';
+import SellerPublishedPrograms from '@/components/SellerPublishedPrograms';
 
 interface Profile {
   id: string;
@@ -141,16 +142,11 @@ const Profile = () => {
             <UserPurchases userId={profile.id} />
           )}
 
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold">Pine Script Programs for Sale</h3>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <p>No programs available yet. Check back later!</p>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Show published programs for sale */}
+          <SellerPublishedPrograms 
+            sellerId={profile.id} 
+            sellerUsername={profile.username} 
+          />
 
           {profile.is_tradingview_connected && (
             <UserTradingViewScripts profileId={profile.id} isOwner={isOwner} />
