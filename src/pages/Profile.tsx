@@ -148,7 +148,8 @@ const Profile = () => {
             sellerUsername={profile.username} 
           />
 
-          {profile.is_tradingview_connected && (
+          {/* Show TradingView publications only to the profile owner */}
+          {isOwner && profile.is_tradingview_connected && (
             <UserTradingViewScripts profileId={profile.id} isOwner={isOwner} />
           )}
         </div>
