@@ -14,8 +14,10 @@ interface SellScriptFormProps {
     category: string;
     tags: string[];
     tradingview_publication_url: string;
+    offer_trial: boolean;
+    trial_period_days: number;
   };
-  onInputChange: (field: string, value: string | number) => void;
+  onInputChange: (field: string, value: string | number | boolean) => void;
   categories: string[];
   currentTag: string;
   setCurrentTag: (tag: string) => void;
