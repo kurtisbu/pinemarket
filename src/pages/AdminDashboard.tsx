@@ -1,88 +1,156 @@
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { Navigate } from 'react-router-dom';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
-import AdminScriptAssignments from '@/components/AdminScriptAssignments';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import Header from '@/components/Header';
+import { Shield, Users, FileText, BarChart3, AlertTriangle, Clock } from 'lucide-react';
+import AdminScriptAssignments from '@/components/AdminScriptAssignments';
+import SecurityAuditDashboard from '@/components/SecurityAuditDashboard';
+import AdminTrialManagement from '@/components/AdminTrialManagement';
 
-const AdminDashboard: React.FC = () => {
+const AdminDashboard = () => {
   const { user } = useAuth();
-  const [profile, setProfile] = useState<{ role: string } | null>(null);
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
-      const fetchProfile = async () => {
-        const { data } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-        
-        setProfile(data);
-        setLoading(false);
-      };
-      fetchProfile();
-    } else {
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+    checkAdminAccess();
+  }, [user, navigate]);
+
+  const checkAdminAccess = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+      
+      if (data?.role !== 'admin') {
+        toast({
+          title: 'Access Denied',
+          description: 'You do not have admin privileges',
+          variant: 'destructive',
+        });
+        navigate('/');
+        return;
+      }
+      
+      setIsAdmin(true);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Failed to verify admin access',
+        variant: 'destructive',
+      });
+      navigate('/');
+    } finally {
       setLoading(false);
     }
-  }, [user]);
+  };
 
-  // Redirect if not authenticated
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
+  if (!user) return null;
 
-  // Show loading while checking permissions
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div>Loading...</div>
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-6xl mx-auto">
+            <div className="animate-pulse">
+              <div className="h-8 bg-muted rounded w-1/3 mb-6"></div>
+              <div className="h-32 bg-muted rounded mb-6"></div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
-  // Redirect if not admin
-  if (!profile || profile.role !== 'admin') {
-    return <Navigate to="/" replace />;
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="container mx-auto px-4 py-8">
+          <Alert>
+            <Shield className="w-4 h-4" />
+            <AlertDescription>
+              Admin access required to view this page.
+            </AlertDescription>
+          </Alert>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <Header />
-      <main className="container mx-auto px-4 py-8">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold mb-8">Admin Dashboard</h1>
-          
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Shield className="w-8 h-8" />
+              Admin Dashboard
+            </h1>
+            <p className="text-muted-foreground">
+              System administration and monitoring tools
+            </p>
+          </div>
+
           <Tabs defaultValue="assignments" className="space-y-6">
-            <TabsList>
-              <TabsTrigger value="assignments">Script Assignments</TabsTrigger>
-              <TabsTrigger value="users">User Management</TabsTrigger>
-              <TabsTrigger value="programs">Program Management</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="assignments" className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4" />
+                Assignments
+              </TabsTrigger>
+              <TabsTrigger value="trials" className="flex items-center gap-2">
+                <Clock className="w-4 h-4" />
+                Trials
+              </TabsTrigger>
+              <TabsTrigger value="security" className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                Security
+              </TabsTrigger>
+              <TabsTrigger value="users" className="flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                Users
+              </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="assignments">
+            <TabsContent value="assignments" className="space-y-6">
               <AdminScriptAssignments />
             </TabsContent>
 
-            <TabsContent value="users">
-              <div className="text-center py-8 text-muted-foreground">
-                User management interface coming soon...
-              </div>
+            <TabsContent value="trials" className="space-y-6">
+              <AdminTrialManagement />
             </TabsContent>
 
-            <TabsContent value="programs">
+            <TabsContent value="security" className="space-y-6">
+              <SecurityAuditDashboard />
+            </TabsContent>
+
+            <TabsContent value="users" className="space-y-6">
               <div className="text-center py-8 text-muted-foreground">
-                Program management interface coming soon...
+                User management features coming soon...
               </div>
             </TabsContent>
           </Tabs>
         </div>
-      </main>
-      <Footer />
+      </div>
     </div>
   );
 };

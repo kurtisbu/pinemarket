@@ -3,15 +3,16 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Header from '@/components/Header';
-import { User, Settings, FileText, BarChart3 } from 'lucide-react';
+import { User, Settings, FileText, BarChart3, Clock } from 'lucide-react';
 import SellerProfileView from '@/components/SellerProfileView';
 import SellerProgramsView from '@/components/SellerProgramsView';
 import SellerSettingsView from '@/components/SellerSettingsView';
 import SellerScriptAssignments from '@/components/SellerScriptAssignments';
+import TrialManagementDashboard from '@/components/TrialManagementDashboard';
 
 interface Profile {
   id: string;
@@ -106,7 +107,7 @@ const SellerDashboard = () => {
           </div>
 
           <Tabs defaultValue="profile" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="profile" className="flex items-center gap-2">
                 <User className="w-4 h-4" />
                 Profile
@@ -118,6 +119,10 @@ const SellerDashboard = () => {
               <TabsTrigger value="assignments" className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4" />
                 Assignments
+              </TabsTrigger>
+              <TabsTrigger value="trials" className="flex items-center gap-2">
+                <Clock className="w-4 h-4" />
+                Trials
               </TabsTrigger>
               <TabsTrigger value="settings" className="flex items-center gap-2">
                 <Settings className="w-4 h-4" />
@@ -135,6 +140,10 @@ const SellerDashboard = () => {
 
             <TabsContent value="assignments" className="space-y-6">
               <SellerScriptAssignments />
+            </TabsContent>
+
+            <TabsContent value="trials" className="space-y-6">
+              <TrialManagementDashboard />
             </TabsContent>
 
             <TabsContent value="settings" className="space-y-6">
