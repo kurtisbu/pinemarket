@@ -13,6 +13,12 @@ interface AccessCodeStepProps {
   onNext: () => void;
 }
 
+interface AccessCodeResponse {
+  valid: boolean;
+  error?: string;
+  message?: string;
+}
+
 const AccessCodeStep: React.FC<AccessCodeStepProps> = ({ onNext }) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -37,14 +43,16 @@ const AccessCodeStep: React.FC<AccessCodeStepProps> = ({ onNext }) => {
 
       if (error) throw error;
 
-      if (data.valid) {
+      const response = data as AccessCodeResponse;
+
+      if (response.valid) {
         toast({
           title: 'Access Code Validated',
           description: 'You can now proceed with seller onboarding.',
         });
         onNext();
       } else {
-        setError(data.error || 'Invalid access code');
+        setError(response.error || 'Invalid access code');
       }
     } catch (error: any) {
       console.error('Access code validation error:', error);
