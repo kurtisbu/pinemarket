@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import TradingViewVendorDisclaimer from '@/components/TradingViewVendorDisclaimer';
 import SellerOnboardingSteps from '@/components/SellerOnboarding/SellerOnboardingSteps';
+import AccessCodeStep from '@/components/SellerOnboarding/AccessCodeStep';
 import WelcomeStep from '@/components/SellerOnboarding/WelcomeStep';
 import TradingViewSetupStep from '@/components/SellerOnboarding/TradingViewSetupStep';
 import CookiesStep from '@/components/SellerOnboarding/CookiesStep';
@@ -29,11 +30,12 @@ const SellerOnboarding: React.FC<SellerOnboardingProps> = ({ onComplete }) => {
 
   const steps = [
     { id: 0, title: 'Vendor Rules', description: 'TradingView requirements' },
-    { id: 1, title: 'Welcome', description: 'Get started as a seller' },
-    { id: 2, title: 'TradingView Setup', description: 'Connect your TradingView account' },
-    { id: 3, title: 'Get Cookies', description: 'Extract session cookies' },
-    { id: 4, title: 'Test Connection', description: 'Verify and sync scripts' },
-    { id: 5, title: 'Complete', description: 'Ready to sell!' },
+    { id: 1, title: 'Access Code', description: 'Validate seller access' },
+    { id: 2, title: 'Welcome', description: 'Get started as a seller' },
+    { id: 3, title: 'TradingView Setup', description: 'Connect your TradingView account' },
+    { id: 4, title: 'Get Cookies', description: 'Extract session cookies' },
+    { id: 5, title: 'Test Connection', description: 'Verify and sync scripts' },
+    { id: 6, title: 'Complete', description: 'Ready to sell!' },
   ];
 
   const handleInputChange = (field: string, value: string) => {
@@ -79,7 +81,7 @@ const SellerOnboarding: React.FC<SellerOnboardingProps> = ({ onComplete }) => {
       });
 
       await handleSyncScripts();
-      setCurrentStep(5);
+      setCurrentStep(6);
     } catch (error: any) {
       toast({
         title: 'Connection Test Failed',
@@ -127,25 +129,16 @@ const SellerOnboarding: React.FC<SellerOnboardingProps> = ({ onComplete }) => {
         );
 
       case 1:
-        return <WelcomeStep onNext={() => setCurrentStep(2)} />;
+        return <AccessCodeStep onNext={() => setCurrentStep(2)} />;
 
       case 2:
+        return <WelcomeStep onNext={() => setCurrentStep(3)} />;
+
+      case 3:
         return (
           <TradingViewSetupStep
             username={formData.tradingview_username}
             onUsernameChange={(value) => handleInputChange('tradingview_username', value)}
-            onNext={() => setCurrentStep(3)}
-            onBack={() => setCurrentStep(1)}
-          />
-        );
-
-      case 3:
-        return (
-          <CookiesStep
-            sessionCookie={formData.tradingview_session_cookie}
-            signedSessionCookie={formData.tradingview_signed_session_cookie}
-            onSessionCookieChange={(value) => handleInputChange('tradingview_session_cookie', value)}
-            onSignedSessionCookieChange={(value) => handleInputChange('tradingview_signed_session_cookie', value)}
             onNext={() => setCurrentStep(4)}
             onBack={() => setCurrentStep(2)}
           />
@@ -153,15 +146,27 @@ const SellerOnboarding: React.FC<SellerOnboardingProps> = ({ onComplete }) => {
 
       case 4:
         return (
-          <TestConnectionStep
-            username={formData.tradingview_username}
-            loading={loading}
-            onTestConnection={handleTestConnection}
+          <CookiesStep
+            sessionCookie={formData.tradingview_session_cookie}
+            signedSessionCookie={formData.tradingview_signed_session_cookie}
+            onSessionCookieChange={(value) => handleInputChange('tradingview_session_cookie', value)}
+            onSignedSessionCookieChange={(value) => handleInputChange('tradingview_signed_session_cookie', value)}
+            onNext={() => setCurrentStep(5)}
             onBack={() => setCurrentStep(3)}
           />
         );
 
       case 5:
+        return (
+          <TestConnectionStep
+            username={formData.tradingview_username}
+            loading={loading}
+            onTestConnection={handleTestConnection}
+            onBack={() => setCurrentStep(4)}
+          />
+        );
+
+      case 6:
         return <CompleteStep onComplete={onComplete} />;
 
       default:

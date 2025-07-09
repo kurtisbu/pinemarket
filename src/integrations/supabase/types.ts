@@ -476,6 +476,45 @@ export type Database = {
         }
         Relationships: []
       }
+      seller_access_codes: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          current_uses: number | null
+          expires_at: string | null
+          id: string
+          is_used: boolean
+          max_uses: number | null
+          used_at: string | null
+          used_by_user_id: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          current_uses?: number | null
+          expires_at?: string | null
+          id?: string
+          is_used?: boolean
+          max_uses?: number | null
+          used_at?: string | null
+          used_by_user_id?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          current_uses?: number | null
+          expires_at?: string | null
+          id?: string
+          is_used?: boolean
+          max_uses?: number | null
+          used_at?: string | null
+          used_by_user_id?: string | null
+        }
+        Relationships: []
+      }
       subscription_access: {
         Row: {
           created_at: string
@@ -721,6 +760,10 @@ export type Database = {
           p_mime_type: string
           p_bucket_name: string
         }
+        Returns: Json
+      }
+      validate_seller_access_code: {
+        Args: { p_code: string; p_user_id: string }
         Returns: Json
       }
       validate_tradingview_url: {

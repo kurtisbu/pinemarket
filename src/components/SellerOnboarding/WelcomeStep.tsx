@@ -13,7 +13,7 @@ const WelcomeStep: React.FC<WelcomeStepProps> = ({ onNext }) => {
       <div className="space-y-2">
         <h2 className="text-2xl font-bold">Welcome to PineMarket!</h2>
         <p className="text-muted-foreground">
-          Let's get you set up to start selling your TradingView Pine Scripts.
+          Your access has been verified. Let's get you set up to start selling your TradingView Pine Scripts.
         </p>
       </div>
       <div className="bg-muted/50 p-4 rounded-lg text-left">
