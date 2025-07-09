@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface ProgramBasicFormProps {
   formData: {
@@ -11,8 +12,10 @@ interface ProgramBasicFormProps {
     description: string;
     price: string;
     category: string;
+    trial_period_days: number;
+    offer_trial: boolean;
   };
-  onInputChange: (field: string, value: string) => void;
+  onInputChange: (field: string, value: string | number | boolean) => void;
   categories: string[];
 }
 
@@ -67,6 +70,38 @@ const ProgramBasicForm: React.FC<ProgramBasicFormProps> = ({
         <p className="text-sm text-muted-foreground">
           One-time payment for lifetime access to your Pine Script
         </p>
+      </div>
+
+      <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="offer-trial"
+            checked={formData.offer_trial}
+            onCheckedChange={(checked) => onInputChange('offer_trial', checked)}
+          />
+          <Label htmlFor="offer-trial" className="text-sm font-medium">
+            Offer Free Trial
+          </Label>
+        </div>
+        
+        {formData.offer_trial && (
+          <div className="space-y-2">
+            <Label htmlFor="trial_period_days">Trial Period (Days) *</Label>
+            <Input
+              id="trial_period_days"
+              type="number"
+              min="1"
+              max="30"
+              value={formData.trial_period_days}
+              onChange={(e) => onInputChange('trial_period_days', parseInt(e.target.value) || 7)}
+              placeholder="7"
+              required={formData.offer_trial}
+            />
+            <p className="text-sm text-muted-foreground">
+              Users can try your script for free for this many days before purchasing
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="space-y-2">

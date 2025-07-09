@@ -8,7 +8,7 @@ export async function assignScriptAccess(
   supabaseAdmin: SupabaseClient,
   key: CryptoKey
 ): Promise<Response> {
-  const { pine_id, tradingview_username, assignment_id } = payload;
+  const { pine_id, tradingview_username, assignment_id, access_type, trial_duration_days } = payload;
   
   if (!pine_id || !tradingview_username || !assignment_id) {
     return new Response(JSON.stringify({ 
@@ -65,7 +65,7 @@ export async function assignScriptAccess(
       })
       .eq('id', assignment_id);
 
-    console.log(`[ASSIGN] Attempting to assign script access: pine_id=${pine_id}, username=${tradingview_username}`);
+    console.log(`[ASSIGN] Attempting to assign script access: pine_id=${pine_id}, username=${tradingview_username}, access_type=${access_type}`);
 
     // Step 1: Validate username exists
     console.log(`[ASSIGN] Validating username: ${tradingview_username}`);
@@ -96,7 +96,6 @@ export async function assignScriptAccess(
     console.log(`[ASSIGN] Username "${tradingview_username}" validated successfully`);
 
     // Step 2: Get the actual script_id (PUB;xxx format) from our database
-    // Use the most recent script entry for this seller and pine_id to avoid duplicates
     console.log(`[ASSIGN] Looking up script_id for pine_id: ${pine_id}`);
     
     const { data: scriptData, error: scriptError } = await supabaseAdmin
@@ -149,7 +148,9 @@ export async function assignScriptAccess(
           sessionCookie, 
           signedSessionCookie, 
           assignment_id, 
-          supabaseAdmin
+          supabaseAdmin,
+          access_type,
+          trial_duration_days
         );
       }
       
@@ -177,7 +178,9 @@ export async function assignScriptAccess(
       sessionCookie, 
       signedSessionCookie, 
       assignment_id, 
-      supabaseAdmin
+      supabaseAdmin,
+      access_type,
+      trial_duration_days
     );
 
   } catch (error: any) {
@@ -192,6 +195,8 @@ export async function assignScriptAccess(
         assignment_details: {
           pine_id,
           tradingview_username,
+          access_type,
+          trial_duration_days,
           error: error.message,
           failed_at: new Date().toISOString()
         }
@@ -217,15 +222,24 @@ async function performAssignment(
   sessionCookie: string,
   signedSessionCookie: string,
   assignmentId: string,
-  supabaseAdmin: SupabaseClient
+  supabaseAdmin: SupabaseClient,
+  accessType?: string,
+  trialDurationDays?: number
 ): Promise<Response> {
   // Step 3: Add script access using the actual script_id
-  console.log(`[ASSIGN] Adding script access for ${tradingviewUsername} to script_id: ${scriptId}`);
+  console.log(`[ASSIGN] Adding script access for ${tradingviewUsername} to script_id: ${scriptId}, access_type: ${accessType}`);
 
   const formData = new FormData();
   formData.append('pine_id', scriptId); // Use the actual script_id (PUB;xxx format)
   formData.append('username_recip', tradingviewUsername);
-  // No expiration parameter = lifetime access
+  
+  // Add expiration for trials
+  if (accessType === 'trial' && trialDurationDays) {
+    const expirationDate = new Date(Date.now() + (trialDurationDays * 24 * 60 * 60 * 1000));
+    formData.append('expiration', expirationDate.toISOString());
+    console.log(`[ASSIGN] Setting trial expiration: ${expirationDate.toISOString()}`);
+  }
+  // For full purchases, no expiration parameter = lifetime access
 
   const addAccessResponse = await fetch('https://www.tradingview.com/pine_perm/add/', {
     method: 'POST',
@@ -255,7 +269,8 @@ async function performAssignment(
 
   if (responseData.status === 'ok') {
     isSuccess = true;
-    message = `Successfully granted lifetime access to ${tradingviewUsername}`;
+    const accessTypeText = accessType === 'trial' ? `${trialDurationDays}-day trial` : 'lifetime';
+    message = `Successfully granted ${accessTypeText} access to ${tradingviewUsername}`;
   } else if (responseData.error) {
     // Check for "user already has access" type errors which we can treat as success
     const errorMsg = responseData.error.toLowerCase();
@@ -273,19 +288,30 @@ async function performAssignment(
   }
 
   if (isSuccess) {
+    // Calculate expiration date for trials
+    let expiresAt = null;
+    if (accessType === 'trial' && trialDurationDays) {
+      expiresAt = new Date(Date.now() + (trialDurationDays * 24 * 60 * 60 * 1000)).toISOString();
+    }
+
     // Update assignment as successful
     await supabaseAdmin
       .from('script_assignments')
       .update({
         status: 'assigned',
         assigned_at: new Date().toISOString(),
+        access_type: accessType || 'full_purchase',
+        expires_at: expiresAt,
+        is_trial: accessType === 'trial',
         assignment_details: {
           pine_id: pineId,
           script_id: scriptId,
           tradingview_username: tradingviewUsername,
+          access_type: accessType || 'full_purchase',
+          trial_duration_days: trialDurationDays,
+          expires_at: expiresAt,
           response: responseData,
-          assigned_at: new Date().toISOString(),
-          access_type: 'lifetime'
+          assigned_at: new Date().toISOString()
         }
       })
       .eq('id', assignmentId);
@@ -297,7 +323,9 @@ async function performAssignment(
       pine_id: pineId,
       script_id: scriptId,
       tradingview_username: tradingviewUsername,
-      access_type: 'lifetime'
+      access_type: accessType || 'full_purchase',
+      expires_at: expiresAt,
+      trial_duration_days: trialDurationDays
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200

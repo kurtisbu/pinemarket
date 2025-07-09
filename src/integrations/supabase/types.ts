@@ -395,13 +395,16 @@ export type Database = {
       }
       script_assignments: {
         Row: {
+          access_type: string | null
           assigned_at: string | null
           assignment_attempts: number
           assignment_details: Json | null
           buyer_id: string
           created_at: string
           error_message: string | null
+          expires_at: string | null
           id: string
+          is_trial: boolean | null
           last_attempt_at: string | null
           pine_id: string | null
           program_id: string
@@ -414,13 +417,16 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          access_type?: string | null
           assigned_at?: string | null
           assignment_attempts?: number
           assignment_details?: Json | null
           buyer_id: string
           created_at?: string
           error_message?: string | null
+          expires_at?: string | null
           id?: string
+          is_trial?: boolean | null
           last_attempt_at?: string | null
           pine_id?: string | null
           program_id: string
@@ -433,13 +439,16 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          access_type?: string | null
           assigned_at?: string | null
           assignment_attempts?: number
           assignment_details?: Json | null
           buyer_id?: string
           created_at?: string
           error_message?: string | null
+          expires_at?: string | null
           id?: string
+          is_trial?: boolean | null
           last_attempt_at?: string | null
           pine_id?: string | null
           program_id?: string
@@ -694,6 +703,45 @@ export type Database = {
           },
         ]
       }
+      trial_usage: {
+        Row: {
+          created_at: string
+          id: string
+          program_id: string
+          used_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          program_id: string
+          used_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          program_id?: string
+          used_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trial_usage_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trial_usage_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_subscriptions: {
         Row: {
           cancel_at_period_end: boolean
@@ -776,6 +824,10 @@ export type Database = {
         }
         Returns: Json
       }
+      check_trial_eligibility: {
+        Args: { p_user_id: string; p_program_id: string }
+        Returns: boolean
+      }
       get_script_download_url: {
         Args: { program_id_param: string }
         Returns: string
@@ -793,6 +845,10 @@ export type Database = {
           p_risk_level?: string
         }
         Returns: string
+      }
+      record_trial_usage: {
+        Args: { p_user_id: string; p_program_id: string }
+        Returns: undefined
       }
       sanitize_user_content: {
         Args: { content: string; max_length?: number }

@@ -26,10 +26,12 @@ export const useSellScriptForm = () => {
     price: '',
     category: '',
     tags: [] as string[],
-    tradingview_publication_url: ''
+    tradingview_publication_url: '',
+    offer_trial: false,
+    trial_period_days: 7
   });
 
-  const handleInputChange = (field: string, value: string | number) => {
+  const handleInputChange = (field: string, value: string | number | boolean) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -84,6 +86,15 @@ export const useSellScriptForm = () => {
       toast({
         title: 'Price required',
         description: 'Please set a price for your program.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (formData.offer_trial && (!formData.trial_period_days || formData.trial_period_days < 1)) {
+      toast({
+        title: 'Invalid trial period',
+        description: 'Trial period must be at least 1 day.',
         variant: 'destructive',
       });
       return;
@@ -177,7 +188,7 @@ export const useSellScriptForm = () => {
         monthly_price: null,
         yearly_price: null,
         billing_interval: null,
-        trial_period_days: 0
+        trial_period_days: formData.offer_trial ? formData.trial_period_days : 0
       };
 
       const { error } = await supabase
@@ -188,7 +199,7 @@ export const useSellScriptForm = () => {
 
       toast({
         title: 'Program created successfully',
-        description: `Your Pine Script program has been created with ${imageUrls.length} optimized image${imageUrls.length !== 1 ? 's' : ''}.`,
+        description: `Your Pine Script program has been created${formData.offer_trial ? ` with a ${formData.trial_period_days}-day free trial` : ''} with ${imageUrls.length} optimized image${imageUrls.length !== 1 ? 's' : ''}.`,
       });
 
       navigate('/my-programs');
