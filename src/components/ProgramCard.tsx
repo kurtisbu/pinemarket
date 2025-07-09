@@ -1,113 +1,83 @@
 
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Star, Download, Eye } from 'lucide-react';
+import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
+import { Eye, Download } from 'lucide-react';
+import RatingDisplay from './RatingDisplay';
 
-interface ProgramCardProps {
+interface Program {
   id: string;
   title: string;
   description: string;
   price: number;
-  rating: number;
-  downloads: number;
-  views: number;
   category: string;
-  author: string;
-  image: string;
-  tags: string[];
-  pricing_model?: string;
-  monthly_price?: number | null;
-  yearly_price?: number | null;
-  billing_interval?: string | null;
+  image_urls: string[];
+  view_count: number;
+  download_count: number;
+  average_rating: number;
+  rating_count: number;
+  profiles?: {
+    display_name: string | null;
+    username: string | null;
+  };
 }
 
-const ProgramCard: React.FC<ProgramCardProps> = ({
-  id,
-  title,
-  description,
-  price,
-  rating,
-  downloads,
-  views,
-  category,
-  author,
-  image,
-  tags
-}) => {
-  const navigate = useNavigate();
+interface ProgramCardProps {
+  program: Program;
+  onClick: () => void;
+}
 
-  const handleViewDetails = () => {
-    navigate(`/program/${id}`);
-  };
-
+const ProgramCard: React.FC<ProgramCardProps> = ({ program, onClick }) => {
   return (
-    <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-border">
+    <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={onClick}>
       <CardHeader className="p-0">
-        <div className="relative">
-          <img 
-            src={image} 
-            alt={title}
-            className="w-full h-48 object-cover rounded-t-lg cursor-pointer"
-            onClick={handleViewDetails}
+        {program.image_urls && program.image_urls[0] && (
+          <img
+            src={program.image_urls[0]}
+            alt={program.title}
+            className="w-full h-48 object-cover rounded-t-lg"
           />
-          <Badge className="absolute top-3 left-3 bg-blue-500 hover:bg-blue-600">
-            {category}
-          </Badge>
-          <div className="absolute top-3 right-3 bg-black/50 text-white px-2 py-1 rounded text-sm">
-            ${price}
-          </div>
-        </div>
+        )}
       </CardHeader>
       
       <CardContent className="p-4">
-        <h3 
-          className="font-semibold text-lg mb-2 group-hover:text-blue-500 transition-colors cursor-pointer"
-          onClick={handleViewDetails}
-        >
-          {title}
-        </h3>
-        <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
-          {description}
+        <div className="flex items-start justify-between mb-2">
+          <h3 className="font-semibold text-lg line-clamp-2">{program.title}</h3>
+          <Badge variant="secondary">{program.category}</Badge>
+        </div>
+        
+        <p className="text-muted-foreground text-sm line-clamp-2 mb-3">
+          {program.description}
         </p>
+
+        <RatingDisplay 
+          averageRating={program.average_rating} 
+          ratingCount={program.rating_count}
+          size="sm"
+        />
         
-        <div className="flex items-center justify-between text-sm text-muted-foreground mb-3">
-          <span>by {author}</span>
-          <div className="flex items-center space-x-1">
-            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-            <span>{rating.toFixed(1)}</span>
-          </div>
-        </div>
-        
-        <div className="flex flex-wrap gap-1 mb-3">
-          {tags.slice(0, 3).map((tag, index) => (
-            <Badge key={index} variant="secondary" className="text-xs">
-              {tag}
-            </Badge>
-          ))}
-        </div>
-        
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <div className="flex items-center space-x-1">
-            <Download className="w-3 h-3" />
-            <span>{downloads}</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <Eye className="w-3 h-3" />
-            <span>{views}</span>
-          </div>
-        </div>
+        {program.profiles && (
+          <p className="text-xs text-muted-foreground mt-2">
+            by {program.profiles.display_name || program.profiles.username}
+          </p>
+        )}
       </CardContent>
       
-      <CardFooter className="p-4 pt-0">
-        <Button 
-          className="w-full bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600"
-          onClick={handleViewDetails}
-        >
-          View Details
-        </Button>
+      <CardFooter className="px-4 pb-4 pt-0 flex items-center justify-between">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1">
+            <Eye className="w-4 h-4" />
+            <span>{program.view_count}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Download className="w-4 h-4" />
+            <span>{program.download_count}</span>
+          </div>
+        </div>
+        
+        <div className="font-semibold text-lg">
+          ${program.price}
+        </div>
       </CardFooter>
     </Card>
   );

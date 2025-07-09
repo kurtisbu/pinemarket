@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,6 +11,8 @@ import ImageGallery from '@/components/ImageGallery';
 import ProgramHeader from '@/components/ProgramDetail/ProgramHeader';
 import ProgramDescription from '@/components/ProgramDetail/ProgramDescription';
 import ProgramSidebar from '@/components/ProgramDetail/ProgramSidebar';
+import UserRatingSection from '@/components/UserRatingSection';
+import RatingsList from '@/components/RatingsList';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 
@@ -20,9 +22,10 @@ const ProgramDetail = () => {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { toast } = useToast();
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const { data: program, isLoading, error, refetch } = useQuery({
-    queryKey: ['program', id],
+    queryKey: ['program', id, refreshKey],
     queryFn: async () => {
       if (!id) throw new Error('Program ID is required');
 
@@ -113,6 +116,10 @@ const ProgramDetail = () => {
     }
   };
 
+  const handleRatingUpdate = () => {
+    setRefreshKey(prev => prev + 1);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -153,6 +160,13 @@ const ProgramDetail = () => {
             <ImageGallery images={program.image_urls || []} />
             <ProgramHeader program={program} />
             <ProgramDescription description={program.description} tags={program.tags} />
+            
+            <UserRatingSection 
+              programId={program.id} 
+              onRatingUpdate={handleRatingUpdate}
+            />
+            
+            <RatingsList programId={program.id} />
           </div>
           
           <ProgramSidebar program={program} onViewProfile={handleViewProfile} />
