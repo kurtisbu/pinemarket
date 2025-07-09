@@ -43,7 +43,7 @@ const AccessCodeStep: React.FC<AccessCodeStepProps> = ({ onNext }) => {
 
       if (error) throw error;
 
-      const response = data as AccessCodeResponse;
+      const response = data as unknown as AccessCodeResponse;
 
       if (response.valid) {
         toast({
