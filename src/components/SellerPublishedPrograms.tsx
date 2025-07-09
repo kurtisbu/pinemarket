@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ProgramCard from '@/components/ProgramCard';
 import { Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface SellerPublishedProgramsProps {
   sellerId: string;
@@ -12,6 +13,8 @@ interface SellerPublishedProgramsProps {
 }
 
 const SellerPublishedPrograms: React.FC<SellerPublishedProgramsProps> = ({ sellerId, sellerUsername }) => {
+  const navigate = useNavigate();
+
   const { data: programs, isLoading, error } = useQuery({
     queryKey: ['seller-programs', sellerId],
     queryFn: async () => {
@@ -33,6 +36,10 @@ const SellerPublishedPrograms: React.FC<SellerPublishedProgramsProps> = ({ selle
     },
     enabled: !!sellerId,
   });
+
+  const handleProgramClick = (programId: string) => {
+    navigate(`/program/${programId}`);
+  };
 
   if (isLoading) {
     return (
@@ -84,21 +91,8 @@ const SellerPublishedPrograms: React.FC<SellerPublishedProgramsProps> = ({ selle
             {programs.map(program => (
               <ProgramCard
                 key={program.id}
-                id={program.id}
-                title={program.title}
-                description={program.description}
-                price={program.price}
-                rating={program.average_rating}
-                downloads={program.download_count}
-                views={program.view_count}
-                category={program.category}
-                author={program.profiles?.display_name || program.profiles?.username || sellerUsername}
-                image={program.image_urls?.[0] || '/placeholder.svg'}
-                tags={program.tags || []}
-                pricing_model={program.pricing_model}
-                monthly_price={program.monthly_price}
-                yearly_price={program.yearly_price}
-                billing_interval={program.billing_interval}
+                program={program}
+                onClick={() => handleProgramClick(program.id)}
               />
             ))}
           </div>

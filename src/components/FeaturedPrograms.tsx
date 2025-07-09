@@ -33,6 +33,10 @@ const FeaturedPrograms = () => {
     },
   });
 
+  const handleProgramClick = (programId: string) => {
+    navigate(`/program/${programId}`);
+  };
+
   if (isLoading || !programs || programs.length === 0) {
     // Fallback to static data for demo purposes when no programs exist
     const samplePrograms = [
@@ -42,12 +46,13 @@ const FeaturedPrograms = () => {
         description: "A sophisticated trend-following strategy that combines multiple timeframes and RSI divergence for optimal entry and exit points.",
         price: 49.99,
         average_rating: 4.8,
+        rating_count: 156,
         download_count: 1247,
         view_count: 8934,
         category: "Strategy",
-        seller: { display_name: "TradePro" },
         image_urls: ["/placeholder.svg"],
-        tags: ["Trend", "RSI", "Multi-timeframe"]
+        tags: ["Trend", "RSI", "Multi-timeframe"],
+        profiles: { display_name: "TradePro", username: "tradepro" }
       },
       {
         id: 'sample-2',
@@ -55,12 +60,13 @@ const FeaturedPrograms = () => {
         description: "Professional volume profile indicator with VWAP integration and support/resistance level detection.",
         price: 29.99,
         average_rating: 4.9,
+        rating_count: 203,
         download_count: 2156,
         view_count: 12450,
         category: "Indicator",
-        seller: { display_name: "VolumeExpert" },
         image_urls: ["/placeholder.svg"],
-        tags: ["Volume", "VWAP", "Support/Resistance"]
+        tags: ["Volume", "VWAP", "Support/Resistance"],
+        profiles: { display_name: "VolumeExpert", username: "volumeexpert" }
       },
       {
         id: 'sample-3',
@@ -68,12 +74,13 @@ const FeaturedPrograms = () => {
         description: "Complete dashboard showing institutional order flow, liquidity zones, and market structure analysis.",
         price: 79.99,
         average_rating: 4.7,
+        rating_count: 89,
         download_count: 834,
         view_count: 6721,
         category: "Indicator",
-        seller: { display_name: "SmartFlow" },
         image_urls: ["/placeholder.svg"],
-        tags: ["SMC", "Order Flow", "Institutional"]
+        tags: ["SMC", "Order Flow", "Institutional"],
+        profiles: { display_name: "SmartFlow", username: "smartflow" }
       },
       {
         id: 'sample-4',
@@ -81,12 +88,13 @@ const FeaturedPrograms = () => {
         description: "Automatically draws Fibonacci retracements and extensions based on swing highs and lows with customizable alerts.",
         price: 24.99,
         average_rating: 4.6,
+        rating_count: 134,
         download_count: 1789,
         view_count: 9876,
         category: "Indicator",
-        seller: { display_name: "FibMaster" },
         image_urls: ["/placeholder.svg"],
-        tags: ["Fibonacci", "Auto", "Alerts"]
+        tags: ["Fibonacci", "Auto", "Alerts"],
+        profiles: { display_name: "FibMaster", username: "fibmaster" }
       },
       {
         id: 'sample-5',
@@ -94,12 +102,13 @@ const FeaturedPrograms = () => {
         description: "Real-time options flow scanner with unusual activity detection and whale tracking capabilities.",
         price: 89.99,
         average_rating: 4.8,
+        rating_count: 67,
         download_count: 567,
         view_count: 4532,
         category: "Screener",
-        seller: { display_name: "OptionsGuru" },
         image_urls: ["/placeholder.svg"],
-        tags: ["Options", "Scanner", "Whale Tracking"]
+        tags: ["Options", "Scanner", "Whale Tracking"],
+        profiles: { display_name: "OptionsGuru", username: "optionsguru" }
       },
       {
         id: 'sample-6',
@@ -107,12 +116,13 @@ const FeaturedPrograms = () => {
         description: "High-frequency scalping strategy with noise filtering and dynamic stop-loss management for 1-5 minute charts.",
         price: 39.99,
         average_rating: 4.5,
+        rating_count: 112,
         download_count: 1456,
         view_count: 7843,
         category: "Strategy",
-        seller: { display_name: "ScalpKing" },
         image_urls: ["/placeholder.svg"],
-        tags: ["Scalping", "High Frequency", "Stop Loss"]
+        tags: ["Scalping", "High Frequency", "Stop Loss"],
+        profiles: { display_name: "ScalpKing", username: "scalpking" }
       }
     ];
 
@@ -130,17 +140,8 @@ const FeaturedPrograms = () => {
             {samplePrograms.map((program) => (
               <ProgramCard
                 key={program.id}
-                id={program.id}
-                title={program.title}
-                description={program.description}
-                price={program.price}
-                rating={program.average_rating}
-                downloads={program.download_count}
-                views={program.view_count}
-                category={program.category}
-                author={program.seller?.display_name || 'Unknown'}
-                image={program.image_urls?.[0] || '/placeholder.svg'}
-                tags={program.tags || []}
+                program={program}
+                onClick={() => handleProgramClick(program.id)}
               />
             ))}
           </div>
@@ -172,17 +173,8 @@ const FeaturedPrograms = () => {
           {programs.map((program) => (
             <ProgramCard
               key={program.id}
-              id={program.id}
-              title={program.title}
-              description={program.description}
-              price={program.price}
-              rating={program.average_rating}
-              downloads={program.download_count}
-              views={program.view_count}
-              category={program.category}
-              author={program.seller?.display_name || 'Unknown'}
-              image={program.image_urls?.[0] || '/placeholder.svg'}
-              tags={program.tags || []}
+              program={program}
+              onClick={() => handleProgramClick(program.id)}
             />
           ))}
         </div>
