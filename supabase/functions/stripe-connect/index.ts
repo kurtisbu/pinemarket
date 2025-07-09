@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -19,7 +20,7 @@ serve(async (req) => {
 
     switch (action) {
       case 'create-trial-access':
-        return await createTrialAccess(payload, supabaseAdmin);
+        return await createTrialAccess(payload, supabaseAdmin, req);
       case 'create-payment-intent':
         return await createPaymentIntent(payload, supabaseAdmin);
       case 'confirm-purchase':
@@ -41,7 +42,7 @@ serve(async (req) => {
   }
 });
 
-async function createTrialAccess(payload: any, supabaseAdmin: any) {
+async function createTrialAccess(payload: any, supabaseAdmin: any, req: Request) {
   const { program_id, trial_period_days, tradingview_username } = payload;
   
   if (!program_id || !trial_period_days || !tradingview_username) {
@@ -49,6 +50,28 @@ async function createTrialAccess(payload: any, supabaseAdmin: any) {
   }
 
   console.log('[TRIAL] Creating trial access...', { program_id, trial_period_days, tradingview_username });
+
+  // Get the user from the Authorization header
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) {
+    throw new Error('No authorization header provided');
+  }
+
+  // Create a client with anon key to authenticate the user
+  const supabaseAuth = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+  );
+
+  const token = authHeader.replace('Bearer ', '');
+  const { data: { user }, error: userError } = await supabaseAuth.auth.getUser(token);
+  
+  if (userError || !user) {
+    console.error('[TRIAL] Authentication error:', userError);
+    throw new Error('User not authenticated');
+  }
+
+  console.log('[TRIAL] User authenticated:', { userId: user.id, email: user.email });
 
   // Get program details
   const { data: program, error: programError } = await supabaseAdmin
@@ -58,14 +81,11 @@ async function createTrialAccess(payload: any, supabaseAdmin: any) {
     .single();
 
   if (programError || !program) {
+    console.error('[TRIAL] Program not found:', programError);
     throw new Error('Program not found');
   }
 
-  // Get current user
-  const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser();
-  if (userError || !user) {
-    throw new Error('User not authenticated');
-  }
+  console.log('[TRIAL] Program found:', { id: program.id, title: program.title });
 
   // Check trial eligibility
   const { data: isEligible, error: eligibilityError } = await supabaseAdmin.rpc('check_trial_eligibility', {
@@ -74,12 +94,16 @@ async function createTrialAccess(payload: any, supabaseAdmin: any) {
   });
 
   if (eligibilityError) {
+    console.error('[TRIAL] Eligibility check error:', eligibilityError);
     throw new Error('Error checking trial eligibility');
   }
 
   if (!isEligible) {
+    console.log('[TRIAL] User not eligible:', { userId: user.id, programId: program_id });
     throw new Error('User is not eligible for trial');
   }
+
+  console.log('[TRIAL] User is eligible for trial');
 
   // Create trial purchase record
   const { data: purchase, error: purchaseError } = await supabaseAdmin
@@ -104,6 +128,9 @@ async function createTrialAccess(payload: any, supabaseAdmin: any) {
 
   console.log('[TRIAL] Trial purchase created:', purchase.id);
 
+  // Calculate expiration date
+  const expiresAt = new Date(Date.now() + (trial_period_days * 24 * 60 * 60 * 1000));
+
   // Create script assignment for trial
   const { data: assignment, error: assignmentError } = await supabaseAdmin
     .from('script_assignments')
@@ -115,6 +142,7 @@ async function createTrialAccess(payload: any, supabaseAdmin: any) {
       status: 'pending',
       access_type: 'trial',
       is_trial: true,
+      expires_at: expiresAt.toISOString(),
       tradingview_username,
       pine_id: program.tradingview_script_id,
       tradingview_script_id: program.tradingview_script_id
@@ -157,6 +185,22 @@ async function createTrialAccess(payload: any, supabaseAdmin: any) {
     }
 
     console.log('[TRIAL] TradingView assignment successful:', assignmentResult);
+
+    // Update assignment as successful
+    await supabaseAdmin
+      .from('script_assignments')
+      .update({
+        status: 'assigned',
+        assigned_at: new Date().toISOString()
+      })
+      .eq('id', assignment.id);
+
+    // Record trial usage
+    await supabaseAdmin.rpc('record_trial_usage', {
+      p_user_id: user.id,
+      p_program_id: program_id
+    });
+
   } catch (error) {
     console.error('[TRIAL] TradingView assignment failed:', error);
     throw error;
@@ -166,7 +210,8 @@ async function createTrialAccess(payload: any, supabaseAdmin: any) {
     success: true,
     trial_id: purchase.id,
     assignment_id: assignment.id,
-    message: 'Trial access created successfully'
+    expires_at: expiresAt.toISOString(),
+    message: `Trial access created successfully - expires in ${trial_period_days} days`
   }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     status: 200,
