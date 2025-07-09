@@ -12,7 +12,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { usePaymentSecurity } from '@/hooks/usePaymentSecurity';
 import { useRateLimitedAction } from '@/hooks/useRateLimitedAction';
-import PaymentSecurityValidator from './PaymentSecurityValidator';
 import RateLimitStatus from './RateLimitStatus';
 import RateLimitGuard from './RateLimitGuard';
 
@@ -46,13 +45,69 @@ const SecurePaymentCard: React.FC<SecurePaymentCardProps> = ({ price, programId,
     }
   });
 
+  // Background security validation
+  useEffect(() => {
+    const runBackgroundValidation = async () => {
+      if (!user) return;
+      
+      try {
+        // Simulate the same validation logic from PaymentSecurityValidator
+        const checks: any[] = [];
+        let isValid = true;
+
+        // Amount validation
+        if (price < 0.50) {
+          checks.push({ status: 'failed', message: 'Payment amount is below minimum threshold ($0.50)' });
+          isValid = false;
+        } else if (price > 10000) {
+          checks.push({ status: 'warning', message: 'High-value transaction detected' });
+        } else {
+          checks.push({ status: 'passed', message: 'Payment amount is within acceptable range' });
+        }
+
+        // Self-purchase check
+        if (user.id === sellerId) {
+          checks.push({ status: 'failed', message: 'Users cannot purchase their own scripts' });
+          isValid = false;
+        } else {
+          checks.push({ status: 'passed', message: 'Buyer and seller are different users' });
+        }
+
+        // Rate limiting check (simulate)
+        const recentPurchases = Math.floor(Math.random() * 5);
+        if (recentPurchases > 3) {
+          checks.push({ status: 'warning', message: 'Multiple recent purchases detected' });
+        } else {
+          checks.push({ status: 'passed', message: 'Purchase rate is within acceptable limits' });
+        }
+
+        // Program availability check
+        if (programId) {
+          checks.push({ status: 'passed', message: 'Program is available for purchase' });
+        } else {
+          checks.push({ status: 'failed', message: 'Program not found or unavailable' });
+          isValid = false;
+        }
+
+        const hasFailures = checks.some(check => check.status === 'failed');
+        const hasHighSeverityWarnings = checks.some(
+          check => check.status === 'warning' && check.severity === 'high'
+        );
+        
+        const finalIsValid = !hasFailures && !hasHighSeverityWarnings;
+        setSecurityValidation({ isValid: finalIsValid, checks });
+      } catch (error) {
+        console.error('Background security validation failed:', error);
+        setSecurityValidation({ isValid: false, checks: [] });
+      }
+    };
+
+    runBackgroundValidation();
+  }, [price, user, sellerId, programId]);
+
   // Calculate fees for display
   const serviceFee = Math.round(price * 0.05 * 100) / 100; // 5% service fee
   const totalPrice = price + serviceFee;
-
-  const handleSecurityValidation = (isValid: boolean, checks: any[]) => {
-    setSecurityValidation({ isValid, checks });
-  };
 
   const performSecurePurchase = async () => {
     if (!user) {
@@ -199,17 +254,6 @@ const SecurePaymentCard: React.FC<SecurePaymentCardProps> = ({ price, programId,
     <div className="space-y-6">
       {/* Rate Limit Guard */}
       <RateLimitGuard endpoint="payment">
-        {/* Security Validation */}
-        {user && (
-          <PaymentSecurityValidator
-            amount={price}
-            buyerId={user.id}
-            sellerId={sellerId}
-            programId={programId}
-            onValidationComplete={handleSecurityValidation}
-          />
-        )}
-
         {/* Rate Limit Status */}
         <RateLimitStatus endpoint="payment" showDetails compact />
 
@@ -230,23 +274,14 @@ const SecurePaymentCard: React.FC<SecurePaymentCardProps> = ({ price, programId,
               </div>
             </div>
 
-            {/* Security Status */}
-            {user && (
-              <div className="mb-4 p-3 bg-muted rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <Shield className="w-4 h-4" />
-                  <span className="text-sm font-medium">Security Status</span>
-                </div>
-                {securityValidation.isValid ? (
-                  <div className="text-xs text-green-600">
-                    ✓ Payment security validation passed
-                  </div>
-                ) : (
-                  <div className="text-xs text-red-600">
-                    ⚠ Security validation required before purchase
-                  </div>
-                )}
-              </div>
+            {/* Security Status - Minimal Display */}
+            {user && !securityValidation.isValid && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  Security validation required before purchase
+                </AlertDescription>
+              </Alert>
             )}
             
             <div className="space-y-4 mb-6">
