@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -105,14 +104,14 @@ async function createTrialAccess(payload: any, supabaseAdmin: any, req: Request)
 
   console.log('[TRIAL] User is eligible for trial');
 
-  // Create trial purchase record
+  // Create trial purchase record with a minimal positive amount (1 cent) to satisfy constraints
   const { data: purchase, error: purchaseError } = await supabaseAdmin
     .from('purchases')
     .insert({
       program_id,
       buyer_id: user.id,
       seller_id: program.seller_id,
-      amount: 0, // Trial is free
+      amount: 0.01, // Use 1 cent instead of 0 to satisfy positive amount constraint
       status: 'completed',
       tradingview_username,
       platform_fee: 0,
