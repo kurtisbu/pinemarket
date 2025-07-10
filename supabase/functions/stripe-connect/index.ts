@@ -104,18 +104,18 @@ async function createTrialAccess(payload: any, supabaseAdmin: any, req: Request)
 
   console.log('[TRIAL] User is eligible for trial');
 
-  // Create trial purchase record with a minimal positive amount (1 cent) to satisfy constraints
+  // Create trial purchase record with 0 amount for trials
   const { data: purchase, error: purchaseError } = await supabaseAdmin
     .from('purchases')
     .insert({
       program_id,
       buyer_id: user.id,
       seller_id: program.seller_id,
-      amount: 0.01, // Use 1 cent instead of 0 to satisfy positive amount constraint
+      amount: 0, // Use 0 for trials to clearly distinguish from paid purchases
       status: 'completed',
       tradingview_username,
       platform_fee: 0,
-      payment_intent_id: `trial_${Date.now()}`
+      payment_intent_id: `trial_${program_id}_${user.id}_${Date.now()}`
     })
     .select()
     .single();
@@ -156,8 +156,21 @@ async function createTrialAccess(payload: any, supabaseAdmin: any, req: Request)
 
   console.log('[TRIAL] Trial assignment created:', assignment.id);
 
-  // Trigger TradingView script assignment
+  // Record trial usage immediately to prevent duplicate trials
   try {
+    await supabaseAdmin.rpc('record_trial_usage', {
+      p_user_id: user.id,
+      p_program_id: program_id
+    });
+    console.log('[TRIAL] Trial usage recorded');
+  } catch (error) {
+    console.error('[TRIAL] Failed to record trial usage:', error);
+    // Continue with assignment even if usage recording fails
+  }
+
+  // Trigger TradingView script assignment with better error handling
+  try {
+    console.log('[TRIAL] Triggering TradingView assignment...');
     const { data: assignmentResult, error: tvError } = await supabaseAdmin.functions.invoke('tradingview-service', {
       body: {
         action: 'assign-script-access',
@@ -171,38 +184,95 @@ async function createTrialAccess(payload: any, supabaseAdmin: any, req: Request)
 
     if (tvError) {
       console.error('[TRIAL] TradingView assignment error:', tvError);
-      // Update assignment as failed
+      
+      // Update assignment with error details
       await supabaseAdmin
         .from('script_assignments')
         .update({
           status: 'failed',
-          error_message: tvError.message
+          error_message: `TradingView assignment failed: ${tvError.message}`,
+          assignment_details: {
+            error: tvError.message,
+            failed_at: new Date().toISOString(),
+            assignment_attempts: 1
+          }
         })
         .eq('id', assignment.id);
       
-      throw new Error('Failed to assign TradingView access');
+      throw new Error(`Failed to assign TradingView access: ${tvError.message}`);
     }
 
-    console.log('[TRIAL] TradingView assignment successful:', assignmentResult);
+    console.log('[TRIAL] TradingView assignment response:', assignmentResult);
 
-    // Update assignment as successful
-    await supabaseAdmin
-      .from('script_assignments')
-      .update({
-        status: 'assigned',
-        assigned_at: new Date().toISOString()
-      })
-      .eq('id', assignment.id);
+    // Check if the assignment was successful
+    if (assignmentResult?.success) {
+      // Update assignment as successful
+      await supabaseAdmin
+        .from('script_assignments')
+        .update({
+          status: 'assigned',
+          assigned_at: new Date().toISOString(),
+          assignment_details: {
+            ...assignmentResult,
+            assigned_at: new Date().toISOString()
+          }
+        })
+        .eq('id', assignment.id);
 
-    // Record trial usage
-    await supabaseAdmin.rpc('record_trial_usage', {
-      p_user_id: user.id,
-      p_program_id: program_id
-    });
+      console.log('[TRIAL] Assignment marked as successful');
+    } else {
+      // Handle cases where TradingView service doesn't return success flag
+      console.log('[TRIAL] TradingView service response unclear, checking for errors...');
+      
+      if (assignmentResult?.error) {
+        throw new Error(assignmentResult.error);
+      }
+      
+      // If no explicit error, consider it potentially successful but pending verification
+      await supabaseAdmin
+        .from('script_assignments')
+        .update({
+          status: 'pending',
+          assignment_details: {
+            ...assignmentResult,
+            note: 'Assignment submitted, awaiting verification',
+            submitted_at: new Date().toISOString()
+          }
+        })
+        .eq('id', assignment.id);
+    }
 
   } catch (error) {
     console.error('[TRIAL] TradingView assignment failed:', error);
-    throw error;
+    
+    // Update assignment with detailed error
+    await supabaseAdmin
+      .from('script_assignments')
+      .update({
+        status: 'failed',
+        error_message: error.message,
+        assignment_details: {
+          error: error.message,
+          stack: error.stack,
+          failed_at: new Date().toISOString(),
+          assignment_attempts: 1
+        }
+      })
+      .eq('id', assignment.id);
+    
+    // Return partial success - trial is created but assignment failed
+    return new Response(JSON.stringify({
+      success: true,
+      trial_id: purchase.id,
+      assignment_id: assignment.id,
+      expires_at: expiresAt.toISOString(),
+      message: `Trial created successfully but script assignment failed: ${error.message}`,
+      warning: 'You may need to manually retry the script assignment from your dashboard.',
+      assignment_status: 'failed'
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    });
   }
 
   return new Response(JSON.stringify({
@@ -210,7 +280,8 @@ async function createTrialAccess(payload: any, supabaseAdmin: any, req: Request)
     trial_id: purchase.id,
     assignment_id: assignment.id,
     expires_at: expiresAt.toISOString(),
-    message: `Trial access created successfully - expires in ${trial_period_days} days`
+    message: `Trial access created successfully - expires in ${trial_period_days} days`,
+    assignment_status: 'assigned'
   }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     status: 200,

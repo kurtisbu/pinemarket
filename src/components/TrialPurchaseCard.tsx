@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Clock, Shield, Loader2 } from 'lucide-react';
+import { Clock, Shield, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,6 +29,7 @@ const TrialPurchaseCard: React.FC<TrialPurchaseCardProps> = ({
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [tradingviewUsername, setTradingviewUsername] = useState('');
+  const [trialStatus, setTrialStatus] = useState<'idle' | 'creating' | 'success' | 'error'>('idle');
 
   const handleTrialStart = async () => {
     if (!user) {
@@ -60,6 +61,8 @@ const TrialPurchaseCard: React.FC<TrialPurchaseCardProps> = ({
     }
 
     setLoading(true);
+    setTrialStatus('creating');
+    
     try {
       console.log('Starting free trial...', { 
         programId, 
@@ -82,28 +85,44 @@ const TrialPurchaseCard: React.FC<TrialPurchaseCardProps> = ({
         throw error;
       }
 
-      console.log('Trial created successfully:', data);
+      console.log('Trial creation response:', data);
 
-      // Record trial usage
-      await supabase.rpc('record_trial_usage', {
-        p_user_id: user.id,
-        p_program_id: programId
-      });
+      if (data.success) {
+        setTrialStatus('success');
+        
+        // Show appropriate success message based on assignment status
+        if (data.assignment_status === 'assigned') {
+          toast({
+            title: 'Free trial started successfully!',
+            description: `Your ${trialPeriodDays}-day free trial has begun and script access has been granted.`,
+          });
+        } else if (data.assignment_status === 'failed') {
+          toast({
+            title: 'Trial created with assignment issue',
+            description: `Your trial is active, but there was an issue assigning the script. Please check your dashboard.`,
+            variant: 'default',
+          });
+        } else {
+          toast({
+            title: 'Free trial started!',
+            description: `Your ${trialPeriodDays}-day free trial has begun. Script access is being processed.`,
+          });
+        }
 
-      toast({
-        title: 'Free trial started!',
-        description: `Your ${trialPeriodDays}-day free trial has begun. Script access is being set up.`,
-      });
-
-      // Clear the form
-      setTradingviewUsername('');
-      
-      // Refresh the page after successful trial start
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
+        // Clear the form
+        setTradingviewUsername('');
+        
+        // Refresh the page after successful trial start
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } else {
+        throw new Error(data.message || 'Failed to create trial');
+      }
     } catch (error: any) {
       console.error('Trial start error:', error);
+      setTrialStatus('error');
+      
       toast({
         title: 'Failed to start trial',
         description: error.message || 'An unexpected error occurred while starting your trial.',
@@ -122,6 +141,24 @@ const TrialPurchaseCard: React.FC<TrialPurchaseCardProps> = ({
           You have already used the free trial for this program.
         </AlertDescription>
       </Alert>
+    );
+  }
+
+  if (trialStatus === 'success') {
+    return (
+      <Card className="border-green-200 bg-green-50/30">
+        <CardContent className="p-6">
+          <div className="text-center">
+            <CheckCircle className="w-12 h-12 mx-auto text-green-600 mb-4" />
+            <h3 className="text-lg font-semibold text-green-800 mb-2">
+              Trial Started Successfully!
+            </h3>
+            <p className="text-sm text-green-700">
+              Your {trialPeriodDays}-day free trial is now active. The page will refresh shortly.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -156,6 +193,15 @@ const TrialPurchaseCard: React.FC<TrialPurchaseCardProps> = ({
             </p>
           </div>
         </div>
+
+        {trialStatus === 'error' && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              There was an issue starting your trial. Please try again or contact support.
+            </AlertDescription>
+          </Alert>
+        )}
         
         <Button 
           className="w-full mb-4 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
