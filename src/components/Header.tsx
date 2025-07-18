@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, User, ShoppingCart, LogOut, LayoutDashboard, Settings, UserCircle } from 'lucide-react';
+import { Search, User, ShoppingCart, LogOut, LayoutDashboard, Settings, UserCircle, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,7 +24,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [profile, setProfile] = useState<{ username: string; avatar_url: string; display_name: string; is_tradingview_connected: boolean } | null>(null);
+  const [profile, setProfile] = useState<{ username: string; avatar_url: string; display_name: string; is_tradingview_connected: boolean; role?: string } | null>(null);
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
 
   useEffect(() => {
@@ -32,11 +32,12 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
       const fetchProfile = async () => {
         const { data } = await supabase
           .from('profiles')
-          .select('username, avatar_url, display_name, is_tradingview_connected')
+          .select('username, avatar_url, display_name, is_tradingview_connected, role')
           .eq('id', user.id)
           .single();
         
         if (data) {
+          console.log('Header - Profile loaded:', data);
           setProfile(data);
         }
       };
@@ -101,6 +102,11 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
     navigate('/my-purchases');
   };
 
+  const handleAdminDashboard = () => {
+    console.log('Header - Navigating to admin dashboard, current role:', profile?.role);
+    navigate('/admin');
+  };
+
   return (
     <header className="bg-background border-b border-border sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4">
@@ -154,6 +160,10 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
+                  <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                    Role: {profile?.role || 'user'}
+                  </div>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleMyProfile}>
                     <UserCircle className="w-4 h-4 mr-2" />
                     My Profile
@@ -171,6 +181,12 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
                     <DropdownMenuItem onClick={handleDashboard}>
                       <LayoutDashboard className="w-4 h-4 mr-2" />
                       Seller Dashboard
+                    </DropdownMenuItem>
+                  )}
+                  {profile?.role === 'admin' && (
+                    <DropdownMenuItem onClick={handleAdminDashboard}>
+                      <Shield className="w-4 h-4 mr-2" />
+                      Admin Dashboard
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />
