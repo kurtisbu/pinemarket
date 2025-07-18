@@ -61,12 +61,48 @@ export async function testConnection(
     // Updated check: Look for 'is-authenticated' class on the <html> tag.
     const isAuthenticated = doc?.querySelector('html')?.classList.contains('is-authenticated');
     
-    // Updated check: Extract username from the <title> tag as a fallback.
+    // Enhanced username extraction with multiple fallback methods
+    let foundUsername = null;
+    
+    // Method 1: Extract from title tag - handle multiple formats
     const title = doc?.querySelector('title')?.textContent;
-    const usernameMatch = title?.match(/Trader (.+?) —/);
-    const foundUsername = usernameMatch ? usernameMatch[1] : null;
+    if (title) {
+      // Try different title patterns
+      const titlePatterns = [
+        /^([^—]+)\s*—\s*Trading Ideas and Scripts/,  // "CapitalCodersLLC — Trading Ideas and Scripts"
+        /^([^—]+)\s*—\s*TradingView/,                // "CapitalCodersLLC — TradingView"
+        /Trader\s+([^—\s]+)/,                        // "Trader USERNAME"
+        /^([^—\s]+)/                                 // First word before any separator
+      ];
+      
+      for (const pattern of titlePatterns) {
+        const match = title.match(pattern);
+        if (match && match[1]) {
+          foundUsername = match[1].trim();
+          break;
+        }
+      }
+    }
+    
+    // Method 2: If we have a provided username and title contains it, use it
+    if (!foundUsername && tradingview_username && title?.toLowerCase().includes(tradingview_username.toLowerCase())) {
+      foundUsername = tradingview_username;
+    }
+    
+    // Method 3: Look for username in meta tags or data attributes
+    if (!foundUsername) {
+      const metaDescription = doc?.querySelector('meta[name="description"]')?.getAttribute('content');
+      if (metaDescription) {
+        const descMatch = metaDescription.match(/View\s+([^'s\s]+)'?s?\s+trading/i);
+        if (descMatch && descMatch[1]) {
+          foundUsername = descMatch[1];
+        }
+      }
+    }
+    
+    console.log(`Authentication check - isAuthenticated: ${isAuthenticated}, foundUsername: ${foundUsername}, title: ${title}`);
 
-    if (!isAuthenticated || !foundUsername) {
+    if (!isAuthenticated) {
       // Update connection status to expired
       await supabaseAdmin.from('profiles').update({ 
         is_tradingview_connected: false,
@@ -76,14 +112,38 @@ export async function testConnection(
         updated_at: new Date().toISOString() 
       }).eq('id', user_id);
 
-      console.error("Could not verify TradingView session. isAuthenticated:", isAuthenticated, "foundUsername:", foundUsername);
-      console.error("Received HTML (first 500 chars):", html.substring(0, 500));
+      console.error("Could not verify TradingView session. isAuthenticated:", isAuthenticated);
       return new Response(JSON.stringify({ error: `Could not verify TradingView session. Your cookies may be invalid or expired. Please get new ones from your browser.` }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 401,
       });
     }
 
+    // If we couldn't extract username but have authentication, try to use provided username
+    if (!foundUsername && tradingview_username) {
+      console.log(`Using provided username since extraction failed: ${tradingview_username}`);
+      foundUsername = tradingview_username;
+    }
+
+    // If we still don't have a username, that's an error
+    if (!foundUsername) {
+      await supabaseAdmin.from('profiles').update({ 
+        is_tradingview_connected: false,
+        tradingview_connection_status: 'error',
+        tradingview_last_validated_at: new Date().toISOString(),
+        tradingview_last_error: 'Could not extract username from TradingView profile',
+        updated_at: new Date().toISOString() 
+      }).eq('id', user_id);
+
+      console.error("Could not extract username from TradingView profile");
+      console.error("Received HTML (first 500 chars):", html.substring(0, 500));
+      return new Response(JSON.stringify({ error: `Could not extract your TradingView username from the profile page. Please ensure you're logged into TradingView and try again.` }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      });
+    }
+
+    // Validate username match if one was provided
     if (tradingview_username && foundUsername.toLowerCase() !== tradingview_username.toLowerCase()) {
       // Update connection status to error
       await supabaseAdmin.from('profiles').update({ 
