@@ -11,6 +11,7 @@ import { Shield, Users, FileText, BarChart3, AlertTriangle, Clock } from 'lucide
 import AdminScriptAssignments from '@/components/AdminScriptAssignments';
 import SecurityAuditDashboard from '@/components/SecurityAuditDashboard';
 import AdminTrialManagement from '@/components/AdminTrialManagement';
+import AdminAccessCodes from '@/components/AdminAccessCodes';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -127,7 +128,7 @@ const AdminDashboard = () => {
               </TabsTrigger>
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
-                Users
+                Access Codes
               </TabsTrigger>
             </TabsList>
 
@@ -144,9 +145,7 @@ const AdminDashboard = () => {
             </TabsContent>
 
             <TabsContent value="users" className="space-y-6">
-              <div className="text-center py-8 text-muted-foreground">
-                User management features coming soon...
-              </div>
+              <AdminAccessCodes />
             </TabsContent>
           </Tabs>
         </div>
