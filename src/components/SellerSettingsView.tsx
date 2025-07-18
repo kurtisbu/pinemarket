@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
@@ -11,8 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import StripeConnectSettings from '@/components/StripeConnectSettings';
-import { Upload, User, Loader2 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import TradingViewConnectionStatus from '@/components/TradingViewConnectionStatus';
+import { Upload, User, Loader2, RefreshCw } from 'lucide-react';
 
 interface Profile {
   id: string;
@@ -23,6 +22,9 @@ interface Profile {
   role: string;
   created_at: string;
   is_tradingview_connected: boolean;
+  tradingview_connection_status?: string;
+  tradingview_last_validated_at?: string;
+  tradingview_last_error?: string;
 }
 
 interface SellerSettingsViewProps {
@@ -37,6 +39,7 @@ const SellerSettingsView: React.FC<SellerSettingsViewProps> = ({ profile, onProf
   const [loading, setLoading] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [refreshingHealth, setRefreshingHealth] = useState(false);
   const [formData, setFormData] = useState({
     display_name: profile?.display_name || '',
     bio: profile?.bio || '',
@@ -137,6 +140,32 @@ const SellerSettingsView: React.FC<SellerSettingsViewProps> = ({ profile, onProf
     }
   };
 
+  const handleRefreshHealthCheck = async () => {
+    if (!user) return;
+    setRefreshingHealth(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('tradingview-health-check');
+
+      if (error) throw new Error(error.message);
+
+      toast({
+        title: 'Health Check Complete',
+        description: 'TradingView connection status has been refreshed.',
+      });
+
+      onProfileUpdate();
+    } catch (error: any) {
+      toast({
+        title: 'Health Check Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setRefreshingHealth(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -194,6 +223,7 @@ const SellerSettingsView: React.FC<SellerSettingsViewProps> = ({ profile, onProf
             <CardTitle>Profile Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            
             <div className="flex flex-col items-center space-y-4">
               <Avatar className="w-24 h-24">
                 <AvatarImage src={formData.avatar_url} alt="Profile picture" />
@@ -248,12 +278,38 @@ const SellerSettingsView: React.FC<SellerSettingsViewProps> = ({ profile, onProf
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>TradingView Integration</CardTitle>
-              <Badge variant={formData.is_tradingview_connected ? 'default' : 'destructive'}>
-                {formData.is_tradingview_connected ? 'Connected' : 'Not Connected'}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <TradingViewConnectionStatus
+                  isConnected={profile?.is_tradingview_connected || false}
+                  connectionStatus={profile?.tradingview_connection_status}
+                  lastValidatedAt={profile?.tradingview_last_validated_at}
+                  lastError={profile?.tradingview_last_error}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRefreshHealthCheck}
+                  disabled={refreshingHealth}
+                >
+                  {refreshingHealth ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            <TradingViewConnectionStatus
+              isConnected={profile?.is_tradingview_connected || false}
+              connectionStatus={profile?.tradingview_connection_status}
+              lastValidatedAt={profile?.tradingview_last_validated_at}
+              lastError={profile?.tradingview_last_error}
+              showDetails={true}
+            />
+            
             <p className="text-sm text-muted-foreground">
               Connect your TradingView account to automate script assignments for your buyers.
             </p>

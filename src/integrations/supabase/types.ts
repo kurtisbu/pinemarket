@@ -72,6 +72,9 @@ export type Database = {
           stripe_charges_enabled: boolean | null
           stripe_onboarding_completed: boolean | null
           stripe_payouts_enabled: boolean | null
+          tradingview_connection_status: string | null
+          tradingview_last_error: string | null
+          tradingview_last_validated_at: string | null
           tradingview_session_cookie: string | null
           tradingview_signed_session_cookie: string | null
           tradingview_username: string | null
@@ -90,6 +93,9 @@ export type Database = {
           stripe_charges_enabled?: boolean | null
           stripe_onboarding_completed?: boolean | null
           stripe_payouts_enabled?: boolean | null
+          tradingview_connection_status?: string | null
+          tradingview_last_error?: string | null
+          tradingview_last_validated_at?: string | null
           tradingview_session_cookie?: string | null
           tradingview_signed_session_cookie?: string | null
           tradingview_username?: string | null
@@ -108,6 +114,9 @@ export type Database = {
           stripe_charges_enabled?: boolean | null
           stripe_onboarding_completed?: boolean | null
           stripe_payouts_enabled?: boolean | null
+          tradingview_connection_status?: string | null
+          tradingview_last_error?: string | null
+          tradingview_last_validated_at?: string | null
           tradingview_session_cookie?: string | null
           tradingview_signed_session_cookie?: string | null
           tradingview_username?: string | null
@@ -577,6 +586,44 @@ export type Database = {
         }
         Relationships: []
       }
+      seller_notifications: {
+        Row: {
+          created_at: string | null
+          email_on_connection_expiry: boolean | null
+          email_on_program_disabled: boolean | null
+          id: string
+          last_expiry_notification_sent_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          email_on_connection_expiry?: boolean | null
+          email_on_program_disabled?: boolean | null
+          id?: string
+          last_expiry_notification_sent_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          email_on_connection_expiry?: boolean | null
+          email_on_program_disabled?: boolean | null
+          id?: string
+          last_expiry_notification_sent_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscription_access: {
         Row: {
           created_at: string
@@ -836,6 +883,10 @@ export type Database = {
         Args: { p_user_id: string; p_program_id: string }
         Returns: boolean
       }
+      disable_programs_for_expired_connections: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       get_script_download_url: {
         Args: { program_id_param: string }
         Returns: string
@@ -861,6 +912,10 @@ export type Database = {
       sanitize_user_content: {
         Args: { content: string; max_length?: number }
         Returns: string
+      }
+      seller_has_valid_tradingview_connection: {
+        Args: { seller_user_id: string }
+        Returns: boolean
       }
       update_program_rating_stats: {
         Args: { program_uuid: string }

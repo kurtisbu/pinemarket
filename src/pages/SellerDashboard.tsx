@@ -13,6 +13,9 @@ import SellerProgramsView from '@/components/SellerProgramsView';
 import SellerSettingsView from '@/components/SellerSettingsView';
 import SellerScriptAssignments from '@/components/SellerScriptAssignments';
 import TrialManagementDashboard from '@/components/TrialManagementDashboard';
+import TradingViewConnectionStatus from '@/components/TradingViewConnectionStatus';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertTriangle } from 'lucide-react';
 
 interface Profile {
   id: string;
@@ -23,6 +26,9 @@ interface Profile {
   role: string;
   created_at: string;
   is_tradingview_connected: boolean;
+  tradingview_connection_status?: string;
+  tradingview_last_validated_at?: string;
+  tradingview_last_error?: string;
 }
 
 const SellerDashboard = () => {
@@ -46,7 +52,12 @@ const SellerDashboard = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          *,
+          tradingview_connection_status,
+          tradingview_last_validated_at,
+          tradingview_last_error
+        `)
         .eq('id', user.id)
         .single();
 
@@ -94,17 +105,49 @@ const SellerDashboard = () => {
     );
   }
 
+  const showConnectionWarning = () => {
+    return profile?.tradingview_connection_status === 'expired' || 
+           profile?.tradingview_connection_status === 'error' ||
+           !profile?.is_tradingview_connected;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
           <div className="mb-6">
-            <h1 className="text-3xl font-bold">Seller Dashboard</h1>
-            <p className="text-muted-foreground">
-              Manage your profile, programs, and settings all in one place
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold">Seller Dashboard</h1>
+                <p className="text-muted-foreground">
+                  Manage your profile, programs, and settings all in one place
+                </p>
+              </div>
+              <TradingViewConnectionStatus
+                isConnected={profile?.is_tradingview_connected || false}
+                connectionStatus={profile?.tradingview_connection_status}
+                lastValidatedAt={profile?.tradingview_last_validated_at}
+                showDetails={false}
+              />
+            </div>
           </div>
+
+          {showConnectionWarning() && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Your TradingView connection needs attention. Some programs may be disabled until you reconnect.
+                <Button 
+                  variant="link" 
+                  className="p-0 h-auto font-normal underline ml-1"
+                  onClick={() => navigate('/seller-dashboard?tab=settings')}
+                >
+                  Fix connection
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
 
           <Tabs defaultValue="profile" className="space-y-6">
             <TabsList className="grid w-full grid-cols-5">
