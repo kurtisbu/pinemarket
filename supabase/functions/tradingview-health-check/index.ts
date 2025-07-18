@@ -3,7 +3,21 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { DOMParser } from 'https://deno.land/x/deno_dom/deno-dom-wasm.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { decrypt } from '../tradingview-service/utils/crypto.ts';
+
+// AES-256-GCM decryption function (copied from crypto utils)
+async function decrypt(encryptedText: string, key: CryptoKey): Promise<string> {
+  const ivAndCiphertext = new Uint8Array(atob(encryptedText).split('').map(c => c.charCodeAt(0)));
+  const iv = ivAndCiphertext.slice(0, 12);
+  const ciphertext = ivAndCiphertext.slice(12);
+
+  const decryptedBuffer = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    ciphertext
+  );
+
+  return new TextDecoder().decode(decryptedBuffer);
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
