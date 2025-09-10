@@ -7,11 +7,12 @@ import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import Header from '@/components/Header';
-import { Shield, Users, FileText, BarChart3, AlertTriangle, Clock } from 'lucide-react';
+import { Shield, Users, FileText, BarChart3, AlertTriangle, Clock, Star } from 'lucide-react';
 import AdminScriptAssignments from '@/components/AdminScriptAssignments';
 import SecurityAuditDashboard from '@/components/SecurityAuditDashboard';
 import AdminTrialManagement from '@/components/AdminTrialManagement';
 import AdminAccessCodes from '@/components/AdminAccessCodes';
+import AdminFeaturedCreators from '@/components/AdminFeaturedCreators';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -173,7 +174,7 @@ const AdminDashboard = () => {
           </div>
 
           <Tabs defaultValue="assignments" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="assignments" className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4" />
                 Assignments
@@ -189,6 +190,10 @@ const AdminDashboard = () => {
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
                 Access Codes
+              </TabsTrigger>
+              <TabsTrigger value="featured-creators" className="flex items-center gap-2">
+                <Star className="w-4 h-4" />
+                Featured Creators
               </TabsTrigger>
             </TabsList>
 
@@ -206,6 +211,10 @@ const AdminDashboard = () => {
 
             <TabsContent value="users" className="space-y-6">
               <AdminAccessCodes />
+            </TabsContent>
+
+            <TabsContent value="featured-creators" className="space-y-6">
+              <AdminFeaturedCreators />
             </TabsContent>
           </Tabs>
         </div>

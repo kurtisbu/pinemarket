@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -65,7 +65,11 @@ export type Database = {
           bio: string | null
           created_at: string
           display_name: string | null
+          featured_at: string | null
+          featured_description: string | null
+          featured_priority: number | null
           id: string
+          is_featured: boolean | null
           is_tradingview_connected: boolean
           role: string | null
           stripe_account_id: string | null
@@ -86,7 +90,11 @@ export type Database = {
           bio?: string | null
           created_at?: string
           display_name?: string | null
+          featured_at?: string | null
+          featured_description?: string | null
+          featured_priority?: number | null
           id: string
+          is_featured?: boolean | null
           is_tradingview_connected?: boolean
           role?: string | null
           stripe_account_id?: string | null
@@ -107,7 +115,11 @@ export type Database = {
           bio?: string | null
           created_at?: string
           display_name?: string | null
+          featured_at?: string | null
+          featured_description?: string | null
+          featured_priority?: number | null
           id?: string
+          is_featured?: boolean | null
           is_tradingview_connected?: boolean
           role?: string | null
           stripe_account_id?: string | null
@@ -209,6 +221,13 @@ export type Database = {
             foreignKeyName: "programs_seller_id_fkey"
             columns: ["seller_id"]
             isOneToOne: false
+            referencedRelation: "featured_creators_with_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programs_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -272,6 +291,13 @@ export type Database = {
             foreignKeyName: "purchases_buyer_id_fkey"
             columns: ["buyer_id"]
             isOneToOne: false
+            referencedRelation: "featured_creators_with_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchases_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -280,6 +306,13 @@ export type Database = {
             columns: ["program_id"]
             isOneToOne: false
             referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchases_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "featured_creators_with_stats"
             referencedColumns: ["id"]
           },
           {
@@ -397,6 +430,13 @@ export type Database = {
             foreignKeyName: "ratings_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "featured_creators_with_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ratings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -474,6 +514,13 @@ export type Database = {
             foreignKeyName: "script_assignments_buyer_id_fkey"
             columns: ["buyer_id"]
             isOneToOne: false
+            referencedRelation: "featured_creators_with_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "script_assignments_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -489,6 +536,13 @@ export type Database = {
             columns: ["purchase_id"]
             isOneToOne: true
             referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "script_assignments_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "featured_creators_with_stats"
             referencedColumns: ["id"]
           },
           {
@@ -538,6 +592,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "security_audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "featured_creators_with_stats"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "security_audit_logs_user_id_fkey"
             columns: ["user_id"]
@@ -615,6 +676,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "seller_notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "featured_creators_with_stats"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "seller_notifications_user_id_fkey"
             columns: ["user_id"]
@@ -753,6 +821,13 @@ export type Database = {
             foreignKeyName: "tradingview_scripts_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "featured_creators_with_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tradingview_scripts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -786,6 +861,13 @@ export type Database = {
             columns: ["program_id"]
             isOneToOne: false
             referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trial_usage_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "featured_creators_with_stats"
             referencedColumns: ["id"]
           },
           {
@@ -849,6 +931,13 @@ export type Database = {
             foreignKeyName: "user_subscriptions_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "featured_creators_with_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -856,31 +945,51 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      featured_creators_with_stats: {
+        Row: {
+          avatar_url: string | null
+          avg_rating: number | null
+          bio: string | null
+          created_at: string | null
+          display_name: string | null
+          featured_at: string | null
+          featured_description: string | null
+          featured_priority: number | null
+          id: string | null
+          is_featured: boolean | null
+          is_tradingview_connected: boolean | null
+          role: string | null
+          total_programs: number | null
+          total_revenue: number | null
+          total_sales: number | null
+          username: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       check_rate_limit: {
         Args: {
-          p_user_id?: string
-          p_ip_address?: unknown
           p_endpoint?: string
+          p_ip_address?: unknown
           p_limit?: number
+          p_user_id?: string
           p_window_minutes?: number
         }
         Returns: Json
       }
       check_rate_limit_secure: {
         Args: {
-          p_user_id?: string
-          p_ip_address?: unknown
           p_endpoint?: string
+          p_ip_address?: unknown
           p_limit?: number
+          p_user_id?: string
           p_window_minutes?: number
         }
         Returns: Json
       }
       check_trial_eligibility: {
-        Args: { p_user_id: string; p_program_id: string }
+        Args: { p_program_id: string; p_user_id: string }
         Returns: boolean
       }
       disable_programs_for_expired_connections: {
@@ -898,15 +1007,15 @@ export type Database = {
       log_security_event: {
         Args: {
           p_action: string
-          p_resource_type: string
-          p_resource_id?: string
           p_details?: Json
+          p_resource_id?: string
+          p_resource_type: string
           p_risk_level?: string
         }
         Returns: string
       }
       record_trial_usage: {
-        Args: { p_user_id: string; p_program_id: string }
+        Args: { p_program_id: string; p_user_id: string }
         Returns: undefined
       }
       sanitize_user_content: {
@@ -917,16 +1026,25 @@ export type Database = {
         Args: { seller_user_id: string }
         Returns: boolean
       }
+      toggle_creator_featured_status: {
+        Args: {
+          creator_id: string
+          description?: string
+          featured: boolean
+          priority?: number
+        }
+        Returns: undefined
+      }
       update_program_rating_stats: {
         Args: { program_uuid: string }
         Returns: undefined
       }
       validate_file_upload: {
         Args: {
+          p_bucket_name: string
           p_file_name: string
           p_file_size: number
           p_mime_type: string
-          p_bucket_name: string
         }
         Returns: Json
       }
