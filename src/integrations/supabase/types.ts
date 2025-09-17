@@ -230,21 +230,7 @@ export type Database = {
             foreignKeyName: "programs_seller_id_fkey"
             columns: ["seller_id"]
             isOneToOne: false
-            referencedRelation: "featured_creators_with_stats"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "programs_seller_id_fkey"
-            columns: ["seller_id"]
-            isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "programs_seller_id_fkey"
-            columns: ["seller_id"]
-            isOneToOne: false
-            referencedRelation: "safe_profiles"
             referencedColumns: ["id"]
           },
           {
@@ -307,21 +293,7 @@ export type Database = {
             foreignKeyName: "purchases_buyer_id_fkey"
             columns: ["buyer_id"]
             isOneToOne: false
-            referencedRelation: "featured_creators_with_stats"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "purchases_buyer_id_fkey"
-            columns: ["buyer_id"]
-            isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "purchases_buyer_id_fkey"
-            columns: ["buyer_id"]
-            isOneToOne: false
-            referencedRelation: "safe_profiles"
             referencedColumns: ["id"]
           },
           {
@@ -335,21 +307,7 @@ export type Database = {
             foreignKeyName: "purchases_seller_id_fkey"
             columns: ["seller_id"]
             isOneToOne: false
-            referencedRelation: "featured_creators_with_stats"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "purchases_seller_id_fkey"
-            columns: ["seller_id"]
-            isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "purchases_seller_id_fkey"
-            columns: ["seller_id"]
-            isOneToOne: false
-            referencedRelation: "safe_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -460,21 +418,7 @@ export type Database = {
             foreignKeyName: "ratings_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: "featured_creators_with_stats"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ratings_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ratings_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "safe_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -551,21 +495,7 @@ export type Database = {
             foreignKeyName: "script_assignments_buyer_id_fkey"
             columns: ["buyer_id"]
             isOneToOne: false
-            referencedRelation: "featured_creators_with_stats"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "script_assignments_buyer_id_fkey"
-            columns: ["buyer_id"]
-            isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "script_assignments_buyer_id_fkey"
-            columns: ["buyer_id"]
-            isOneToOne: false
-            referencedRelation: "safe_profiles"
             referencedColumns: ["id"]
           },
           {
@@ -586,21 +516,7 @@ export type Database = {
             foreignKeyName: "script_assignments_seller_id_fkey"
             columns: ["seller_id"]
             isOneToOne: false
-            referencedRelation: "featured_creators_with_stats"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "script_assignments_seller_id_fkey"
-            columns: ["seller_id"]
-            isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "script_assignments_seller_id_fkey"
-            columns: ["seller_id"]
-            isOneToOne: false
-            referencedRelation: "safe_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -647,21 +563,7 @@ export type Database = {
             foreignKeyName: "security_audit_logs_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: "featured_creators_with_stats"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "security_audit_logs_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "security_audit_logs_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "safe_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -738,21 +640,7 @@ export type Database = {
             foreignKeyName: "seller_notifications_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: "featured_creators_with_stats"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "seller_notifications_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "seller_notifications_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "safe_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -886,21 +774,7 @@ export type Database = {
             foreignKeyName: "tradingview_scripts_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: "featured_creators_with_stats"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tradingview_scripts_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tradingview_scripts_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "safe_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -939,21 +813,7 @@ export type Database = {
             foreignKeyName: "trial_usage_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: "featured_creators_with_stats"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "trial_usage_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "trial_usage_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "safe_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1010,93 +870,14 @@ export type Database = {
             foreignKeyName: "user_subscriptions_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
-            referencedRelation: "featured_creators_with_stats"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_subscriptions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_subscriptions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "safe_profiles"
             referencedColumns: ["id"]
           },
         ]
       }
     }
     Views: {
-      featured_creators_with_stats: {
-        Row: {
-          avatar_url: string | null
-          avg_rating: number | null
-          bio: string | null
-          created_at: string | null
-          display_name: string | null
-          featured_at: string | null
-          featured_description: string | null
-          featured_priority: number | null
-          id: string | null
-          is_featured: boolean | null
-          is_tradingview_connected: boolean | null
-          role: string | null
-          total_programs: number | null
-          total_revenue: number | null
-          total_sales: number | null
-          username: string | null
-        }
-        Relationships: []
-      }
-      safe_profiles: {
-        Row: {
-          avatar_url: string | null
-          bio: string | null
-          created_at: string | null
-          display_name: string | null
-          featured_at: string | null
-          featured_description: string | null
-          featured_priority: number | null
-          id: string | null
-          is_featured: boolean | null
-          is_tradingview_connected: boolean | null
-          role: string | null
-          username: string | null
-        }
-        Insert: {
-          avatar_url?: string | null
-          bio?: string | null
-          created_at?: string | null
-          display_name?: string | null
-          featured_at?: string | null
-          featured_description?: string | null
-          featured_priority?: number | null
-          id?: string | null
-          is_featured?: boolean | null
-          is_tradingview_connected?: boolean | null
-          role?: string | null
-          username?: string | null
-        }
-        Update: {
-          avatar_url?: string | null
-          bio?: string | null
-          created_at?: string | null
-          display_name?: string | null
-          featured_at?: string | null
-          featured_description?: string | null
-          featured_priority?: number | null
-          id?: string | null
-          is_featured?: boolean | null
-          is_tradingview_connected?: boolean | null
-          role?: string | null
-          username?: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       check_rate_limit: {
@@ -1126,6 +907,44 @@ export type Database = {
       disable_programs_for_expired_connections: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      get_featured_creators_with_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          avatar_url: string
+          avg_rating: number
+          bio: string
+          created_at: string
+          display_name: string
+          featured_at: string
+          featured_description: string
+          featured_priority: number
+          id: string
+          is_featured: boolean
+          is_tradingview_connected: boolean
+          role: string
+          total_programs: number
+          total_revenue: number
+          total_sales: number
+          username: string
+        }[]
+      }
+      get_public_profiles: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          avatar_url: string
+          bio: string
+          created_at: string
+          display_name: string
+          featured_at: string
+          featured_description: string
+          featured_priority: number
+          id: string
+          is_featured: boolean
+          is_tradingview_connected: boolean
+          role: string
+          username: string
+        }[]
       }
       get_safe_profile: {
         Args: { profile_id: string }

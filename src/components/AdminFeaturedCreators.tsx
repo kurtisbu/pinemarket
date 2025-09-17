@@ -44,10 +44,7 @@ const AdminFeaturedCreators = () => {
 
   const fetchCreators = async () => {
     try {
-      const { data, error } = await supabase
-        .from('featured_creators_with_stats')
-        .select('*')
-        .order('featured_priority', { ascending: false });
+      const { data, error } = await supabase.rpc('get_featured_creators_with_stats');
 
       if (error) throw error;
       setCreators(data || []);
