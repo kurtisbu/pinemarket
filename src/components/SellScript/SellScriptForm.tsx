@@ -5,6 +5,7 @@ import ProgramBasicForm from './ProgramBasicForm';
 import TagManager from './TagManager';
 import ScriptUploadSection from './ScriptUploadSection';
 import MediaUploadSection from './MediaUploadSection';
+import SubscriptionPlanSelector from '../SubscriptionPlanSelector';
 
 interface SellScriptFormProps {
   formData: {
@@ -16,6 +17,10 @@ interface SellScriptFormProps {
     tradingview_publication_url: string;
     offer_trial: boolean;
     trial_period_days: number;
+    pricing_model: string;
+    monthly_price: string;
+    yearly_price: string;
+    billing_interval: string;
   };
   onInputChange: (field: string, value: string | number | boolean) => void;
   categories: string[];
@@ -87,6 +92,19 @@ const SellScriptForm: React.FC<SellScriptFormProps> = ({
         mediaFiles={mediaFiles}
         setMediaFiles={setMediaFiles}
       />
+
+      {formData.pricing_model === 'subscription' && (
+        <SubscriptionPlanSelector
+          monthlyPrice={formData.monthly_price}
+          onMonthlyPriceChange={(price) => onInputChange('monthly_price', price)}
+          yearlyPrice={formData.yearly_price}
+          onYearlyPriceChange={(price) => onInputChange('yearly_price', price)}
+          interval={formData.billing_interval}
+          onIntervalChange={(interval) => onInputChange('billing_interval', interval)}
+          trialPeriodDays={formData.trial_period_days}
+          onTrialPeriodChange={(days) => onInputChange('trial_period_days', days)}
+        />
+      )}
 
       <div className="flex gap-4">
         <Button 
