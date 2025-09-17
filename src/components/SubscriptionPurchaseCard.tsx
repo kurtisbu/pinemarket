@@ -114,48 +114,40 @@ const SubscriptionPurchaseCard: React.FC<SubscriptionPurchaseCardProps> = ({ pro
   const handleSubscribe = async () => {
     if (!user) {
       toast({
-        title: 'Authentication Required',
-        description: 'Please sign in to subscribe',
-        variant: 'destructive',
+        title: "Authentication required",
+        description: "Please sign in to subscribe to this program.",
+        variant: "destructive",
       });
       return;
     }
 
     setSubscribing(true);
-
     try {
       const currentPrice = getCurrentPrice(program, selectedInterval, subscriptionPlan);
-      const requestBody: any = {
-        successUrl: `${window.location.origin}/subscription/success`,
-        cancelUrl: `${window.location.origin}/subscription/cancel`,
-      };
-
-      if (program.subscription_plan_id) {
-        requestBody.planId = program.subscription_plan_id;
-      } else {
-        requestBody.programId = program.id;
-        requestBody.price = currentPrice;
-        requestBody.interval = selectedInterval;
-        requestBody.productName = program.title;
-      }
-
-      console.log('Creating subscription with:', requestBody);
-
+      const intervalDisplay = getIntervalDisplay(selectedInterval);
+      
       const { data, error } = await supabase.functions.invoke('create-subscription', {
-        body: requestBody,
+        body: {
+          programId: program.id,
+          billingInterval: selectedInterval,
+          successUrl: `${window.location.origin}/program/${program.id}?success=true`,
+          cancelUrl: `${window.location.origin}/program/${program.id}`,
+        },
       });
 
       if (error) throw error;
 
-      if (data.url) {
+      if (data?.url) {
         window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL received');
       }
     } catch (error: any) {
       console.error('Subscription error:', error);
       toast({
-        title: 'Error',
-        description: error.message || 'Failed to create subscription',
-        variant: 'destructive',
+        title: "Subscription failed",
+        description: error.message || "Failed to create subscription. Please try again.",
+        variant: "destructive",
       });
     } finally {
       setSubscribing(false);

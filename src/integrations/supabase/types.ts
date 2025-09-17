@@ -154,6 +154,9 @@ export type Database = {
           script_file_path: string | null
           seller_id: string
           status: string
+          stripe_monthly_price_id: string | null
+          stripe_product_id: string | null
+          stripe_yearly_price_id: string | null
           subscription_plan_id: string | null
           tags: string[] | null
           title: string
@@ -180,6 +183,9 @@ export type Database = {
           script_file_path?: string | null
           seller_id: string
           status?: string
+          stripe_monthly_price_id?: string | null
+          stripe_product_id?: string | null
+          stripe_yearly_price_id?: string | null
           subscription_plan_id?: string | null
           tags?: string[] | null
           title: string
@@ -206,6 +212,9 @@ export type Database = {
           script_file_path?: string | null
           seller_id?: string
           status?: string
+          stripe_monthly_price_id?: string | null
+          stripe_product_id?: string | null
+          stripe_yearly_price_id?: string | null
           subscription_plan_id?: string | null
           tags?: string[] | null
           title?: string
