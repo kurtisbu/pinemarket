@@ -86,13 +86,16 @@ export const useSellScriptForm = () => {
     e.preventDefault();
     if (!user) return;
 
-    if (formData.pricing_model === 'one_time' && !formData.price) {
-      toast({
-        title: 'Price required',
-        description: 'Please set a price for your program.',
-        variant: 'destructive',
-      });
-      return;
+    if (formData.pricing_model === 'one_time') {
+      const price = parseFloat(formData.price);
+      if (!formData.price || isNaN(price) || price <= 0) {
+        toast({
+          title: 'Valid price required',
+          description: 'Please enter a valid price greater than $0.',
+          variant: 'destructive',
+        });
+        return;
+      }
     }
 
     if (formData.pricing_model === 'subscription') {
@@ -217,7 +220,7 @@ export const useSellScriptForm = () => {
         tradingview_publication_url: publicationUrl,
         tradingview_script_id: scriptId,
         pricing_model: formData.pricing_model,
-        price: formData.pricing_model === 'one_time' ? parseFloat(formData.price) : null,
+        price: formData.pricing_model === 'one_time' ? parseFloat(formData.price) : 0,
         monthly_price: formData.pricing_model === 'subscription' && formData.monthly_price ? parseFloat(formData.monthly_price) : null,
         yearly_price: formData.pricing_model === 'subscription' && formData.yearly_price ? parseFloat(formData.yearly_price) : null,
         billing_interval: formData.pricing_model === 'subscription' ? formData.billing_interval : null,
