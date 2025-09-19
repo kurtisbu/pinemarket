@@ -253,10 +253,15 @@ export const useSellScriptForm = () => {
   };
 
   const isFormValid = formData.title.trim() && formData.description.trim() && formData.category && 
-    (formData.pricing_model === 'one_time' ? formData.price : 
-     (formData.billing_interval && 
-      ((formData.billing_interval === 'month' || formData.billing_interval === 'both') ? formData.monthly_price : true) &&
-      ((formData.billing_interval === 'year' || formData.billing_interval === 'both') ? formData.yearly_price : true)));
+    (formData.pricing_model === 'one_time' 
+      ? (formData.price && parseFloat(formData.price) > 0)
+      : (formData.billing_interval && 
+         ((formData.billing_interval === 'month' || formData.billing_interval === 'both') 
+           ? (formData.monthly_price && parseFloat(formData.monthly_price) > 0) 
+           : true) &&
+         ((formData.billing_interval === 'year' || formData.billing_interval === 'both') 
+           ? (formData.yearly_price && parseFloat(formData.yearly_price) > 0) 
+           : true)));
   const isSubmitDisabled = loading || securityValidating || uploadingMedia || !isFormValid;
 
   return {
