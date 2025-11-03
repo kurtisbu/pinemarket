@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import StripeConnectSettings from '@/components/StripeConnectSettings';
+import { SellerPayoutSettings } from '@/components/SellerPayoutSettings';
 import TradingViewConnectionStatus from '@/components/TradingViewConnectionStatus';
 import { Upload, User, Loader2, RefreshCw } from 'lucide-react';
 
@@ -272,7 +272,7 @@ const SellerSettingsView: React.FC<SellerSettingsViewProps> = ({ profile, onProf
           </CardContent>
         </Card>
 
-        <StripeConnectSettings />
+        <SellerPayoutSettings />
 
         <Card>
           <CardHeader>

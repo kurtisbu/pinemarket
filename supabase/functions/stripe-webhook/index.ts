@@ -96,6 +96,7 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
   // Calculate platform fee (10%)
   const amount = price?.amount || 0;
   const platformFee = amount * 0.10;
+  const sellerOwed = amount - platformFee;
 
   // Create purchase record
   const { data: purchase, error: purchaseError } = await supabaseAdmin
@@ -106,6 +107,7 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
       seller_id: sellerId,
       amount: amount,
       platform_fee: platformFee,
+      seller_owed: sellerOwed,
       status: 'completed',
       payment_intent_id: session.payment_intent || session.id,
     })
@@ -118,6 +120,20 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
   }
 
   console.log("[WEBHOOK] Purchase created:", purchase.id);
+
+  // Update seller balance (pending)
+  const { error: balanceError } = await supabaseAdmin
+    .rpc('update_seller_balance', {
+      p_seller_id: sellerId,
+      p_amount: sellerOwed,
+      p_type: 'sale'
+    });
+
+  if (balanceError) {
+    console.error("[WEBHOOK] Error updating seller balance:", balanceError);
+  } else {
+    console.log("[WEBHOOK] Seller balance updated with pending amount:", sellerOwed);
+  }
 
   // Get program details for script assignment
   const { data: program } = await supabaseAdmin

@@ -59,6 +59,51 @@ export type Database = {
           },
         ]
       }
+      payouts: {
+        Row: {
+          amount: number
+          completed_at: string | null
+          created_at: string | null
+          currency: string
+          failure_reason: string | null
+          id: string
+          initiated_at: string | null
+          payout_method: string
+          seller_id: string
+          status: string
+          stripe_transfer_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          completed_at?: string | null
+          created_at?: string | null
+          currency?: string
+          failure_reason?: string | null
+          id?: string
+          initiated_at?: string | null
+          payout_method: string
+          seller_id: string
+          status?: string
+          stripe_transfer_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          completed_at?: string | null
+          created_at?: string | null
+          currency?: string
+          failure_reason?: string | null
+          id?: string
+          initiated_at?: string | null
+          payout_method?: string
+          seller_id?: string
+          status?: string
+          stripe_transfer_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -309,6 +354,7 @@ export type Database = {
           program_id: string
           purchased_at: string
           seller_id: string
+          seller_owed: number | null
           status: Database["public"]["Enums"]["purchase_status"]
           stripe_transfer_id: string | null
           tradingview_username: string | null
@@ -324,6 +370,7 @@ export type Database = {
           program_id: string
           purchased_at?: string
           seller_id: string
+          seller_owed?: number | null
           status?: Database["public"]["Enums"]["purchase_status"]
           stripe_transfer_id?: string | null
           tradingview_username?: string | null
@@ -339,6 +386,7 @@ export type Database = {
           program_id?: string
           purchased_at?: string
           seller_id?: string
+          seller_owed?: number | null
           status?: Database["public"]["Enums"]["purchase_status"]
           stripe_transfer_id?: string | null
           tradingview_username?: string | null
@@ -663,6 +711,42 @@ export type Database = {
         }
         Relationships: []
       }
+      seller_balances: {
+        Row: {
+          available_balance: number
+          created_at: string | null
+          id: string
+          last_payout_at: string | null
+          pending_balance: number
+          seller_id: string
+          total_earned: number
+          total_paid_out: number
+          updated_at: string | null
+        }
+        Insert: {
+          available_balance?: number
+          created_at?: string | null
+          id?: string
+          last_payout_at?: string | null
+          pending_balance?: number
+          seller_id: string
+          total_earned?: number
+          total_paid_out?: number
+          updated_at?: string | null
+        }
+        Update: {
+          available_balance?: number
+          created_at?: string | null
+          id?: string
+          last_payout_at?: string | null
+          pending_balance?: number
+          seller_id?: string
+          total_earned?: number
+          total_paid_out?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       seller_notifications: {
         Row: {
           created_at: string | null
@@ -700,6 +784,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      seller_payout_info: {
+        Row: {
+          bank_account_holder_name: string | null
+          bank_account_number: string | null
+          bank_name: string | null
+          bank_routing_number: string | null
+          country: string
+          created_at: string | null
+          currency: string
+          id: string
+          is_verified: boolean | null
+          payout_method: string
+          paypal_email: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          bank_account_holder_name?: string | null
+          bank_account_number?: string | null
+          bank_name?: string | null
+          bank_routing_number?: string | null
+          country: string
+          created_at?: string | null
+          currency?: string
+          id?: string
+          is_verified?: boolean | null
+          payout_method: string
+          paypal_email?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          bank_account_holder_name?: string | null
+          bank_account_number?: string | null
+          bank_name?: string | null
+          bank_routing_number?: string | null
+          country?: string
+          created_at?: string | null
+          currency?: string
+          id?: string
+          is_verified?: boolean | null
+          payout_method?: string
+          paypal_email?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       subscription_access: {
         Row: {
@@ -1081,6 +1213,10 @@ export type Database = {
         Args: { seller_user_id: string }
         Returns: boolean
       }
+      settle_pending_balance: {
+        Args: { p_seller_id: string }
+        Returns: undefined
+      }
       toggle_creator_featured_status: {
         Args: {
           creator_id: string
@@ -1092,6 +1228,10 @@ export type Database = {
       }
       update_program_rating_stats: {
         Args: { program_uuid: string }
+        Returns: undefined
+      }
+      update_seller_balance: {
+        Args: { p_amount: number; p_seller_id: string; p_type: string }
         Returns: undefined
       }
       validate_file_upload: {
