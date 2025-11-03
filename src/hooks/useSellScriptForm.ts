@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { useSecurityValidation } from './useSecurityValidation';
 import { useSecureFileValidation } from './useSecureFileValidation';
+import type { PriceObject } from '@/components/SellScript/PriceManager';
 
 export const useSellScriptForm = () => {
   const { user } = useAuth();
@@ -20,19 +21,15 @@ export const useSellScriptForm = () => {
   const [scriptType, setScriptType] = useState<'file' | 'link'>('link');
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [currentTag, setCurrentTag] = useState('');
+  const [prices, setPrices] = useState<PriceObject[]>([]);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    price: '',
     category: '',
     tags: [] as string[],
     tradingview_publication_url: '',
     offer_trial: false,
     trial_period_days: 7,
-    pricing_model: 'one_time',
-    monthly_price: '',
-    yearly_price: '',
-    billing_interval: ''
   });
 
   const handleInputChange = (field: string, value: string | number | boolean) => {
@@ -86,41 +83,41 @@ export const useSellScriptForm = () => {
     e.preventDefault();
     if (!user) return;
 
-    if (formData.pricing_model === 'one_time') {
-      const price = parseFloat(formData.price);
-      if (!formData.price || isNaN(price) || price <= 0) {
-        toast({
-          title: 'Valid price required',
-          description: 'Please enter a valid price greater than $0.',
-          variant: 'destructive',
-        });
-        return;
-      }
+    // Validate prices
+    if (prices.length === 0) {
+      toast({
+        title: 'At least one price required',
+        description: 'Please add at least one pricing option for your program.',
+        variant: 'destructive',
+      });
+      return;
     }
 
-    if (formData.pricing_model === 'subscription') {
-      if (!formData.billing_interval) {
+    // Validate each price
+    for (const price of prices) {
+      if (!price.display_name.trim()) {
+        toast({
+          title: 'Display name required',
+          description: 'All pricing options must have a display name.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const amount = parseFloat(price.amount);
+      if (!price.amount || isNaN(amount) || amount <= 0) {
+        toast({
+          title: 'Valid price required',
+          description: 'All pricing options must have a valid price greater than $0.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (price.price_type === 'recurring' && !price.interval) {
         toast({
           title: 'Billing interval required',
-          description: 'Please select a billing interval for your subscription.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      if ((formData.billing_interval === 'month' || formData.billing_interval === 'both') && !formData.monthly_price) {
-        toast({
-          title: 'Monthly price required',
-          description: 'Please set a monthly price for your subscription.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      if ((formData.billing_interval === 'year' || formData.billing_interval === 'both') && !formData.yearly_price) {
-        toast({
-          title: 'Yearly price required',
-          description: 'Please set a yearly price for your subscription.',
+          description: 'Recurring pricing options must have a billing interval.',
           variant: 'destructive',
         });
         return;
@@ -219,23 +216,39 @@ export const useSellScriptForm = () => {
         script_file_path: scriptPath,
         tradingview_publication_url: publicationUrl,
         tradingview_script_id: scriptId,
-        pricing_model: formData.pricing_model,
-        price: formData.pricing_model === 'one_time' ? parseFloat(formData.price) : 0,
-        monthly_price: formData.pricing_model === 'subscription' && formData.monthly_price ? parseFloat(formData.monthly_price) : null,
-        yearly_price: formData.pricing_model === 'subscription' && formData.yearly_price ? parseFloat(formData.yearly_price) : null,
-        billing_interval: formData.pricing_model === 'subscription' ? formData.billing_interval : null,
-        trial_period_days: formData.pricing_model === 'subscription' ? formData.trial_period_days : (formData.offer_trial ? formData.trial_period_days : 0)
+        pricing_model: 'flexible', // New flexible pricing model
+        price: 0, // Price is now in program_prices table
+        trial_period_days: formData.offer_trial ? formData.trial_period_days : 0
       };
 
-      const { error } = await supabase
+      const { data: program, error: programError } = await supabase
         .from('programs')
-        .insert(programData);
+        .insert(programData)
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (programError) throw programError;
+
+      // Insert all price objects
+      const priceData = prices.map((price, index) => ({
+        program_id: program.id,
+        price_type: price.price_type,
+        amount: parseFloat(price.amount),
+        interval: price.interval || null,
+        display_name: price.display_name,
+        description: price.description || null,
+        sort_order: index,
+      }));
+
+      const { error: pricesError } = await supabase
+        .from('program_prices')
+        .insert(priceData);
+
+      if (pricesError) throw pricesError;
 
       toast({
         title: 'Program created successfully',
-        description: `Your Pine Script program has been created${formData.offer_trial ? ` with a ${formData.trial_period_days}-day free trial` : ''} with ${imageUrls.length} optimized image${imageUrls.length !== 1 ? 's' : ''}.`,
+        description: `Your Pine Script program has been created with ${prices.length} pricing option${prices.length !== 1 ? 's' : ''}${imageUrls.length > 0 ? ` and ${imageUrls.length} image${imageUrls.length !== 1 ? 's' : ''}` : ''}.`,
       });
 
       navigate('/my-programs');
@@ -252,16 +265,16 @@ export const useSellScriptForm = () => {
     }
   };
 
-  const isFormValid = formData.title.trim() && formData.description.trim() && formData.category && 
-    (formData.pricing_model === 'one_time' 
-      ? (formData.price && parseFloat(formData.price) > 0)
-      : (formData.billing_interval && 
-         ((formData.billing_interval === 'month' || formData.billing_interval === 'both') 
-           ? (formData.monthly_price && parseFloat(formData.monthly_price) > 0) 
-           : true) &&
-         ((formData.billing_interval === 'year' || formData.billing_interval === 'both') 
-           ? (formData.yearly_price && parseFloat(formData.yearly_price) > 0) 
-           : true)));
+  const isFormValid = formData.title.trim() && 
+    formData.description.trim() && 
+    formData.category && 
+    prices.length > 0 &&
+    prices.every(p => 
+      p.display_name.trim() && 
+      p.amount && 
+      parseFloat(p.amount) > 0 &&
+      (p.price_type === 'one_time' || (p.price_type === 'recurring' && p.interval))
+    );
   const isSubmitDisabled = loading || securityValidating || uploadingMedia || !isFormValid;
 
   return {
@@ -277,6 +290,8 @@ export const useSellScriptForm = () => {
     setScriptFile,
     mediaFiles,
     setMediaFiles,
+    prices,
+    setPrices,
     handleSubmit,
     loading,
     securityValidating,

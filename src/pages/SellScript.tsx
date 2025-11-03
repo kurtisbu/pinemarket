@@ -23,6 +23,8 @@ const SellScript = () => {
     setScriptFile,
     mediaFiles,
     setMediaFiles,
+    prices,
+    setPrices,
     handleSubmit,
     loading,
     securityValidating,
@@ -76,6 +78,8 @@ const SellScript = () => {
                 setScriptFile={setScriptFile}
                 mediaFiles={mediaFiles}
                 setMediaFiles={setMediaFiles}
+                prices={prices}
+                setPrices={setPrices}
                 onSubmit={handleSubmit}
                 isSubmitDisabled={isSubmitDisabled}
                 loading={loading}

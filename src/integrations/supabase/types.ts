@@ -137,6 +137,62 @@ export type Database = {
         }
         Relationships: []
       }
+      program_prices: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          description: string | null
+          display_name: string
+          id: string
+          interval: string | null
+          is_active: boolean
+          price_type: string
+          program_id: string
+          sort_order: number
+          stripe_price_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          description?: string | null
+          display_name: string
+          id?: string
+          interval?: string | null
+          is_active?: boolean
+          price_type: string
+          program_id: string
+          sort_order?: number
+          stripe_price_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          description?: string | null
+          display_name?: string
+          id?: string
+          interval?: string | null
+          is_active?: boolean
+          price_type?: string
+          program_id?: string
+          sort_order?: number
+          stripe_price_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "program_prices_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       programs: {
         Row: {
           average_rating: number
@@ -350,7 +406,7 @@ export type Database = {
           created_at: string
           endpoint: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           request_count: number
           updated_at: string
           user_id: string | null
@@ -360,7 +416,7 @@ export type Database = {
           created_at?: string
           endpoint: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           request_count?: number
           updated_at?: string
           user_id?: string | null
@@ -370,7 +426,7 @@ export type Database = {
           created_at?: string
           endpoint?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           request_count?: number
           updated_at?: string
           user_id?: string | null
@@ -527,7 +583,7 @@ export type Database = {
           created_at: string | null
           details: Json | null
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           resource_id: string | null
           resource_type: string
           risk_level: string | null
@@ -539,7 +595,7 @@ export type Database = {
           created_at?: string | null
           details?: Json | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           resource_id?: string | null
           resource_type: string
           risk_level?: string | null
@@ -551,7 +607,7 @@ export type Database = {
           created_at?: string | null
           details?: Json | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           resource_id?: string | null
           resource_type?: string
           risk_level?: string | null
@@ -905,11 +961,11 @@ export type Database = {
         Returns: boolean
       }
       disable_programs_for_expired_connections: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: undefined
       }
       get_featured_creators_with_stats: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           avatar_url: string
           avg_rating: number
@@ -930,7 +986,7 @@ export type Database = {
         }[]
       }
       get_public_profiles: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           avatar_url: string
           bio: string
@@ -1019,10 +1075,7 @@ export type Database = {
         Args: { p_code: string; p_user_id: string }
         Returns: Json
       }
-      validate_tradingview_url: {
-        Args: { url: string }
-        Returns: boolean
-      }
+      validate_tradingview_url: { Args: { url: string }; Returns: boolean }
     }
     Enums: {
       assignment_status: "pending" | "assigned" | "failed" | "expired"
