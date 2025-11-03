@@ -7,12 +7,13 @@ import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import Header from '@/components/Header';
-import { Shield, Users, FileText, BarChart3, AlertTriangle, Clock, Star } from 'lucide-react';
+import { Shield, Users, FileText, BarChart3, AlertTriangle, Clock, Star, DollarSign } from 'lucide-react';
 import AdminScriptAssignments from '@/components/AdminScriptAssignments';
 import SecurityAuditDashboard from '@/components/SecurityAuditDashboard';
 import AdminTrialManagement from '@/components/AdminTrialManagement';
 import AdminAccessCodes from '@/components/AdminAccessCodes';
 import AdminFeaturedCreators from '@/components/AdminFeaturedCreators';
+import { AdminPayoutManagement } from '@/components/AdminPayoutManagement';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -172,7 +173,7 @@ const AdminDashboard = () => {
           </div>
 
           <Tabs defaultValue="assignments" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="assignments" className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4" />
                 Assignments
@@ -192,6 +193,10 @@ const AdminDashboard = () => {
               <TabsTrigger value="featured-creators" className="flex items-center gap-2">
                 <Star className="w-4 h-4" />
                 Featured Creators
+              </TabsTrigger>
+              <TabsTrigger value="payouts" className="flex items-center gap-2">
+                <DollarSign className="w-4 h-4" />
+                Payouts
               </TabsTrigger>
             </TabsList>
 
@@ -213,6 +218,10 @@ const AdminDashboard = () => {
 
             <TabsContent value="featured-creators" className="space-y-6">
               <AdminFeaturedCreators />
+            </TabsContent>
+
+            <TabsContent value="payouts" className="space-y-6">
+              <AdminPayoutManagement />
             </TabsContent>
           </Tabs>
         </div>
