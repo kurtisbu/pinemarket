@@ -26,6 +26,8 @@ serve(async (req) => {
         return await confirmPurchase(payload, supabaseAdmin);
       case 'complete-stripe-purchase':
         return await completeStripePurchase(payload, supabaseAdmin);
+      case 'get-account-status':
+        return await getAccountStatus(payload);
       default:
         return new Response(JSON.stringify({ error: 'Invalid action.' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -310,4 +312,72 @@ async function completeStripePurchase(payload: any, supabaseAdmin: any) {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     status: 200,
   });
+}
+
+async function getAccountStatus(payload: any) {
+  const { account_id } = payload;
+  
+  if (!account_id) {
+    return new Response(JSON.stringify({ error: 'Missing account_id' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400,
+    });
+  }
+
+  console.log('[STRIPE-ACCOUNT] Fetching account status for:', account_id);
+
+  try {
+    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
+    if (!stripeSecretKey) {
+      throw new Error('Stripe secret key not configured');
+    }
+
+    // Fetch Stripe account details
+    const response = await fetch(`https://api.stripe.com/v1/accounts/${account_id}`, {
+      headers: {
+        'Authorization': `Bearer ${stripeSecretKey}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[STRIPE-ACCOUNT] Stripe API error:', errorText);
+      throw new Error(`Stripe API error: ${response.status} - ${errorText}`);
+    }
+
+    const account = await response.json();
+
+    console.log('[STRIPE-ACCOUNT] Account fetched successfully:', {
+      id: account.id,
+      charges_enabled: account.charges_enabled,
+      payouts_enabled: account.payouts_enabled,
+      details_submitted: account.details_submitted,
+    });
+
+    return new Response(JSON.stringify({
+      success: true,
+      account: {
+        id: account.id,
+        charges_enabled: account.charges_enabled,
+        payouts_enabled: account.payouts_enabled,
+        details_submitted: account.details_submitted,
+        requirements: account.requirements,
+        type: account.type,
+      },
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    });
+
+  } catch (error) {
+    console.error('[STRIPE-ACCOUNT] Error fetching account status:', error);
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      success: false,
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    });
+  }
 }
