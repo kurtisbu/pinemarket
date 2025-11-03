@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import PurchaseCard from '@/components/PurchaseCard';
+import { ProgramPriceSelector } from '@/components/ProgramPriceSelector';
 import TrialPurchaseCard from '@/components/TrialPurchaseCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -73,10 +73,8 @@ const ProgramPurchaseSection: React.FC<ProgramPurchaseSectionProps> = ({ program
   // If no trial or user not eligible, show regular purchase card
   if (!showTrialTab) {
     return (
-      <PurchaseCard 
-        price={program.price}
+      <ProgramPriceSelector 
         programId={program.id}
-        sellerId={program.seller_id}
       />
     );
   }
@@ -99,10 +97,8 @@ const ProgramPurchaseSection: React.FC<ProgramPurchaseSectionProps> = ({ program
       </TabsContent>
       
       <TabsContent value="purchase" className="mt-4">
-        <PurchaseCard 
-          price={program.price}
+        <ProgramPriceSelector 
           programId={program.id}
-          sellerId={program.seller_id}
         />
       </TabsContent>
     </Tabs>

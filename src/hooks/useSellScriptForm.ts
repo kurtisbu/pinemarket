@@ -246,6 +246,25 @@ export const useSellScriptForm = () => {
 
       if (pricesError) throw pricesError;
 
+      // Create Stripe products and prices
+      try {
+        const { error: stripeError } = await supabase.functions.invoke('create-program-prices', {
+          body: { programId: program.id }
+        });
+
+        if (stripeError) {
+          console.error('Stripe price creation error:', stripeError);
+          toast({
+            title: 'Program created',
+            description: 'Program created but Stripe prices setup failed. You can set them up later from your dashboard.',
+            variant: 'destructive',
+          });
+        }
+      } catch (stripeError: any) {
+        console.error('Stripe integration error:', stripeError);
+        // Don't fail the whole operation if Stripe fails
+      }
+
       toast({
         title: 'Program created successfully',
         description: `Your Pine Script program has been created with ${prices.length} pricing option${prices.length !== 1 ? 's' : ''}${imageUrls.length > 0 ? ` and ${imageUrls.length} image${imageUrls.length !== 1 ? 's' : ''}` : ''}.`,
