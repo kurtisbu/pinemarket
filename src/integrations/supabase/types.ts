@@ -874,6 +874,30 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_subscriptions: {
         Row: {
           cancel_at_period_end: boolean
@@ -1023,10 +1047,18 @@ export type Database = {
         Args: { program_id_param: string }
         Returns: string
       }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       increment_program_view_count: {
         Args: { program_uuid: string }
         Returns: undefined
       }
+      is_current_user_admin: { Args: never; Returns: boolean }
       log_security_event: {
         Args: {
           p_action: string
@@ -1078,6 +1110,7 @@ export type Database = {
       validate_tradingview_url: { Args: { url: string }; Returns: boolean }
     }
     Enums: {
+      app_role: "admin" | "moderator" | "user"
       assignment_status: "pending" | "assigned" | "failed" | "expired"
       purchase_status: "pending" | "completed" | "failed" | "refunded"
     }
@@ -1207,6 +1240,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "moderator", "user"],
       assignment_status: ["pending", "assigned", "failed", "expired"],
       purchase_status: ["pending", "completed", "failed", "refunded"],
     },

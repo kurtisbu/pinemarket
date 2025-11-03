@@ -38,18 +38,16 @@ const AdminDashboard = () => {
     console.log('AdminDashboard - Checking admin access for user:', user.id);
     
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('role, username, display_name')
-        .eq('id', user.id)
-        .single();
+      // Use secure server-side admin check
+      const { data: isAdmin, error } = await supabase
+        .rpc('is_current_user_admin');
 
-      console.log('AdminDashboard - Profile query result:', { data, error });
+      console.log('AdminDashboard - Admin check result:', { isAdmin, error });
       
       const debugData = {
         userId: user.id,
         userEmail: user.email,
-        profileData: data,
+        isAdmin: isAdmin,
         error: error?.message,
         timestamp: new Date().toISOString()
       };
@@ -58,7 +56,7 @@ const AdminDashboard = () => {
       console.log('AdminDashboard - Debug info:', debugData);
 
       if (error) {
-        console.error('AdminDashboard - Error fetching profile:', error);
+        console.error('AdminDashboard - Error checking admin status:', error);
         toast({
           title: 'Error',
           description: `Failed to verify admin access: ${error.message}`,
@@ -69,13 +67,13 @@ const AdminDashboard = () => {
         return;
       }
       
-      console.log('AdminDashboard - User role:', data?.role);
+      console.log('AdminDashboard - User is admin:', isAdmin);
       
-      if (data?.role !== 'admin') {
-        console.log('AdminDashboard - User is not admin, role:', data?.role);
+      if (!isAdmin) {
+        console.log('AdminDashboard - User is not admin');
         toast({
           title: 'Access Denied',
-          description: `You do not have admin privileges. Current role: ${data?.role || 'none'}`,
+          description: 'You do not have admin privileges.',
           variant: 'destructive',
         });
         // Add a small delay before redirecting to let user see the message

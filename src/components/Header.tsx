@@ -30,15 +30,24 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
   useEffect(() => {
     if (user) {
       const fetchProfile = async () => {
-        const { data } = await supabase
-          .from('profiles')
-          .select('username, avatar_url, display_name, is_tradingview_connected, role')
-          .eq('id', user.id)
-          .single();
-        
-        if (data) {
-          console.log('Header - Profile loaded:', data);
-          setProfile(data);
+        try {
+          // Fetch basic profile info
+          const { data } = await supabase
+            .from('profiles')
+            .select('username, avatar_url, display_name, is_tradingview_connected')
+            .eq('id', user.id)
+            .single();
+          
+          if (data) {
+            // Check admin status via secure RPC
+            const { data: isAdmin } = await supabase
+              .rpc('is_current_user_admin');
+            
+            console.log('Header - Profile loaded:', data, 'isAdmin:', isAdmin);
+            setProfile({ ...data, role: isAdmin ? 'admin' : 'user' });
+          }
+        } catch (error) {
+          console.error('Error fetching profile:', error);
         }
       };
       fetchProfile();

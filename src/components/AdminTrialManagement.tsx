@@ -30,13 +30,11 @@ const AdminTrialManagement: React.FC = () => {
     if (!user) return;
     
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
+      // Use secure server-side admin check
+      const { data: isAdmin, error } = await supabase
+        .rpc('is_current_user_admin');
 
-      if (!error && data?.role === 'admin') {
+      if (!error && isAdmin) {
         setIsAdmin(true);
       }
     } catch (error) {
