@@ -560,17 +560,12 @@ async function createDashboardLink(payload: any) {
 
     console.log('[STRIPE-CONNECT] Creating dashboard link for:', account_id);
 
-    const formData = new URLSearchParams({
-      account: account_id,
-    });
-
     const response = await fetch('https://api.stripe.com/v1/accounts/' + account_id + '/login_links', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${stripeSecretKey}`,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: formData.toString(),
     });
 
     if (!response.ok) {
