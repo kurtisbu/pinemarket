@@ -29,10 +29,10 @@ interface SellerScriptAssignment {
       title: string;
     };
   };
-  profiles: {
-    display_name: string;
-    username: string;
-  };
+  profiles?: {
+    display_name?: string | null;
+    username?: string | null;
+  } | null;
 }
 
 const SellerScriptAssignments: React.FC = () => {
@@ -226,7 +226,7 @@ const SellerScriptAssignments: React.FC = () => {
                         </CardTitle>
                         <div className="text-sm text-muted-foreground flex items-center gap-2">
                           <User className="w-4 h-4" />
-                          Buyer: {assignment.profiles.display_name || assignment.profiles.username}
+                          Buyer: {assignment.profiles?.display_name || assignment.profiles?.username || 'Unknown buyer'}
                         </div>
                       </div>
                       {getStatusBadge(assignment.status)}
