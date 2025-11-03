@@ -31,10 +31,10 @@ interface ScriptAssignment {
       title: string;
     };
   };
-  profiles: {
-    display_name: string;
-    username: string;
-  };
+  profiles?: {
+    display_name?: string | null;
+    username?: string | null;
+  } | null;
 }
 
 const AdminScriptAssignments: React.FC = () => {
@@ -222,7 +222,7 @@ const AdminScriptAssignments: React.FC = () => {
                           {assignment.purchases.programs.title}
                         </CardTitle>
                         <div className="text-sm text-muted-foreground">
-                          Buyer: {assignment.profiles.display_name || assignment.profiles.username}
+                          Buyer: {assignment.profiles?.display_name || assignment.profiles?.username || 'Unknown buyer'}
                         </div>
                       </div>
                       {getStatusBadge(assignment.status)}
