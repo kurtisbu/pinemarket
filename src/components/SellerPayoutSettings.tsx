@@ -191,6 +191,14 @@ export const SellerPayoutSettings = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Testing Mode:</strong> Payouts are currently simulated for testing. 
+              Real bank transfers will be implemented before production launch. Your bank information 
+              will be verified by an administrator before payouts can be processed.
+            </AlertDescription>
+          </Alert>
           <div className="space-y-2">
             <Label htmlFor="payout_method">Payout Method</Label>
             <Select 

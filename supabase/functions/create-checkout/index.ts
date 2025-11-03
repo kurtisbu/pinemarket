@@ -35,6 +35,17 @@ serve(async (req) => {
 
     console.log(`[CHECKOUT] Creating checkout session for price: ${priceId}`);
 
+    // Fetch buyer's TradingView username from profile
+    const { data: profile, error: profileError } = await supabaseClient
+      .from('profiles')
+      .select('tradingview_username')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile?.tradingview_username) {
+      throw new Error("TradingView username not found. Please add your TradingView username to your profile before purchasing.");
+    }
+
     // Get price details
     const { data: price, error: priceError } = await supabaseClient
       .from('program_prices')
@@ -103,6 +114,7 @@ serve(async (req) => {
         seller_id: price.programs.seller_id,
         user_id: user.id,
         price_type: price.price_type,
+        tradingview_username: profile.tradingview_username,
       },
     };
 

@@ -1,5 +1,25 @@
 # Testing Guide: Centralized Payment System
 
+## ⚠️ Important: Simulated Payouts
+
+**Current Implementation Status:**
+- ✅ Purchase processing: REAL (via Stripe)
+- ✅ Balance tracking: REAL (in database)
+- ✅ TradingView username collection: ACTIVE (from user profiles)
+- ⚠️ Bank transfers: SIMULATED (for testing only)
+
+**What "Simulated" Means:**
+- The `process-payouts` edge function logs "Simulated payout" in the console
+- Payout records are created in the database with status 'completed'
+- No actual money is transferred to seller bank accounts
+- Stripe Payouts API is NOT yet implemented
+
+**Before Production:**
+- Implement real Stripe Payouts API calls (see `MIGRATION_PLAN.md`)
+- Set up Stripe webhook listeners for payout status updates
+- Verify your Stripe account for payout capability
+- Implement bank account verification workflow
+
 ## Setup Complete ✅
 
 ### 1. Automated Cron Jobs (Active)
@@ -11,6 +31,12 @@
 - Manual triggers for testing:
   - "Settle Pending Balances" - Force settlement immediately
   - "Process Payouts Now" - Force payout processing immediately
+
+### 3. TradingView Username Flow (ACTIVE)
+- Usernames collected during account signup
+- Automatically fetched from profile during checkout
+- Passed to Stripe metadata for script assignments
+- Webhook extracts username for automatic script access
 
 ## Testing Workflow
 
