@@ -413,15 +413,19 @@ async function createConnectAccount(payload: any, supabaseAdmin: any, req: Reque
     console.log('[STRIPE-CONNECT] Creating Connect account for user:', user.id);
 
     // Create Stripe Connect account
-    const formData = new URLSearchParams({
-      type: 'express',
-      country: country || 'US',
-      capabilities: JSON.stringify({
-        card_payments: { requested: true },
-        transfers: { requested: true },
-      }),
-      business_type: 'individual',
-    });
+    const formData = new URLSearchParams();
+    formData.append('type', 'express');
+    formData.append('country', country || 'US');
+    formData.append('business_type', 'individual');
+
+    // Capabilities must be sent as nested form fields, not JSON
+    formData.append('capabilities[card_payments][requested]', 'true');
+    formData.append('capabilities[transfers][requested]', 'true');
+
+    // Optionally pass email to prefill Stripe
+    if (user.email) {
+      formData.append('email', user.email);
+    }
 
     const response = await fetch('https://api.stripe.com/v1/accounts', {
       method: 'POST',
