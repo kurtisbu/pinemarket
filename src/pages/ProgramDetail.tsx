@@ -13,6 +13,7 @@ import ProgramDescription from '@/components/ProgramDetail/ProgramDescription';
 import ProgramSidebar from '@/components/ProgramDetail/ProgramSidebar';
 import UserRatingSection from '@/components/UserRatingSection';
 import RatingsList from '@/components/RatingsList';
+import ProfileCompletionBanner from '@/components/ProfileCompletionBanner';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 
@@ -23,6 +24,7 @@ const ProgramDetail = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [hasTradingViewUsername, setHasTradingViewUsername] = useState(true);
 
   const { data: program, isLoading, error, refetch } = useQuery({
     queryKey: ['program', id, refreshKey],
@@ -103,6 +105,30 @@ const ProgramDetail = () => {
     handleStripeSuccess();
   }, [searchParams, user, id, toast, refetch]);
 
+  // Check if user has TradingView username in profile
+  useEffect(() => {
+    const checkProfile = async () => {
+      if (!user) {
+        setHasTradingViewUsername(true); // Don't show banner for non-logged in users
+        return;
+      }
+      
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('tradingview_username')
+          .eq('id', user.id)
+          .single();
+
+        setHasTradingViewUsername(!!(data?.tradingview_username));
+      } catch (error) {
+        console.error('Error checking profile:', error);
+      }
+    };
+
+    checkProfile();
+  }, [user]);
+
   // Increment view count when program is loaded
   useEffect(() => {
     if (program && id) {
@@ -155,7 +181,9 @@ const ProgramDetail = () => {
       <Header />
       
       <main className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {user && <ProfileCompletionBanner hasTradingViewUsername={hasTradingViewUsername} />}
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-6">
           <div className="lg:col-span-2 space-y-6">
             <ImageGallery images={program.image_urls || []} />
             <ProgramHeader program={program} />

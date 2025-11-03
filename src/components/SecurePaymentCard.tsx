@@ -28,6 +28,8 @@ const SecurePaymentCard: React.FC<SecurePaymentCardProps> = ({ price, programId,
   const { validatePayment, metrics } = usePaymentSecurity();
   const [loading, setLoading] = useState(false);
   const [tradingviewUsername, setTradingviewUsername] = useState('');
+  const [saveToProfile, setSaveToProfile] = useState(false);
+  const [profileUsername, setProfileUsername] = useState('');
   const [securityValidation, setSecurityValidation] = useState<{
     isValid: boolean;
     checks: any[];
@@ -44,6 +46,30 @@ const SecurePaymentCard: React.FC<SecurePaymentCardProps> = ({ price, programId,
       });
     }
   });
+
+  // Fetch user profile and auto-populate TradingView username
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('tradingview_username')
+          .eq('id', user.id)
+          .single();
+
+        if (!error && data?.tradingview_username) {
+          setTradingviewUsername(data.tradingview_username);
+          setProfileUsername(data.tradingview_username);
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      }
+    };
+
+    fetchProfile();
+  }, [user]);
 
   // Background security validation
   useEffect(() => {
@@ -220,6 +246,14 @@ const SecurePaymentCard: React.FC<SecurePaymentCardProps> = ({ price, programId,
 
           console.log('Secure purchase confirmed:', confirmData);
 
+          // Update profile if user wants to save username
+          if (saveToProfile && tradingviewUsername !== profileUsername) {
+            await supabase
+              .from('profiles')
+              .update({ tradingview_username: tradingviewUsername.trim() })
+              .eq('id', user.id);
+          }
+
           toast({
             title: 'Secure purchase successful!',
             description: 'Your payment has been processed securely. Script access is being set up.',
@@ -227,6 +261,7 @@ const SecurePaymentCard: React.FC<SecurePaymentCardProps> = ({ price, programId,
 
           // Clear the form
           setTradingviewUsername('');
+          setSaveToProfile(false);
           
           // Refresh the page after successful purchase
           setTimeout(() => {
@@ -286,7 +321,14 @@ const SecurePaymentCard: React.FC<SecurePaymentCardProps> = ({ price, programId,
             
             <div className="space-y-4 mb-6">
               <div>
-                <Label htmlFor="tradingview-username">TradingView Username</Label>
+                <Label htmlFor="tradingview-username">
+                  TradingView Username
+                  {profileUsername && (
+                    <span className="ml-2 text-xs text-green-600 font-normal">
+                      ✓ From your profile
+                    </span>
+                  )}
+                </Label>
                 <Input
                   id="tradingview-username"
                   placeholder="Enter your TradingView username"
@@ -297,7 +339,34 @@ const SecurePaymentCard: React.FC<SecurePaymentCardProps> = ({ price, programId,
                 <p className="text-xs text-muted-foreground mt-1">
                   Required to grant you secure access to the script
                 </p>
+                {!profileUsername && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    💡 <button
+                      type="button"
+                      onClick={() => navigate('/profile/settings')}
+                      className="underline hover:text-blue-700"
+                    >
+                      Save to your profile
+                    </button> to auto-fill this for future purchases
+                  </p>
+                )}
               </div>
+              
+              {/* Save to profile checkbox */}
+              {!profileUsername && tradingviewUsername.trim() && (
+                <div className="flex items-center space-x-2 p-3 bg-blue-50 rounded-md border border-blue-200">
+                  <input
+                    type="checkbox"
+                    id="save-to-profile"
+                    checked={saveToProfile}
+                    onChange={(e) => setSaveToProfile(e.target.checked)}
+                    className="rounded border-gray-300"
+                  />
+                  <label htmlFor="save-to-profile" className="text-sm text-blue-900">
+                    Save this username to my profile for faster future checkouts
+                  </label>
+                </div>
+              )}
             </div>
             
             <Button 

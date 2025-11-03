@@ -172,9 +172,9 @@ const Auth = () => {
             </div>
             {!isLogin && (
               <>
-                <div>
-                  <label htmlFor="tradingviewUsername" className="block text-sm font-medium mb-2">
-                    TradingView Username
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <label htmlFor="tradingviewUsername" className="block text-sm font-semibold mb-2 text-blue-900">
+                    TradingView Username (Required)
                   </label>
                   <Input
                     id="tradingviewUsername"
@@ -183,10 +183,19 @@ const Auth = () => {
                     onChange={(e) => setTradingviewUsername(e.target.value)}
                     placeholder="Your TradingView username"
                     required
+                    className="bg-white"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    This will be used to grant you access to purchased Pine Scripts
-                  </p>
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs text-blue-800 font-medium">
+                      ✓ Auto-fills at checkout for faster purchases
+                    </p>
+                    <p className="text-xs text-blue-700">
+                      ✓ Required to receive access to Pine Scripts you purchase
+                    </p>
+                    <p className="text-xs text-blue-700">
+                      ✓ Must match your exact TradingView profile username
+                    </p>
+                  </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <input
