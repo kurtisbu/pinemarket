@@ -11,8 +11,25 @@ export async function testConnection(
 ): Promise<Response> {
   const { credentials, user_id, tradingview_username } = payload;
 
-  if (!credentials.tradingview_session_cookie || !credentials.tradingview_signed_session_cookie || !user_id) {
-    return new Response(JSON.stringify({ error: 'Missing required credentials or user ID.' }), {
+  console.log('[TEST-CONNECTION] Validating payload:', {
+    has_credentials: !!credentials,
+    has_session_cookie: !!credentials?.tradingview_session_cookie,
+    has_signed_cookie: !!credentials?.tradingview_signed_session_cookie,
+    has_user_id: !!user_id,
+    tradingview_username
+  });
+
+  if (!credentials || !credentials.tradingview_session_cookie || !credentials.tradingview_signed_session_cookie || !user_id) {
+    console.error('[TEST-CONNECTION] Missing required parameters:', payload);
+    return new Response(JSON.stringify({ 
+      error: 'Missing required credentials or user ID.',
+      details: {
+        has_credentials: !!credentials,
+        has_session_cookie: !!credentials?.tradingview_session_cookie,
+        has_signed_cookie: !!credentials?.tradingview_signed_session_cookie,
+        has_user_id: !!user_id
+      }
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
     });
