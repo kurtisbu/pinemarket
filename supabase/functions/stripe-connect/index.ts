@@ -28,6 +28,12 @@ serve(async (req) => {
         return await completeStripePurchase(payload, supabaseAdmin);
       case 'get-account-status':
         return await getAccountStatus(payload);
+      case 'create-connect-account':
+        return await createConnectAccount(payload, supabaseAdmin, req);
+      case 'create-account-link':
+        return await createAccountLink(payload);
+      case 'create-dashboard-link':
+        return await createDashboardLink(payload);
       default:
         return new Response(JSON.stringify({ error: 'Invalid action.' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -357,14 +363,9 @@ async function getAccountStatus(payload: any) {
 
     return new Response(JSON.stringify({
       success: true,
-      account: {
-        id: account.id,
-        charges_enabled: account.charges_enabled,
-        payouts_enabled: account.payouts_enabled,
-        details_submitted: account.details_submitted,
-        requirements: account.requirements,
-        type: account.type,
-      },
+      charges_enabled: account.charges_enabled,
+      payouts_enabled: account.payouts_enabled,
+      details_submitted: account.details_submitted,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
@@ -375,6 +376,220 @@ async function getAccountStatus(payload: any) {
     return new Response(JSON.stringify({ 
       error: error.message,
       success: false,
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    });
+  }
+}
+
+async function createConnectAccount(payload: any, supabaseAdmin: any, req: Request) {
+  const { country } = payload;
+
+  try {
+    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
+    if (!stripeSecretKey) {
+      throw new Error('Stripe secret key not configured');
+    }
+
+    // Get authenticated user
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('No authorization header provided');
+    }
+
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser(token);
+    
+    if (userError || !user) {
+      throw new Error('User not authenticated');
+    }
+
+    console.log('[STRIPE-CONNECT] Creating Connect account for user:', user.id);
+
+    // Create Stripe Connect account
+    const formData = new URLSearchParams({
+      type: 'express',
+      country: country || 'US',
+      capabilities: JSON.stringify({
+        card_payments: { requested: true },
+        transfers: { requested: true },
+      }),
+      business_type: 'individual',
+    });
+
+    const response = await fetch('https://api.stripe.com/v1/accounts', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${stripeSecretKey}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData.toString(),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[STRIPE-CONNECT] Stripe API error:', errorText);
+      throw new Error(`Failed to create Stripe account: ${errorText}`);
+    }
+
+    const account = await response.json();
+    console.log('[STRIPE-CONNECT] Account created:', account.id);
+
+    // Save account ID to user's profile
+    const { error: updateError } = await supabaseAdmin
+      .from('profiles')
+      .update({
+        stripe_account_id: account.id,
+        stripe_onboarding_completed: false,
+        stripe_charges_enabled: false,
+        stripe_payouts_enabled: false,
+      })
+      .eq('id', user.id);
+
+    if (updateError) {
+      console.error('[STRIPE-CONNECT] Failed to save account ID:', updateError);
+      throw new Error('Failed to save Stripe account ID');
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      account_id: account.id,
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    });
+
+  } catch (error) {
+    console.error('[STRIPE-CONNECT] Error creating account:', error);
+    return new Response(JSON.stringify({ 
+      error: error.message,
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    });
+  }
+}
+
+async function createAccountLink(payload: any) {
+  const { account_id, refresh_url, return_url } = payload;
+
+  if (!account_id || !refresh_url || !return_url) {
+    return new Response(JSON.stringify({ error: 'Missing required parameters' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400,
+    });
+  }
+
+  try {
+    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
+    if (!stripeSecretKey) {
+      throw new Error('Stripe secret key not configured');
+    }
+
+    console.log('[STRIPE-CONNECT] Creating account link for:', account_id);
+
+    const formData = new URLSearchParams({
+      account: account_id,
+      refresh_url: refresh_url,
+      return_url: return_url,
+      type: 'account_onboarding',
+    });
+
+    const response = await fetch('https://api.stripe.com/v1/account_links', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${stripeSecretKey}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData.toString(),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[STRIPE-CONNECT] Stripe API error:', errorText);
+      throw new Error(`Failed to create account link: ${errorText}`);
+    }
+
+    const accountLink = await response.json();
+    console.log('[STRIPE-CONNECT] Account link created');
+
+    return new Response(JSON.stringify({
+      success: true,
+      url: accountLink.url,
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    });
+
+  } catch (error) {
+    console.error('[STRIPE-CONNECT] Error creating account link:', error);
+    return new Response(JSON.stringify({ 
+      error: error.message,
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    });
+  }
+}
+
+async function createDashboardLink(payload: any) {
+  const { account_id } = payload;
+
+  if (!account_id) {
+    return new Response(JSON.stringify({ error: 'Missing account_id' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400,
+    });
+  }
+
+  try {
+    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
+    if (!stripeSecretKey) {
+      throw new Error('Stripe secret key not configured');
+    }
+
+    console.log('[STRIPE-CONNECT] Creating dashboard link for:', account_id);
+
+    const formData = new URLSearchParams({
+      account: account_id,
+    });
+
+    const response = await fetch('https://api.stripe.com/v1/accounts/' + account_id + '/login_links', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${stripeSecretKey}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData.toString(),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[STRIPE-CONNECT] Stripe API error:', errorText);
+      throw new Error(`Failed to create dashboard link: ${errorText}`);
+    }
+
+    const loginLink = await response.json();
+    console.log('[STRIPE-CONNECT] Dashboard link created');
+
+    return new Response(JSON.stringify({
+      success: true,
+      url: loginLink.url,
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    });
+
+  } catch (error) {
+    console.error('[STRIPE-CONNECT] Error creating dashboard link:', error);
+    return new Response(JSON.stringify({ 
+      error: error.message,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
