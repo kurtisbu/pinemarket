@@ -33,7 +33,9 @@ Deno.serve(async (req) => {
         available_balance,
         profiles!seller_balances_seller_id_fkey (
           id,
-          display_name
+          display_name,
+          stripe_account_id,
+          stripe_payouts_enabled
         ),
         seller_payout_info!seller_payout_info_user_id_fkey (
           payout_method,
@@ -41,7 +43,8 @@ Deno.serve(async (req) => {
           bank_account_number,
           bank_routing_number,
           paypal_email,
-          is_verified
+          is_verified,
+          currency
         )
       `)
       .gte('available_balance', MINIMUM_PAYOUT);
@@ -68,16 +71,24 @@ Deno.serve(async (req) => {
     const results = [];
     
     for (const seller of sellers) {
+      const sellerProfile = Array.isArray(seller.profiles) 
+        ? seller.profiles[0] 
+        : seller.profiles;
+
       const sellerInfo = Array.isArray(seller.seller_payout_info) 
         ? seller.seller_payout_info[0] 
         : seller.seller_payout_info;
 
-      if (!sellerInfo || !sellerInfo.is_verified) {
-        console.log(`[PROCESS-PAYOUTS] Skipping seller ${seller.seller_id} - unverified payout info`);
+      // Check for Stripe Connect account
+      if (sellerProfile?.stripe_account_id && sellerProfile?.stripe_payouts_enabled) {
+        // Use Stripe Connect Transfer
+        console.log(`[PROCESS-PAYOUTS] Seller ${seller.seller_id} has Stripe Connect enabled`);
+      } else if (!sellerInfo || !sellerInfo.is_verified) {
+        console.log(`[PROCESS-PAYOUTS] Skipping seller ${seller.seller_id} - no valid payout method`);
         results.push({
           seller_id: seller.seller_id,
           success: false,
-          error: 'Unverified payout information'
+          error: 'No verified payout method configured'
         });
         continue;
       }
@@ -86,13 +97,15 @@ Deno.serve(async (req) => {
         console.log(`[PROCESS-PAYOUTS] Processing payout for seller ${seller.seller_id}, amount: $${seller.available_balance}`);
 
         // Create payout record
+        const payoutMethod = sellerProfile?.stripe_account_id ? 'bank_transfer' : (sellerInfo?.payout_method || 'bank_transfer');
+        
         const { data: payout, error: payoutError } = await supabaseClient
           .from('payouts')
           .insert({
             seller_id: seller.seller_id,
             amount: seller.available_balance,
             status: 'processing',
-            payout_method: sellerInfo.payout_method
+            payout_method: payoutMethod
           })
           .select()
           .single();
@@ -102,52 +115,39 @@ Deno.serve(async (req) => {
           throw payoutError;
         }
 
-        // Create Stripe payout (to bank account)
-        if (sellerInfo.payout_method === 'bank_transfer') {
+        // Initialize Stripe
+        const Stripe = (await import('https://esm.sh/stripe@14.21.0')).default;
+        const stripe = new Stripe(stripeSecretKey, {
+          apiVersion: '2023-10-16',
+        });
+
+        const payoutAmount = Math.round(seller.available_balance * 100); // Convert to cents
+
+        // Option 1: Stripe Connect Transfer (preferred if seller has connected account)
+        if (sellerProfile?.stripe_account_id && sellerProfile?.stripe_payouts_enabled) {
           try {
-            console.log(`[PROCESS-PAYOUTS] Creating Stripe payout for seller ${seller.seller_id}`);
+            console.log(`[PROCESS-PAYOUTS] Creating Stripe Connect Transfer for seller ${seller.seller_id}`);
             
-            // Initialize Stripe
-            const stripe = await import('https://esm.sh/stripe@14.21.0').then(m => new m.default(stripeSecretKey, {
-              apiVersion: '2023-10-16',
-              httpClient: Stripe.createFetchHttpClient(),
-            }));
-
-            // Create a bank account token (this should be done during seller onboarding in production)
-            // For now, we'll use the manual bank details to create a payout
-            const payoutAmount = Math.round(seller.available_balance * 100); // Convert to cents
-
-            // Note: Real Stripe Payouts require:
-            // 1. Your platform to be verified for payouts
-            // 2. Stripe account to have payout capability enabled
-            // 3. Either Stripe Connect accounts for sellers OR Stripe Payouts API with manual bank verification
-            
-            // For testing, we'll create a simulated transfer record but mark it as "processing"
-            // In production, uncomment the actual Stripe API call below:
-            
-            /*
-            const payout = await stripe.payouts.create({
+            const transfer = await stripe.transfers.create({
               amount: payoutAmount,
-              currency: sellerInfo.currency?.toLowerCase() || 'usd',
+              currency: sellerInfo?.currency?.toLowerCase() || 'usd',
+              destination: sellerProfile.stripe_account_id,
               description: `Payout for seller ${seller.seller_id}`,
               metadata: {
                 seller_id: seller.seller_id,
-                payout_id: payout.id,
+                payout_record_id: payout.id,
               },
             });
-            */
 
-            // TEMPORARY: Simulated payout for testing
-            const simulatedPayoutId = `sim_po_${Date.now()}_${seller.seller_id.slice(0, 8)}`;
-            console.log(`[PROCESS-PAYOUTS] Simulated Stripe payout created: ${simulatedPayoutId}`);
+            console.log(`[PROCESS-PAYOUTS] Stripe transfer created: ${transfer.id}`);
             
-            // Update payout record with simulated transfer
+            // Update payout record
             await supabaseClient
               .from('payouts')
               .update({
-                status: 'completed', // In production, start with 'processing'
-                completed_at: new Date().toISOString(), // Remove in production
-                stripe_transfer_id: simulatedPayoutId // Use payout.id in production
+                status: 'completed',
+                completed_at: new Date().toISOString(),
+                stripe_transfer_id: transfer.id
               })
               .eq('id', payout.id);
 
@@ -162,17 +162,17 @@ Deno.serve(async (req) => {
               seller_id: seller.seller_id,
               success: true,
               amount: seller.available_balance,
-              transfer_id: simulatedPayoutId
+              transfer_id: transfer.id
             });
 
           } catch (stripeError: any) {
-            console.error(`[PROCESS-PAYOUTS] Stripe error for seller ${seller.seller_id}:`, stripeError);
+            console.error(`[PROCESS-PAYOUTS] Stripe transfer error for seller ${seller.seller_id}:`, stripeError);
             
             await supabaseClient
               .from('payouts')
               .update({
                 status: 'failed',
-                failure_reason: stripeError.message || 'Stripe payout failed'
+                failure_reason: stripeError.message || 'Stripe transfer failed'
               })
               .eq('id', payout.id);
 
@@ -183,7 +183,25 @@ Deno.serve(async (req) => {
             });
           }
 
-        } else if (sellerInfo.payout_method === 'paypal') {
+        // Option 2: Direct bank transfer (requires manual bank verification)
+        } else if (sellerInfo?.payout_method === 'bank_transfer') {
+          console.log(`[PROCESS-PAYOUTS] Bank transfer not yet implemented - seller needs to connect Stripe account`);
+          
+          await supabaseClient
+            .from('payouts')
+            .update({
+              status: 'failed',
+              failure_reason: 'Please connect your Stripe account to receive payouts'
+            })
+            .eq('id', payout.id);
+
+          results.push({
+            seller_id: seller.seller_id,
+            success: false,
+            error: 'Stripe Connect required for payouts'
+          });
+
+        } else if (sellerInfo?.payout_method === 'paypal') {
           // For PayPal, you would integrate with PayPal's Payouts API
           console.log(`[PROCESS-PAYOUTS] PayPal payouts not yet implemented for seller ${seller.seller_id}`);
           
