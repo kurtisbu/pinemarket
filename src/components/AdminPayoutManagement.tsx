@@ -17,6 +17,8 @@ export const AdminPayoutManagement = () => {
   const [settling, setSettling] = useState(false);
   const [balances, setBalances] = useState<any[]>([]);
   const [recentPayouts, setRecentPayouts] = useState<any[]>([]);
+  const [pendingVerifications, setPendingVerifications] = useState<any[]>([]);
+  const [verifying, setVerifying] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -59,6 +61,23 @@ export const AdminPayoutManagement = () => {
 
       if (payoutError) throw payoutError;
       setRecentPayouts(payoutData || []);
+
+      // Fetch pending bank verifications
+      const { data: verificationData, error: verificationError } = await supabase
+        .from('seller_payout_info')
+        .select(`
+          *,
+          profiles!seller_payout_info_user_id_fkey (
+            display_name,
+            username,
+            email
+          )
+        `)
+        .eq('is_verified', false)
+        .order('created_at', { ascending: false });
+
+      if (verificationError) throw verificationError;
+      setPendingVerifications(verificationData || []);
     } catch (error: any) {
       console.error('Error fetching data:', error);
       toast({
@@ -118,6 +137,33 @@ export const AdminPayoutManagement = () => {
       });
     } finally {
       setSettling(false);
+    }
+  };
+
+  const handleVerifyBankAccount = async (userId: string) => {
+    setVerifying(userId);
+    try {
+      const { error } = await supabase.rpc('verify_seller_bank_account', {
+        p_user_id: userId
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Bank account verified successfully'
+      });
+
+      fetchData();
+    } catch (error: any) {
+      console.error('Error verifying bank account:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to verify bank account',
+        variant: 'destructive'
+      });
+    } finally {
+      setVerifying(null);
     }
   };
 
@@ -217,6 +263,71 @@ export const AdminPayoutManagement = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Pending Bank Verifications */}
+      {pendingVerifications.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Pending Bank Verifications</CardTitle>
+            <CardDescription>
+              Review and approve seller bank account information before payouts can be processed
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Seller</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Bank Name</TableHead>
+                  <TableHead>Account Holder</TableHead>
+                  <TableHead>Country</TableHead>
+                  <TableHead>Submitted</TableHead>
+                  <TableHead>Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pendingVerifications.map((verification) => {
+                  const profile = Array.isArray(verification.profiles) 
+                    ? verification.profiles[0] 
+                    : verification.profiles;
+
+                  return (
+                    <TableRow key={verification.id}>
+                      <TableCell className="font-medium">
+                        {profile?.display_name || profile?.username || 'Unknown'}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {profile?.email || '-'}
+                      </TableCell>
+                      <TableCell>{verification.bank_name || '-'}</TableCell>
+                      <TableCell>{verification.bank_account_holder_name || '-'}</TableCell>
+                      <TableCell>{verification.country}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {new Date(verification.created_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          onClick={() => handleVerifyBankAccount(verification.user_id)}
+                          disabled={verifying === verification.user_id}
+                        >
+                          {verifying === verification.user_id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="h-4 w-4 mr-1" />
+                          )}
+                          Approve
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Seller Balances */}
       <Card>
