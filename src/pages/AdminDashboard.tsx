@@ -14,6 +14,7 @@ import AdminTrialManagement from '@/components/AdminTrialManagement';
 import AdminAccessCodes from '@/components/AdminAccessCodes';
 import AdminFeaturedCreators from '@/components/AdminFeaturedCreators';
 import { AdminPayoutManagement } from '@/components/AdminPayoutManagement';
+import AdminPayoutDashboard from '@/components/AdminPayoutDashboard';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -173,7 +174,7 @@ const AdminDashboard = () => {
           </div>
 
           <Tabs defaultValue="assignments" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-6">
+            <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="assignments" className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4" />
                 Assignments
@@ -197,6 +198,10 @@ const AdminDashboard = () => {
               <TabsTrigger value="payouts" className="flex items-center gap-2">
                 <DollarSign className="w-4 h-4" />
                 Payouts
+              </TabsTrigger>
+              <TabsTrigger value="payout-mgmt" className="flex items-center gap-2">
+                <DollarSign className="w-4 h-4" />
+                Payout Mgmt
               </TabsTrigger>
             </TabsList>
 
@@ -222,6 +227,10 @@ const AdminDashboard = () => {
 
             <TabsContent value="payouts" className="space-y-6">
               <AdminPayoutManagement />
+            </TabsContent>
+
+            <TabsContent value="payout-mgmt" className="space-y-6">
+              <AdminPayoutDashboard />
             </TabsContent>
           </Tabs>
         </div>
