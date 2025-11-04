@@ -15,6 +15,7 @@ import AdminAccessCodes from '@/components/AdminAccessCodes';
 import AdminFeaturedCreators from '@/components/AdminFeaturedCreators';
 import { AdminPayoutManagement } from '@/components/AdminPayoutManagement';
 import AdminPayoutDashboard from '@/components/AdminPayoutDashboard';
+import { AdminBankVerification } from '@/components/AdminBankVerification';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -193,15 +194,15 @@ const AdminDashboard = () => {
               </TabsTrigger>
               <TabsTrigger value="featured-creators" className="flex items-center gap-2">
                 <Star className="w-4 h-4" />
-                Featured Creators
-              </TabsTrigger>
-              <TabsTrigger value="payouts" className="flex items-center gap-2">
-                <DollarSign className="w-4 h-4" />
-                Payouts
+                Featured
               </TabsTrigger>
               <TabsTrigger value="payout-mgmt" className="flex items-center gap-2">
                 <DollarSign className="w-4 h-4" />
-                Payout Mgmt
+                Payouts
+              </TabsTrigger>
+              <TabsTrigger value="bank-verification" className="flex items-center gap-2">
+                <DollarSign className="w-4 h-4" />
+                Bank Verification
               </TabsTrigger>
             </TabsList>
 
@@ -225,12 +226,12 @@ const AdminDashboard = () => {
               <AdminFeaturedCreators />
             </TabsContent>
 
-            <TabsContent value="payouts" className="space-y-6">
-              <AdminPayoutManagement />
-            </TabsContent>
-
             <TabsContent value="payout-mgmt" className="space-y-6">
               <AdminPayoutDashboard />
+            </TabsContent>
+
+            <TabsContent value="bank-verification" className="space-y-6">
+              <AdminBankVerification />
             </TabsContent>
           </Tabs>
         </div>

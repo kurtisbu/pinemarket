@@ -16,6 +16,7 @@ export const SellerPayoutSettings = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [balance, setBalance] = useState<any>(null);
+  const [isVerified, setIsVerified] = useState(false);
   const [payoutInfo, setPayoutInfo] = useState({
     payout_method: 'bank_transfer',
     bank_account_holder_name: '',
@@ -56,6 +57,7 @@ export const SellerPayoutSettings = () => {
           country: data.country,
           currency: data.currency
         });
+        setIsVerified(data.is_verified || false);
       }
     } catch (error: any) {
       console.error('Error fetching payout info:', error);
@@ -101,7 +103,7 @@ export const SellerPayoutSettings = () => {
 
       toast({
         title: 'Success',
-        description: 'Payout information saved. Awaiting verification.'
+        description: 'Payout information saved. Awaiting admin verification.'
       });
 
       fetchPayoutInfo();
@@ -185,18 +187,48 @@ export const SellerPayoutSettings = () => {
       {/* Payout Settings */}
       <Card>
         <CardHeader>
-          <CardTitle>Payout Information</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            <span>Payout Information</span>
+            {isVerified ? (
+              <div className="flex items-center gap-2 text-green-600 text-sm font-normal">
+                <CheckCircle2 className="h-4 w-4" />
+                Verified
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-yellow-600 text-sm font-normal">
+                <AlertCircle className="h-4 w-4" />
+                Pending Verification
+              </div>
+            )}
+          </CardTitle>
           <CardDescription>
             Configure how you receive payments
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {!isVerified && (
+            <Alert variant="default" className="border-yellow-500 bg-yellow-50">
+              <AlertCircle className="h-4 w-4 text-yellow-600" />
+              <AlertDescription className="text-yellow-800">
+                Your bank account information is pending admin verification. Payouts cannot be processed until your account is verified.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {isVerified && (
+            <Alert variant="default" className="border-green-500 bg-green-50">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800">
+                Your bank account has been verified. You're eligible to receive payouts.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              <strong>Testing Mode:</strong> Payouts are currently simulated for testing. 
-              Real bank transfers will be implemented before production launch. Your bank information 
-              will be verified by an administrator before payouts can be processed.
+              Payouts are processed weekly on Fridays. Minimum payout amount is $50. 
+              Sales clear after 7 days before becoming available for payout.
             </AlertDescription>
           </Alert>
           <div className="space-y-2">
