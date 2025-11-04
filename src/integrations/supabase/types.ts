@@ -1248,6 +1248,10 @@ export type Database = {
         Returns: Json
       }
       validate_tradingview_url: { Args: { url: string }; Returns: boolean }
+      verify_seller_bank_account: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
