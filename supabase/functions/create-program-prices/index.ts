@@ -13,10 +13,14 @@ serve(async (req) => {
   }
 
   try {
-    const { programId } = await req.json();
+    const { programId, packageId, resourceType, resourceId, prices } = await req.json();
 
-    if (!programId) {
-      throw new Error("Program ID is required");
+    // Support both old API (programId) and new API (resourceType/resourceId)
+    const finalResourceType = resourceType || (programId ? 'program' : packageId ? 'package' : null);
+    const finalResourceId = resourceId || programId || packageId;
+
+    if (!finalResourceType || !finalResourceId) {
+      throw new Error("Resource type and ID are required");
     }
 
     const supabaseAdmin = createClient(
@@ -24,59 +28,101 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    console.log(`[CREATE-PRICES] Creating Stripe products for program: ${programId}`);
+    console.log(`[CREATE-PRICES] Creating Stripe products for ${finalResourceType}: ${finalResourceId}`);
 
-    // Get program details
-    const { data: program, error: programError } = await supabaseAdmin
-      .from('programs')
-      .select('*')
-      .eq('id', programId)
-      .single();
+    // Get resource details
+    let resource: any;
+    let pricesData: any[];
+    
+    if (finalResourceType === 'package') {
+      const { data: packageData, error: packageError } = await supabaseAdmin
+        .from('program_packages')
+        .select('*')
+        .eq('id', finalResourceId)
+        .single();
 
-    if (programError || !program) {
-      throw new Error("Program not found");
-    }
+      if (packageError || !packageData) {
+        throw new Error("Package not found");
+      }
+      resource = packageData;
 
-    // Get all price objects for this program
-    const { data: prices, error: pricesError } = await supabaseAdmin
-      .from('program_prices')
-      .select('*')
-      .eq('program_id', programId)
-      .eq('is_active', true)
-      .order('sort_order');
+      if (prices) {
+        // Prices provided in request (for package creation)
+        pricesData = prices.map((p: any, index: number) => ({
+          ...p,
+          id: crypto.randomUUID(),
+          sort_order: index,
+        }));
+      } else {
+        // Fetch existing prices from database
+        const { data: existingPrices, error: pricesError } = await supabaseAdmin
+          .from('package_prices')
+          .select('*')
+          .eq('package_id', finalResourceId)
+          .eq('is_active', true)
+          .order('sort_order');
 
-    if (pricesError || !prices || prices.length === 0) {
-      throw new Error("No active prices found for this program");
+        if (pricesError || !existingPrices || existingPrices.length === 0) {
+          throw new Error("No active prices found for this package");
+        }
+        pricesData = existingPrices;
+      }
+    } else {
+      const { data: programData, error: programError } = await supabaseAdmin
+        .from('programs')
+        .select('*')
+        .eq('id', finalResourceId)
+        .single();
+
+      if (programError || !programData) {
+        throw new Error("Program not found");
+      }
+      resource = programData;
+
+      // Get all price objects for this program
+      const { data: existingPrices, error: pricesError } = await supabaseAdmin
+        .from('program_prices')
+        .select('*')
+        .eq('program_id', finalResourceId)
+        .eq('is_active', true)
+        .order('sort_order');
+
+      if (pricesError || !existingPrices || existingPrices.length === 0) {
+        throw new Error("No active prices found for this program");
+      }
+      pricesData = existingPrices;
     }
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2023-10-16",
     });
 
-    // Create Stripe product for the program
+    // Create Stripe product for the resource
     const stripeProduct = await stripe.products.create({
-      name: program.title,
-      description: program.description || undefined,
+      name: resource.title,
+      description: resource.description || undefined,
       metadata: {
-        program_id: program.id,
-        seller_id: program.seller_id,
+        [finalResourceType === 'package' ? 'package_id' : 'program_id']: resource.id,
+        seller_id: resource.seller_id,
+        resource_type: finalResourceType,
       },
     });
 
     console.log(`[CREATE-PRICES] Created Stripe product: ${stripeProduct.id}`);
 
     // Create Stripe prices for each price object
-    const priceUpdates = [];
-    for (const price of prices) {
+    const createdPrices = [];
+    for (const price of pricesData) {
       const stripePriceData: any = {
         product: stripeProduct.id,
         currency: price.currency || 'usd',
         unit_amount: Math.round(price.amount * 100), // Convert to cents
         nickname: price.display_name,
         metadata: {
-          program_id: program.id,
+          [finalResourceType === 'package' ? 'package_id' : 'program_id']: resource.id,
           price_id: price.id,
           price_type: price.price_type,
+          resource_type: finalResourceType,
         },
       };
 
@@ -107,25 +153,20 @@ serve(async (req) => {
       
       console.log(`[CREATE-PRICES] Created Stripe price: ${stripePrice.id} for ${price.display_name}`);
 
-      // Update program_prices with Stripe price ID
-      priceUpdates.push(
-        supabaseAdmin
-          .from('program_prices')
-          .update({ stripe_price_id: stripePrice.id })
-          .eq('id', price.id)
-      );
+      createdPrices.push({
+        ...price,
+        stripe_price_id: stripePrice.id,
+      });
     }
 
-    // Execute all price updates
-    await Promise.all(priceUpdates);
-
-    console.log(`[CREATE-PRICES] Successfully created ${prices.length} Stripe prices`);
+    console.log(`[CREATE-PRICES] Successfully created ${pricesData.length} Stripe prices`);
 
     return new Response(
       JSON.stringify({ 
         success: true,
         product_id: stripeProduct.id,
-        prices_created: prices.length,
+        prices_created: pricesData.length,
+        prices: createdPrices,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

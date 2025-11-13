@@ -21,6 +21,7 @@ import Subscriptions from "./pages/Subscriptions";
 import SubscriptionSuccess from "./pages/SubscriptionSuccess";
 import SubscriptionCancel from "./pages/SubscriptionCancel";
 import Creators from "./pages/Creators";
+import CreatePackage from "./pages/CreatePackage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/browse" element={<Browse />} />
           <Route path="/program/:id" element={<ProgramDetail />} />
+          <Route path="/create-package" element={<CreatePackage />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/profile/:username" element={<Profile />} />
           <Route path="/settings/profile" element={<ProfileSettings />} />
