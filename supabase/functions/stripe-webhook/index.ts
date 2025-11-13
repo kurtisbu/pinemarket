@@ -76,25 +76,38 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
   console.log("[WEBHOOK] Processing checkout.session.completed", session.id);
 
   const programId = session.metadata.program_id;
+  const packageId = session.metadata.package_id;
   const priceId = session.metadata.price_id;
   const userId = session.metadata.user_id;
   const sellerId = session.metadata.seller_id;
   const priceType = session.metadata.price_type;
+  const isPackage = session.metadata.is_package === 'true';
+  const tradingviewUsername = session.metadata.tradingview_username;
 
-  if (!programId || !priceId || !userId) {
+  if ((!programId && !packageId) || !priceId || !userId) {
     console.error("[WEBHOOK] Missing required metadata");
     return;
   }
 
-  // Get price details
-  const { data: price } = await supabaseAdmin
-    .from('program_prices')
-    .select('amount')
-    .eq('id', priceId)
-    .single();
+  // Get price details (either program or package price)
+  let amount = 0;
+  if (isPackage) {
+    const { data: packagePrice } = await supabaseAdmin
+      .from('package_prices')
+      .select('amount')
+      .eq('id', priceId)
+      .single();
+    amount = packagePrice?.amount || 0;
+  } else {
+    const { data: programPrice } = await supabaseAdmin
+      .from('program_prices')
+      .select('amount')
+      .eq('id', priceId)
+      .single();
+    amount = programPrice?.amount || 0;
+  }
 
   // Calculate platform fee (10%) - money already transferred via Stripe Connect
-  const amount = price?.amount || 0;
   const platformFee = amount * 0.10;
   const sellerOwed = amount - platformFee;
 
@@ -102,7 +115,8 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
   const { data: purchase, error: purchaseError } = await supabaseAdmin
     .from('purchases')
     .insert({
-      program_id: programId,
+      program_id: programId || null,
+      package_id: packageId || null,
       buyer_id: userId,
       seller_id: sellerId,
       amount: amount,
@@ -110,6 +124,7 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
       seller_owed: sellerOwed,
       status: 'completed',
       payment_intent_id: session.payment_intent || session.id,
+      tradingview_username: tradingviewUsername,
     })
     .select()
     .single();
@@ -121,29 +136,69 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
 
   console.log("[WEBHOOK] Purchase created:", purchase.id);
 
-  // Get program details for script assignment
-  const { data: program } = await supabaseAdmin
-    .from('programs')
-    .select('*')
-    .eq('id', programId)
-    .single();
+  // Create script assignments
+  if (isPackage && packageId) {
+    // Get all programs in the package
+    const { data: packagePrograms } = await supabaseAdmin
+      .from('package_programs')
+      .select(`
+        program_id,
+        programs (
+          id,
+          tradingview_script_id
+        )
+      `)
+      .eq('package_id', packageId);
 
-  if (program && purchase.tradingview_username) {
-    // Create script assignment
-    await supabaseAdmin
-      .from('script_assignments')
-      .insert({
-        purchase_id: purchase.id,
-        program_id: programId,
-        buyer_id: userId,
-        seller_id: sellerId,
-        status: 'pending',
-        access_type: priceType === 'recurring' ? 'subscription' : 'full_purchase',
-        is_trial: false,
-        tradingview_username: purchase.tradingview_username,
-        pine_id: program.tradingview_script_id,
-        tradingview_script_id: program.tradingview_script_id,
-      });
+    if (packagePrograms && packagePrograms.length > 0) {
+      console.log(`[WEBHOOK] Creating ${packagePrograms.length} script assignments for package`);
+      
+      // Create script assignment for each program in the package
+      for (const packageProgram of packagePrograms) {
+        await supabaseAdmin
+          .from('script_assignments')
+          .insert({
+            purchase_id: purchase.id,
+            program_id: packageProgram.program_id,
+            buyer_id: userId,
+            seller_id: sellerId,
+            status: 'pending',
+            access_type: priceType === 'recurring' ? 'subscription' : 'full_purchase',
+            is_trial: false,
+            tradingview_username: tradingviewUsername,
+            pine_id: packageProgram.programs.tradingview_script_id,
+            tradingview_script_id: packageProgram.programs.tradingview_script_id,
+          });
+      }
+      
+      console.log("[WEBHOOK] All script assignments created for package");
+    }
+  } else if (programId) {
+    // Single program purchase
+    const { data: program } = await supabaseAdmin
+      .from('programs')
+      .select('tradingview_script_id')
+      .eq('id', programId)
+      .single();
+
+    if (program) {
+      await supabaseAdmin
+        .from('script_assignments')
+        .insert({
+          purchase_id: purchase.id,
+          program_id: programId,
+          buyer_id: userId,
+          seller_id: sellerId,
+          status: 'pending',
+          access_type: priceType === 'recurring' ? 'subscription' : 'full_purchase',
+          is_trial: false,
+          tradingview_username: tradingviewUsername,
+          pine_id: program.tradingview_script_id,
+          tradingview_script_id: program.tradingview_script_id,
+        });
+      
+      console.log("[WEBHOOK] Script assignment created for program");
+    }
   }
 }
 
