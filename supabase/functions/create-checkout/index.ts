@@ -46,7 +46,7 @@ serve(async (req) => {
       throw new Error("TradingView username not found. Please add your TradingView username to your profile before purchasing.");
     }
 
-    // Get price details
+    // Get price details and seller's Stripe account
     const { data: price, error: priceError } = await supabaseClient
       .from('program_prices')
       .select(`
@@ -55,7 +55,11 @@ serve(async (req) => {
           id,
           title,
           seller_id,
-          trial_period_days
+          trial_period_days,
+          profiles!programs_seller_id_fkey (
+            stripe_account_id,
+            stripe_charges_enabled
+          )
         )
       `)
       .eq('id', priceId)
@@ -67,6 +71,15 @@ serve(async (req) => {
 
     if (!price.stripe_price_id) {
       throw new Error("Stripe price not configured for this pricing option");
+    }
+
+    const sellerProfile = price.programs.profiles;
+    if (!sellerProfile?.stripe_account_id) {
+      throw new Error("Seller has not connected their Stripe account yet");
+    }
+
+    if (!sellerProfile.stripe_charges_enabled) {
+      throw new Error("Seller's Stripe account is not enabled for charges");
     }
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
@@ -95,6 +108,9 @@ serve(async (req) => {
     // Determine checkout mode based on price type
     const mode = price.price_type === 'recurring' ? 'subscription' : 'payment';
 
+    // Calculate platform fee (10%)
+    const platformFeeAmount = Math.round(price.amount * 0.10 * 100); // Convert to cents
+
     // Create checkout session
     const sessionData: any = {
       customer: customerId,
@@ -118,11 +134,27 @@ serve(async (req) => {
       },
     };
 
-    // Add trial period if configured and it's a subscription
-    if (mode === 'subscription' && price.programs.trial_period_days && price.programs.trial_period_days > 0) {
-      sessionData.subscription_data = {
-        trial_period_days: price.programs.trial_period_days,
+    // Add destination charges for Stripe Connect (platform takes 10% fee)
+    if (mode === 'payment') {
+      sessionData.payment_intent_data = {
+        application_fee_amount: platformFeeAmount,
+        transfer_data: {
+          destination: sellerProfile.stripe_account_id,
+        },
       };
+    } else {
+      // For subscriptions, use application_fee_percent
+      sessionData.subscription_data = {
+        application_fee_percent: 10,
+        transfer_data: {
+          destination: sellerProfile.stripe_account_id,
+        },
+      };
+      
+      // Add trial period if configured
+      if (price.programs.trial_period_days && price.programs.trial_period_days > 0) {
+        sessionData.subscription_data.trial_period_days = price.programs.trial_period_days;
+      }
     }
 
     const session = await stripe.checkout.sessions.create(sessionData);

@@ -93,12 +93,12 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
     .eq('id', priceId)
     .single();
 
-  // Calculate platform fee (10%)
+  // Calculate platform fee (10%) - money already transferred via Stripe Connect
   const amount = price?.amount || 0;
   const platformFee = amount * 0.10;
   const sellerOwed = amount - platformFee;
 
-  // Create purchase record
+  // Create purchase record (for tracking only, payment handled by Stripe Connect)
   const { data: purchase, error: purchaseError } = await supabaseAdmin
     .from('purchases')
     .insert({
@@ -120,20 +120,6 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
   }
 
   console.log("[WEBHOOK] Purchase created:", purchase.id);
-
-  // Update seller balance (pending)
-  const { error: balanceError } = await supabaseAdmin
-    .rpc('update_seller_balance', {
-      p_seller_id: sellerId,
-      p_amount: sellerOwed,
-      p_type: 'sale'
-    });
-
-  if (balanceError) {
-    console.error("[WEBHOOK] Error updating seller balance:", balanceError);
-  } else {
-    console.log("[WEBHOOK] Seller balance updated with pending amount:", sellerOwed);
-  }
 
   // Get program details for script assignment
   const { data: program } = await supabaseAdmin
