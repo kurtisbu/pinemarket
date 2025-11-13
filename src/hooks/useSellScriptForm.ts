@@ -83,6 +83,22 @@ export const useSellScriptForm = () => {
     e.preventDefault();
     if (!user) return;
 
+    // Check Stripe connection
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('stripe_account_id, stripe_charges_enabled')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile?.stripe_account_id || !profile.stripe_charges_enabled) {
+      toast({
+        title: 'Stripe Account Required',
+        description: 'You must connect and complete your Stripe account setup before publishing programs.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     // Validate prices
     if (prices.length === 0) {
       toast({
