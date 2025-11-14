@@ -11,6 +11,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import StripeConnectSettings from '@/components/StripeConnectSettings';
 import TradingViewConnectionStatus from '@/components/TradingViewConnectionStatus';
+import TradingViewDisconnect from '@/components/TradingViewDisconnect';
 import { Upload, User, Loader2, RefreshCw } from 'lucide-react';
 
 interface Profile {
@@ -22,6 +23,7 @@ interface Profile {
   role: string;
   created_at: string;
   is_tradingview_connected: boolean;
+  tradingview_username?: string;
   tradingview_connection_status?: string;
   tradingview_last_validated_at?: string;
   tradingview_last_error?: string;
@@ -310,45 +312,70 @@ const SellerSettingsView: React.FC<SellerSettingsViewProps> = ({ profile, onProf
               showDetails={true}
             />
             
-            <p className="text-sm text-muted-foreground">
-              Connect your TradingView account to automate script assignments for your buyers.
-            </p>
-            <div className="space-y-2">
-              <Label htmlFor="tradingview_username">TradingView Username</Label>
-              <Input
-                id="tradingview_username"
-                value={formData.tradingview_username}
-                onChange={(e) => handleInputChange('tradingview_username', e.target.value)}
-                placeholder="Your TradingView username"
-                disabled={loading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="session_cookie">Session Cookie (sessionid)</Label>
-              <Input
-                id="session_cookie"
-                type="password"
-                value={formData.tradingview_session_cookie}
-                onChange={(e) => handleInputChange('tradingview_session_cookie', e.target.value)}
-                placeholder="Value is hidden for security"
-                disabled={loading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="signed_session_cookie">Signed Session Cookie (sessionid_sign)</Label>
-              <Input
-                id="signed_session_cookie"
-                type="password"
-                value={formData.tradingview_signed_session_cookie}
-                onChange={(e) => handleInputChange('tradingview_signed_session_cookie', e.target.value)}
-                placeholder="Value is hidden for security"
-                disabled={loading}
-              />
-            </div>
-            <Button type="button" onClick={handleTestConnection} variant="outline" disabled={loading || testingConnection}>
-              {testingConnection ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {testingConnection ? 'Testing...' : 'Test & Save Connection'}
-            </Button>
+            {profile?.is_tradingview_connected && profile.tradingview_username ? (
+              <div className="space-y-4">
+                <div className="bg-muted p-4 rounded-lg">
+                  <p className="text-sm font-medium mb-1">Connected Account</p>
+                  <p className="text-lg font-semibold">{profile.tradingview_username}</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Your TradingView account is connected and scripts are synced.
+                  </p>
+                </div>
+                <TradingViewDisconnect
+                  userId={user?.id || ''}
+                  tradingviewUsername={profile.tradingview_username}
+                  onDisconnected={() => {
+                    onProfileUpdate();
+                    toast({
+                      title: 'Account Disconnected',
+                      description: 'You can now connect a different TradingView account.',
+                    });
+                  }}
+                />
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Connect your TradingView account to automate script assignments for your buyers.
+                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="tradingview_username">TradingView Username</Label>
+                  <Input
+                    id="tradingview_username"
+                    value={formData.tradingview_username}
+                    onChange={(e) => handleInputChange('tradingview_username', e.target.value)}
+                    placeholder="Your TradingView username"
+                    disabled={loading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="session_cookie">Session Cookie (sessionid)</Label>
+                  <Input
+                    id="session_cookie"
+                    type="password"
+                    value={formData.tradingview_session_cookie}
+                    onChange={(e) => handleInputChange('tradingview_session_cookie', e.target.value)}
+                    placeholder="Value is hidden for security"
+                    disabled={loading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signed_session_cookie">Signed Session Cookie (sessionid_sign)</Label>
+                  <Input
+                    id="signed_session_cookie"
+                    type="password"
+                    value={formData.tradingview_signed_session_cookie}
+                    onChange={(e) => handleInputChange('tradingview_signed_session_cookie', e.target.value)}
+                    placeholder="Value is hidden for security"
+                    disabled={loading}
+                  />
+                </div>
+                <Button type="button" onClick={handleTestConnection} variant="outline" disabled={loading || testingConnection}>
+                  {testingConnection ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  {testingConnection ? 'Testing...' : 'Test & Save Connection'}
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
 
