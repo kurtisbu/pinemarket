@@ -74,8 +74,8 @@ export async function syncUserScripts(
 
   console.log(`Found numeric user ID: ${numericUserId} for username: ${profile.tradingview_username}`);
   
-  // Step 3: Fetch scripts from the API endpoint
-  const scriptsApiUrl = `https://www.tradingview.com/api/v1/user/profile/charts/?script_type=all&access_script=all&privacy_script=all&by=${numericUserId}&q=&script_access=invite-only-open`;
+  // Step 3: Fetch scripts from the API endpoint (try scripts endpoint first)
+  const scriptsApiUrl = `https://www.tradingview.com/api/v1/user/profile/scripts/?by=${numericUserId}&script_type=all&access_script=all&privacy_script=all&limit=100`;
   console.log(`Fetching scripts from TradingView API: ${scriptsApiUrl}`);
 
   const tvResponse = await fetch(scriptsApiUrl, {
@@ -281,6 +281,83 @@ export async function syncUserScripts(
       scriptsData = apiData.results;
     } else if (typeof apiData.results === 'object' && apiData.results !== null) {
       scriptsData = Object.values(apiData.results);
+    }
+  } else {
+    console.log("Primary API endpoint returned no results. Attempting HTML fallback...");
+    
+    // HTML fallback: Fetch the published scripts page directly
+    const publishedScriptsUrl = `https://www.tradingview.com/u/${profile.tradingview_username}/published-scripts/`;
+    console.log(`Fetching published scripts page: ${publishedScriptsUrl}`);
+    
+    const htmlResponse = await fetch(publishedScriptsUrl, {
+      headers: { 
+        'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      },
+    });
+
+    if (htmlResponse.ok) {
+      const htmlText = await htmlResponse.text();
+      console.log(`HTML page fetched successfully. Length: ${htmlText.length}`);
+      
+      // Extract script URLs and titles from the HTML
+      const scriptUrlPattern = /href="(\/script\/[^"\/]+\/)"/g;
+      const scriptUrls: string[] = [];
+      let match;
+      
+      while ((match = scriptUrlPattern.exec(htmlText)) !== null) {
+        const url = match[1];
+        if (!scriptUrls.includes(url)) {
+          scriptUrls.push(url);
+        }
+      }
+      
+      console.log(`Found ${scriptUrls.length} unique script URLs via HTML fallback`);
+      
+      // Parse each script URL to extract data
+      for (const url of scriptUrls) {
+        const pineIdMatch = url.match(/\/script\/([^\/]+)\//);
+        const pineId = pineIdMatch ? pineIdMatch[1] : null;
+        
+        if (pineId) {
+          // Try to find the title near the URL
+          const urlIndex = htmlText.indexOf(url);
+          const contextStart = Math.max(0, urlIndex - 500);
+          const contextEnd = Math.min(htmlText.length, urlIndex + 500);
+          const context = htmlText.substring(contextStart, contextEnd);
+          
+          // Look for title in various formats
+          const titlePatterns = [
+            /<title>([^<]+)<\/title>/i,
+            /class="[^"]*title[^"]*"[^>]*>([^<]+)</i,
+            /data-title="([^"]+)"/i,
+            /<h\d[^>]*>([^<]+)<\/h\d>/i
+          ];
+          
+          let scriptTitle = pineId.replace(/-/g, ' ');
+          for (const pattern of titlePatterns) {
+            const titleMatch = context.match(pattern);
+            if (titleMatch && titleMatch[1]) {
+              scriptTitle = titleMatch[1].trim();
+              break;
+            }
+          }
+          
+          scriptsData.push({
+            script_name: scriptTitle,
+            url: url,
+            image_url: null,
+            likes_count: 0,
+            reviews_count: 0,
+            script_id_private: pineId,
+            pine_id: pineId
+          });
+        }
+      }
+      
+      console.log(`HTML fallback parsed ${scriptsData.length} scripts`);
+    } else {
+      console.error(`HTML fallback failed with status: ${htmlResponse.status}`);
     }
   }
 
