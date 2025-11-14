@@ -73,7 +73,20 @@ const SellerOnboarding: React.FC<SellerOnboardingProps> = ({ onComplete }) => {
       });
 
       if (error) throw new Error(error.message);
-      if (data.error) throw new Error(data.error);
+      if (data.error) {
+        // Handle specific error for duplicate TradingView connection
+        if (data.errorCode === 'TRADINGVIEW_ALREADY_CONNECTED') {
+          toast({
+            title: 'TradingView Account Already Connected',
+            description: data.error,
+            variant: 'destructive',
+          });
+          // Go back to username step so user can try different account
+          setCurrentStep(3);
+          return;
+        }
+        throw new Error(data.error);
+      }
 
       toast({
         title: 'Success!',

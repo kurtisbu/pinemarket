@@ -178,6 +178,40 @@ export async function testConnection(
       });
     }
 
+    // Check if this TradingView username is already connected to another user
+    const { data: existingConnection } = await supabaseAdmin
+      .from('profiles')
+      .select('id, display_name, username')
+      .eq('tradingview_username', foundUsername)
+      .eq('is_tradingview_connected', true)
+      .neq('id', user_id)
+      .single();
+
+    if (existingConnection) {
+      console.log(`TradingView account ${foundUsername} is already connected to user ${existingConnection.id}`);
+      
+      await supabaseAdmin
+        .from('profiles')
+        .update({
+          tradingview_connection_status: 'error',
+          tradingview_last_error: `This TradingView account is already connected to another user`,
+          is_tradingview_connected: false,
+        })
+        .eq('id', user_id);
+
+      return new Response(
+        JSON.stringify({
+          error: `This TradingView account (${foundUsername}) is already connected to another user. Please disconnect it from the other account first, or use a different TradingView account.`,
+          errorCode: 'TRADINGVIEW_ALREADY_CONNECTED',
+          connectedUsername: foundUsername,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
+    }
+
     const encrypted_session = await encrypt(sessionCookie, key);
     const encrypted_signed_session = await encrypt(signedSessionCookie, key);
 
