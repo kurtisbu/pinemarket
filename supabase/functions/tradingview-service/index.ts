@@ -6,6 +6,7 @@ import { testConnection } from './actions/testConnection.ts';
 import { syncUserScripts } from './actions/syncUserScripts.ts';
 import { assignScriptAccess } from './actions/assignScriptAccess.ts';
 import { revokeScriptAccess } from './actions/revokeScriptAccess.ts';
+import { disconnectTradingView } from './actions/disconnectTradingView.ts';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -42,6 +43,8 @@ serve(async (req) => {
         return await assignScriptAccess(payload, supabaseAdmin, key);
       case 'revoke-script-access':
         return await revokeScriptAccess(payload, supabaseAdmin, key);
+      case 'disconnect-tradingview':
+        return await disconnectTradingView(payload, supabaseAdmin);
       default:
         return new Response(JSON.stringify({ error: 'Invalid action.' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
