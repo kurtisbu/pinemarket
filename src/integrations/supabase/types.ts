@@ -59,6 +59,101 @@ export type Database = {
           },
         ]
       }
+      package_prices: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          description: string | null
+          display_name: string
+          id: string
+          interval: string | null
+          is_active: boolean
+          package_id: string
+          price_type: string
+          sort_order: number
+          stripe_price_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          description?: string | null
+          display_name: string
+          id?: string
+          interval?: string | null
+          is_active?: boolean
+          package_id: string
+          price_type: string
+          sort_order?: number
+          stripe_price_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          description?: string | null
+          display_name?: string
+          id?: string
+          interval?: string | null
+          is_active?: boolean
+          package_id?: string
+          price_type?: string
+          sort_order?: number
+          stripe_price_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "package_prices_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "program_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      package_programs: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          package_id: string
+          program_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          package_id: string
+          program_id: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          package_id?: string
+          program_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "package_programs_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "program_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "package_programs_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payouts: {
         Row: {
           amount: number
@@ -179,6 +274,48 @@ export type Database = {
           tradingview_username?: string | null
           updated_at?: string
           username?: string | null
+        }
+        Relationships: []
+      }
+      program_packages: {
+        Row: {
+          average_rating: number
+          created_at: string
+          description: string
+          id: string
+          image_urls: string[] | null
+          rating_count: number
+          seller_id: string
+          status: string
+          title: string
+          updated_at: string
+          view_count: number
+        }
+        Insert: {
+          average_rating?: number
+          created_at?: string
+          description: string
+          id?: string
+          image_urls?: string[] | null
+          rating_count?: number
+          seller_id: string
+          status?: string
+          title: string
+          updated_at?: string
+          view_count?: number
+        }
+        Update: {
+          average_rating?: number
+          created_at?: string
+          description?: string
+          id?: string
+          image_urls?: string[] | null
+          rating_count?: number
+          seller_id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          view_count?: number
         }
         Relationships: []
       }
@@ -349,6 +486,7 @@ export type Database = {
           buyer_id: string
           created_at: string
           id: string
+          package_id: string | null
           payment_intent_id: string | null
           platform_fee: number
           program_id: string
@@ -365,6 +503,7 @@ export type Database = {
           buyer_id: string
           created_at?: string
           id?: string
+          package_id?: string | null
           payment_intent_id?: string | null
           platform_fee?: number
           program_id: string
@@ -381,6 +520,7 @@ export type Database = {
           buyer_id?: string
           created_at?: string
           id?: string
+          package_id?: string | null
           payment_intent_id?: string | null
           platform_fee?: number
           program_id?: string
@@ -398,6 +538,13 @@ export type Database = {
             columns: ["buyer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchases_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "program_packages"
             referencedColumns: ["id"]
           },
           {
@@ -1139,6 +1286,17 @@ export type Database = {
           total_revenue: number
           total_sales: number
           username: string
+        }[]
+      }
+      get_package_programs: {
+        Args: { p_package_id: string }
+        Returns: {
+          description: string
+          display_order: number
+          image_urls: string[]
+          program_id: string
+          title: string
+          tradingview_publication_url: string
         }[]
       }
       get_public_profiles: {
