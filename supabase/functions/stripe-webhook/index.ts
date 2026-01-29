@@ -89,6 +89,53 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
     return;
   }
 
+  // Validate program/package still exists and is published before processing
+  if (isPackage && packageId) {
+    const { data: pkg, error: pkgError } = await supabaseAdmin
+      .from('program_packages')
+      .select('status, seller_id')
+      .eq('id', packageId)
+      .single();
+    
+    if (pkgError || !pkg) {
+      console.error("[WEBHOOK] Package not found:", packageId);
+      return;
+    }
+    
+    if (pkg.status !== 'published') {
+      console.error("[WEBHOOK] Package is not published:", packageId, pkg.status);
+      return;
+    }
+    
+    // Verify seller_id matches metadata
+    if (pkg.seller_id !== sellerId) {
+      console.error("[WEBHOOK] Seller ID mismatch for package:", packageId);
+      return;
+    }
+  } else if (programId) {
+    const { data: program, error: programError } = await supabaseAdmin
+      .from('programs')
+      .select('status, seller_id')
+      .eq('id', programId)
+      .single();
+    
+    if (programError || !program) {
+      console.error("[WEBHOOK] Program not found:", programId);
+      return;
+    }
+    
+    if (program.status !== 'published') {
+      console.error("[WEBHOOK] Program is not published:", programId, program.status);
+      return;
+    }
+    
+    // Verify seller_id matches metadata
+    if (program.seller_id !== sellerId) {
+      console.error("[WEBHOOK] Seller ID mismatch for program:", programId);
+      return;
+    }
+  }
+
   // Get price details (either program or package price)
   let amount = 0;
   if (isPackage) {
