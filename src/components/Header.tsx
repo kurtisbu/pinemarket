@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { Search, User, ShoppingCart, LogOut, Settings } from 'lucide-react';
+import { Search, User, ShoppingCart, LogOut, LayoutDashboard, Settings, UserCircle, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,20 +24,30 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [profile, setProfile] = useState<{ username: string; avatar_url: string; display_name: string } | null>(null);
+  const [profile, setProfile] = useState<{ username: string; avatar_url: string; display_name: string; is_tradingview_connected: boolean; role?: string } | null>(null);
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
 
   useEffect(() => {
     if (user) {
       const fetchProfile = async () => {
-        const { data } = await supabase
-          .from('profiles')
-          .select('username, avatar_url, display_name')
-          .eq('id', user.id)
-          .single();
-        
-        if (data) {
-          setProfile(data);
+        try {
+          // Fetch basic profile info
+          const { data } = await supabase
+            .from('profiles')
+            .select('username, avatar_url, display_name, is_tradingview_connected')
+            .eq('id', user.id)
+            .single();
+          
+          if (data) {
+            // Check admin status via secure RPC
+            const { data: isAdmin } = await supabase
+              .rpc('is_current_user_admin');
+            
+            console.log('Header - Profile loaded:', data, 'isAdmin:', isAdmin);
+            setProfile({ ...data, role: isAdmin ? 'admin' : 'user' });
+          }
+        } catch (error) {
+          console.error('Error fetching profile:', error);
         }
       };
       fetchProfile();
@@ -54,22 +63,20 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
     navigate('/');
   };
 
-  const handleViewProfile = () => {
-    if (profile?.username) {
-      navigate(`/profile/${profile.username}`);
+  const handleDashboard = () => {
+    if (profile?.is_tradingview_connected) {
+      navigate('/dashboard');
+    } else {
+      navigate('/settings/profile');
     }
   };
 
-  const handleSettings = () => {
-    navigate('/settings/profile');
-  };
-
-  const handleMyPrograms = () => {
-    navigate('/my-programs');
-  };
-
   const handleSellScript = () => {
-    navigate('/sell-script');
+    if (profile?.is_tradingview_connected) {
+      navigate('/sell-script');
+    } else {
+      navigate('/seller/onboarding');
+    }
   };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -92,6 +99,21 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
     if (onSearch && location.pathname === '/browse') {
       onSearch(value);
     }
+  };
+
+  const handleMyProfile = () => {
+    if (profile?.username) {
+      navigate(`/profile/${profile.username}`);
+    }
+  };
+
+  const handleMyPurchases = () => {
+    navigate('/my-purchases');
+  };
+
+  const handleAdminDashboard = () => {
+    console.log('Header - Navigating to admin dashboard, current role:', profile?.role);
+    navigate('/admin');
   };
 
   return (
@@ -147,20 +169,36 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  {profile?.username && (
-                    <DropdownMenuItem onClick={handleViewProfile}>
-                      <User className="w-4 h-4 mr-2" />
-                      View Profile
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onClick={handleMyPrograms}>
-                    My Programs
+                  <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                    Role: {profile?.role || 'user'}
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleMyProfile}>
+                    <UserCircle className="w-4 h-4 mr-2" />
+                    My Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleMyPurchases}>
+                    <ShoppingCart className="w-4 h-4 mr-2" />
+                    My Purchases
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSettings}>
+                  <DropdownMenuItem onClick={() => navigate('/settings/profile')}>
                     <Settings className="w-4 h-4 mr-2" />
-                    Settings
+                    Profile Settings
                   </DropdownMenuItem>
+                  {profile?.is_tradingview_connected && (
+                    <DropdownMenuItem onClick={handleDashboard}>
+                      <LayoutDashboard className="w-4 h-4 mr-2" />
+                      Seller Dashboard
+                    </DropdownMenuItem>
+                  )}
+                  {profile?.role === 'admin' && (
+                    <DropdownMenuItem onClick={handleAdminDashboard}>
+                      <Shield className="w-4 h-4 mr-2" />
+                      Admin Dashboard
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut}>
                     <LogOut className="w-4 h-4 mr-2" />
                     Sign out
@@ -174,7 +212,9 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
             )}
             
             {user ? (
-              <Button onClick={handleSellScript}>Sell Your Script</Button>
+              <Button onClick={handleSellScript}>
+                {profile?.is_tradingview_connected ? 'Sell Your Script' : 'Become a Seller'}
+              </Button>
             ) : (
               <Button onClick={() => navigate('/auth')}>Join PineMarket</Button>
             )}

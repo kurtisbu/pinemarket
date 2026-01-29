@@ -6,15 +6,15 @@ import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
-import { Github, Mail, Chrome } from 'lucide-react';
+import { Mail, Chrome } from 'lucide-react';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [username, setUsername] = useState('');
-  const [displayName, setDisplayName] = useState('');
+  const [tradingviewUsername, setTradingviewUsername] = useState('');
   const [loading, setLoading] = useState(false);
+  const [wantsToSell, setWantsToSell] = useState(false);
   
   const { signIn, signUp, signInWithProvider, user } = useAuth();
   const { toast } = useToast();
@@ -46,7 +46,7 @@ const Auth = () => {
           });
         }
       } else {
-        const { error } = await signUp(email, password, username, displayName);
+        const { error } = await signUp(email, password, tradingviewUsername);
         if (error) {
           toast({
             title: "Error signing up",
@@ -56,8 +56,16 @@ const Auth = () => {
         } else {
           toast({
             title: "Account created!",
-            description: "Please check your email to verify your account.",
+            description: wantsToSell 
+              ? "Please check your email to verify your account, then you'll be guided through the seller setup."
+              : "Please check your email to verify your account.",
           });
+          
+          // If they want to sell, we'll redirect them to onboarding after verification
+          if (wantsToSell) {
+            // Store intent in localStorage so we can redirect after email verification
+            localStorage.setItem('pendingSellerOnboarding', 'true');
+          }
         }
       }
     } catch (error) {
@@ -71,13 +79,13 @@ const Auth = () => {
     }
   };
 
-  const handleSocialLogin = async (provider: 'google' | 'github') => {
+  const handleGoogleLogin = async () => {
     setLoading(true);
     try {
-      const { error } = await signInWithProvider(provider);
+      const { error } = await signInWithProvider('google');
       if (error) {
         toast({
-          title: `Error signing in with ${provider}`,
+          title: "Error signing in with Google",
           description: error.message,
           variant: "destructive",
         });
@@ -113,26 +121,15 @@ const Auth = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Button
-            variant="outline"
-            className="w-full"
-            disabled={loading}
-            onClick={() => handleSocialLogin('google')}
-          >
-            <Chrome className="mr-2 h-4 w-4" />
-            Google
-          </Button>
-          <Button
-            variant="outline"
-            className="w-full"
-            disabled={loading}
-            onClick={() => handleSocialLogin('github')}
-          >
-            <Github className="mr-2 h-4 w-4" />
-            GitHub
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          className="w-full"
+          disabled={loading}
+          onClick={handleGoogleLogin}
+        >
+          <Chrome className="mr-2 h-4 w-4" />
+          Continue with Google
+        </Button>
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
@@ -147,35 +144,6 @@ const Auth = () => {
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
-            {!isLogin && (
-              <>
-                <div>
-                  <label htmlFor="username" className="block text-sm font-medium mb-2">
-                    Username
-                  </label>
-                  <Input
-                    id="username"
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Enter your username"
-                    required={!isLogin}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="displayName" className="block text-sm font-medium mb-2">
-                    Display Name
-                  </label>
-                  <Input
-                    id="displayName"
-                    type="text"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="Enter your display name"
-                  />
-                </div>
-              </>
-            )}
             <div>
               <label htmlFor="email" className="block text-sm font-medium mb-2">
                 Email address
@@ -202,6 +170,47 @@ const Auth = () => {
                 required
               />
             </div>
+            {!isLogin && (
+              <>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <label htmlFor="tradingviewUsername" className="block text-sm font-semibold mb-2 text-blue-900">
+                    TradingView Username (Required)
+                  </label>
+                  <Input
+                    id="tradingviewUsername"
+                    type="text"
+                    value={tradingviewUsername}
+                    onChange={(e) => setTradingviewUsername(e.target.value)}
+                    placeholder="Your TradingView username"
+                    required
+                    className="bg-white"
+                  />
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs text-blue-800 font-medium">
+                      ✓ Auto-fills at checkout for faster purchases
+                    </p>
+                    <p className="text-xs text-blue-700">
+                      ✓ Required to receive access to Pine Scripts you purchase
+                    </p>
+                    <p className="text-xs text-blue-700">
+                      ✓ Must match your exact TradingView profile username
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="wantsToSell"
+                    checked={wantsToSell}
+                    onChange={(e) => setWantsToSell(e.target.checked)}
+                    className="rounded border-gray-300"
+                  />
+                  <label htmlFor="wantsToSell" className="text-sm">
+                    I want to sell Pine Scripts (we'll guide you through the setup)
+                  </label>
+                </div>
+              </>
+            )}
           </div>
 
           <Button

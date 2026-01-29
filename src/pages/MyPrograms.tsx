@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,7 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Header from '@/components/Header';
+import SellerScriptAssignments from '@/components/SellerScriptAssignments';
 import { Edit, Eye, Archive, MoreHorizontal, Plus } from 'lucide-react';
 import {
   DropdownMenu,
@@ -135,121 +138,134 @@ const MyPrograms = () => {
             </Button>
           </div>
 
-          <div className="flex gap-4 mb-6">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Programs</SelectItem>
-                <SelectItem value="draft">Drafts</SelectItem>
-                <SelectItem value="published">Published</SelectItem>
-                <SelectItem value="archived">Archived</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Tabs defaultValue="programs" className="space-y-6">
+            <TabsList>
+              <TabsTrigger value="programs">My Programs</TabsTrigger>
+              <TabsTrigger value="assignments">Script Assignments</TabsTrigger>
+            </TabsList>
 
-          {loading ? (
-            <div className="text-center py-8">Loading...</div>
-          ) : filteredPrograms.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-8">
-                <p className="text-muted-foreground">
-                  {statusFilter === 'all' 
-                    ? "You haven't created any programs yet." 
-                    : `No ${statusFilter} programs found.`}
-                </p>
-                <Button 
-                  className="mt-4" 
-                  onClick={() => navigate('/sell-script')}
-                >
-                  Create Your First Program
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredPrograms.map((program) => (
-                <Card key={program.id} className="overflow-hidden">
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg">{program.title}</CardTitle>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {program.category} • ${program.price}
-                        </p>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => navigate(`/edit-program/${program.id}`)}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          {program.status === 'draft' && (
-                            <DropdownMenuItem onClick={() => updateProgramStatus(program.id, 'published')}>
-                              <Eye className="w-4 h-4 mr-2" />
-                              Publish
-                            </DropdownMenuItem>
-                          )}
-                          {program.status === 'published' && (
-                            <DropdownMenuItem onClick={() => updateProgramStatus(program.id, 'archived')}>
-                              <Archive className="w-4 h-4 mr-2" />
-                              Archive
-                            </DropdownMenuItem>
-                          )}
-                          {program.status === 'archived' && (
-                            <DropdownMenuItem onClick={() => updateProgramStatus(program.id, 'published')}>
-                              <Eye className="w-4 h-4 mr-2" />
-                              Republish
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {program.image_urls.length > 0 && (
-                      <img
-                        src={program.image_urls[0]}
-                        alt={program.title}
-                        className="w-full h-32 object-cover rounded mb-4"
-                      />
-                    )}
-                    <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
-                      {program.description}
+            <TabsContent value="programs" className="space-y-6">
+              <div className="flex gap-4">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Programs</SelectItem>
+                    <SelectItem value="draft">Drafts</SelectItem>
+                    <SelectItem value="published">Published</SelectItem>
+                    <SelectItem value="archived">Archived</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {loading ? (
+                <div className="text-center py-8">Loading...</div>
+              ) : filteredPrograms.length === 0 ? (
+                <Card>
+                  <CardContent className="text-center py-8">
+                    <p className="text-muted-foreground">
+                      {statusFilter === 'all' 
+                        ? "You haven't created any programs yet." 
+                        : `No ${statusFilter} programs found.`}
                     </p>
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {program.tags.slice(0, 3).map((tag) => (
-                        <Badge key={tag} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                      {program.tags.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{program.tags.length - 3} more
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <Badge className={getStatusColor(program.status)}>
-                          {program.status}
-                        </Badge>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(program.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
+                    <Button 
+                      className="mt-4" 
+                      onClick={() => navigate('/sell-script')}
+                    >
+                      Create Your First Program
+                    </Button>
                   </CardContent>
                 </Card>
-              ))}
-            </div>
-          )}
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredPrograms.map((program) => (
+                    <Card key={program.id} className="overflow-hidden">
+                      <CardHeader>
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <CardTitle className="text-lg">{program.title}</CardTitle>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {program.category} • ${program.price}
+                            </p>
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => navigate(`/edit-program/${program.id}`)}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              {program.status === 'draft' && (
+                                <DropdownMenuItem onClick={() => updateProgramStatus(program.id, 'published')}>
+                                  <Eye className="w-4 h-4 mr-2" />
+                                  Publish
+                                </DropdownMenuItem>
+                              )}
+                              {program.status === 'published' && (
+                                <DropdownMenuItem onClick={() => updateProgramStatus(program.id, 'archived')}>
+                                  <Archive className="w-4 h-4 mr-2" />
+                                  Archive
+                                </DropdownMenuItem>
+                              )}
+                              {program.status === 'archived' && (
+                                <DropdownMenuItem onClick={() => updateProgramStatus(program.id, 'published')}>
+                                  <Eye className="w-4 h-4 mr-2" />
+                                  Republish
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {program.image_urls.length > 0 && (
+                          <img
+                            src={program.image_urls[0]}
+                            alt={program.title}
+                            className="w-full h-32 object-cover rounded mb-4"
+                          />
+                        )}
+                        <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
+                          {program.description}
+                        </p>
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          {program.tags.slice(0, 3).map((tag) => (
+                            <Badge key={tag} variant="outline" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                          {program.tags.length > 3 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{program.tags.length - 3} more
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <Badge className={getStatusColor(program.status)}>
+                              {program.status}
+                            </Badge>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(program.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="assignments">
+              <SellerScriptAssignments />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>

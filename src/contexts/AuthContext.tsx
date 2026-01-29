@@ -7,9 +7,9 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, username?: string, displayName?: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, tradingviewUsername?: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signInWithProvider: (provider: 'google' | 'github') => Promise<{ error: any }>;
+  signInWithProvider: (provider: 'google') => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
 
@@ -36,6 +36,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+
+        // Handle seller onboarding redirect after email verification
+        if (event === 'SIGNED_IN' && session?.user) {
+          const pendingOnboarding = localStorage.getItem('pendingSellerOnboarding');
+          if (pendingOnboarding === 'true') {
+            localStorage.removeItem('pendingSellerOnboarding');
+            // Use setTimeout to ensure the redirect happens after the current auth flow
+            setTimeout(() => {
+              window.location.href = '/seller/onboarding';
+            }, 1000);
+          }
+        }
       }
     );
 
@@ -49,7 +61,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string, username?: string, displayName?: string) => {
+  const signUp = async (email: string, password: string, tradingviewUsername?: string) => {
     const redirectUrl = `${window.location.origin}/`;
     
     const { error } = await supabase.auth.signUp({
@@ -58,8 +70,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       options: {
         emailRedirectTo: redirectUrl,
         data: {
-          username,
-          display_name: displayName,
+          tradingview_username: tradingviewUsername,
         }
       }
     });
@@ -76,7 +87,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return { error };
   };
 
-  const signInWithProvider = async (provider: 'google' | 'github') => {
+  const signInWithProvider = async (provider: 'google') => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
@@ -88,7 +99,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      // Clear local state immediately
+      setUser(null);
+      setSession(null);
+      
+      // Attempt to sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      // Even if there's an error (like session not found), clear local storage
+      if (error) {
+        console.log('Sign out warning:', error.message);
+        // Clear any remaining auth data
+        localStorage.removeItem('supabase.auth.token');
+      }
+    } catch (error) {
+      console.error('Sign out error:', error);
+      // Force clear local state even on error
+      setUser(null);
+      setSession(null);
+    }
   };
 
   const value = {
