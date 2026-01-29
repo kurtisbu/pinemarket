@@ -1,128 +1,55 @@
 
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { DOMParser } from 'https://deno.land/x/deno_dom/deno-dom-wasm.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { decrypt } from '../utils/crypto.ts';
 
-interface ScriptInfo {
-  pineId: string;
-  title: string;
-  publicationUrl: string;
-  imageUrl: string | null;
-}
-
 /**
- * Fetches all published scripts from a user's TradingView profile page.
- * Scrapes the profile page to find script links and metadata.
+ * Fetches all published Pine IDs owned by the authenticated seller.
+ * Uses the list_scripts endpoint which returns an array of Pine IDs.
  */
-async function fetchPublishedScripts(
-  username: string,
+async function fetchPublishedPineIds(
   sessionCookie: string,
   signedSessionCookie: string
-): Promise<ScriptInfo[]> {
-  const scripts: ScriptInfo[] = [];
+): Promise<string[]> {
+  const url = 'https://www.tradingview.com/pine_perm/list_scripts/';
   
-  console.log(`Fetching published scripts for user: ${username}`);
-  
-  // Fetch the user's scripts page
-  const profileUrl = `https://www.tradingview.com/u/${username}/#published-scripts`;
-  
-  const response = await fetch(profileUrl, {
+  console.log('Fetching published Pine IDs from list_scripts endpoint...');
+
+  const response = await fetch(url, {
     method: 'GET',
     headers: {
+      'Origin': 'https://www.tradingview.com',
       'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     },
   });
 
   if (!response.ok) {
-    console.error(`Failed to fetch profile page: ${response.status}`);
-    throw new Error(`Failed to fetch profile page: ${response.status}`);
+    console.error(`list_scripts API returned status: ${response.status}`);
+    const errorText = await response.text();
+    console.error('Error response:', errorText);
+    throw new Error(`Failed to fetch Pine IDs: ${response.status}`);
   }
 
-  const html = await response.text();
-  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const pineIds: string[] = await response.json();
+  console.log(`Found ${pineIds.length} published Pine IDs`);
   
-  if (!doc) {
-    console.error('Failed to parse profile page HTML');
-    throw new Error('Failed to parse profile page');
-  }
-
-  // Find script cards on the profile page
-  // TradingView uses data attributes for script IDs
-  const scriptElements = doc.querySelectorAll('[data-widget-type="idea"]');
-  
-  console.log(`Found ${scriptElements.length} script elements on profile page`);
-  
-  for (const element of scriptElements) {
-    try {
-      const dataId = element.getAttribute('data-id');
-      const linkElement = element.querySelector('a[href*="/script/"]');
-      const titleElement = element.querySelector('.tv-widget-idea__title');
-      const imgElement = element.querySelector('img');
-      
-      if (linkElement) {
-        const href = linkElement.getAttribute('href') || '';
-        const scriptMatch = href.match(/\/script\/([^/]+)/);
-        
-        if (scriptMatch) {
-          const scriptSlug = scriptMatch[1];
-          const pineId = dataId || `PUB;${scriptSlug}`;
-          const title = titleElement?.textContent?.trim() || `Script ${scriptSlug}`;
-          const imageUrl = imgElement?.getAttribute('src') || null;
-          
-          scripts.push({
-            pineId,
-            title,
-            publicationUrl: `https://www.tradingview.com/script/${scriptSlug}/`,
-            imageUrl,
-          });
-        }
-      }
-    } catch (err) {
-      console.error('Error parsing script element:', err);
-    }
-  }
-
-  // Alternative: Look for script links in any format
-  if (scripts.length === 0) {
-    console.log('No scripts found via widget elements, trying alternative parsing...');
-    
-    const allLinks = doc.querySelectorAll('a[href*="/script/"]');
-    const seenSlugs = new Set<string>();
-    
-    for (const link of allLinks) {
-      const href = link.getAttribute('href') || '';
-      const match = href.match(/\/script\/([a-zA-Z0-9]+)/);
-      
-      if (match && !seenSlugs.has(match[1])) {
-        seenSlugs.add(match[1]);
-        const scriptSlug = match[1];
-        
-        scripts.push({
-          pineId: `PUB;${scriptSlug}`,
-          title: link.textContent?.trim() || `Script ${scriptSlug}`,
-          publicationUrl: `https://www.tradingview.com/script/${scriptSlug}/`,
-          imageUrl: null,
-        });
-      }
-    }
-  }
-
-  console.log(`Parsed ${scripts.length} scripts from profile page`);
-  return scripts;
+  return pineIds;
 }
 
 /**
- * Fetches the Pine ID for a script from its publication page.
- * The Pine ID is needed for access control operations.
+ * Fetches script metadata from TradingView for a given Pine ID.
  */
-async function fetchPineIdFromScriptPage(
-  publicationUrl: string,
+async function fetchScriptMetadata(
+  pineId: string,
   sessionCookie: string,
   signedSessionCookie: string
-): Promise<string | null> {
+): Promise<{ title: string; publicationUrl: string; imageUrl: string | null } | null> {
   try {
+    // Extract script slug from Pine ID (format: "PUB;xxxxx")
+    const scriptSlug = pineId.replace('PUB;', '');
+    const publicationUrl = `https://www.tradingview.com/script/${scriptSlug}/`;
+    
     const response = await fetch(publicationUrl, {
       method: 'GET',
       headers: {
@@ -132,33 +59,33 @@ async function fetchPineIdFromScriptPage(
     });
 
     if (!response.ok) {
+      console.log(`Could not fetch metadata for ${pineId}: ${response.status}`);
       return null;
     }
 
     const html = await response.text();
     
-    // Look for Pine ID in the page - it's typically in a data attribute or script tag
-    // Pattern: "pine_id":"PUB;xxxxx" or data-pine-id="PUB;xxxxx"
-    const pineIdMatch = html.match(/"pine_id"\s*:\s*"([^"]+)"/);
-    if (pineIdMatch) {
-      return pineIdMatch[1];
-    }
+    // Extract title from the page
+    const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+    let title = `Script ${scriptSlug}`;
     
-    // Alternative pattern
-    const dataPineIdMatch = html.match(/data-pine-id="([^"]+)"/);
-    if (dataPineIdMatch) {
-      return dataPineIdMatch[1];
+    if (titleMatch && titleMatch[1]) {
+      title = titleMatch[1]
+        .replace(/\s*[—-]\s*(Indicator|Strategy|Library|Script)\s+by\s+.*/i, '')
+        .replace(/\s*[—-]\s*TradingView$/i, '')
+        .trim();
     }
 
-    // Try to find it in the script's add to chart button or other elements
-    const addToChartMatch = html.match(/PUB;[a-zA-Z0-9]+/);
-    if (addToChartMatch) {
-      return addToChartMatch[0];
+    // Try to extract image URL
+    let imageUrl: string | null = null;
+    const ogImageMatch = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i);
+    if (ogImageMatch && ogImageMatch[1]) {
+      imageUrl = ogImageMatch[1];
     }
 
-    return null;
+    return { title, publicationUrl, imageUrl };
   } catch (error) {
-    console.error(`Error fetching pine ID from ${publicationUrl}:`, error);
+    console.error(`Error fetching metadata for ${pineId}:`, error);
     return null;
   }
 }
@@ -210,15 +137,10 @@ export async function syncUserScripts(
   console.log(`Syncing scripts for user: ${user_id}, TV username: ${profile.tradingview_username}`);
 
   try {
-    // Step 1: Fetch published scripts from profile page
-    const publishedScripts = await fetchPublishedScripts(
-      profile.tradingview_username,
-      sessionCookie,
-      signedSessionCookie
-    );
+    // Step 1: Fetch all Pine IDs using the list_scripts endpoint
+    const pineIds = await fetchPublishedPineIds(sessionCookie, signedSessionCookie);
 
-    if (publishedScripts.length === 0) {
-      // Update connection status and return
+    if (pineIds.length === 0) {
       await supabaseAdmin
         .from('profiles')
         .update({ 
@@ -229,7 +151,7 @@ export async function syncUserScripts(
         .eq('id', user_id);
 
       return new Response(JSON.stringify({ 
-        message: `Sync complete. Found 0 published scripts for '${profile.tradingview_username}'.`,
+        message: `Sync complete. You have no published scripts on TradingView.`,
         scripts_count: 0
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -237,46 +159,27 @@ export async function syncUserScripts(
       });
     }
 
-    // Step 2: For each script, try to get the Pine ID if we don't have it
+    // Step 2: Fetch metadata for each script
     const scriptsToUpsert = [];
     
-    for (const script of publishedScripts) {
-      let pineId = script.pineId;
-      
-      // If the pineId doesn't look like a proper Pine ID, fetch it from the script page
-      if (!pineId.startsWith('PUB;') || pineId === 'PUB;') {
-        console.log(`Fetching Pine ID for ${script.publicationUrl}`);
-        const fetchedPineId = await fetchPineIdFromScriptPage(
-          script.publicationUrl,
-          sessionCookie,
-          signedSessionCookie
-        );
-        
-        if (fetchedPineId) {
-          pineId = fetchedPineId;
-        } else {
-          // Extract from URL as fallback
-          const match = script.publicationUrl.match(/\/script\/([a-zA-Z0-9]+)/);
-          if (match) {
-            pineId = `PUB;${match[1]}`;
-          }
-        }
-        
-        // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 300));
-      }
+    for (const pineId of pineIds) {
+      const scriptSlug = pineId.replace('PUB;', '');
+      const metadata = await fetchScriptMetadata(pineId, sessionCookie, signedSessionCookie);
       
       scriptsToUpsert.push({
         user_id: user_id,
         script_id: pineId,
         pine_id: pineId,
-        title: script.title,
-        publication_url: script.publicationUrl,
-        image_url: script.imageUrl,
+        title: metadata?.title || `Script ${scriptSlug}`,
+        publication_url: metadata?.publicationUrl || `https://www.tradingview.com/script/${scriptSlug}/`,
+        image_url: metadata?.imageUrl || null,
         likes: 0,
         reviews_count: 0,
         last_synced_at: new Date().toISOString(),
       });
+
+      // Small delay to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 200));
     }
 
     console.log(`Prepared ${scriptsToUpsert.length} scripts for upsert`);
@@ -314,7 +217,6 @@ export async function syncUserScripts(
   } catch (error) {
     console.error('Error syncing scripts:', error);
     
-    // Update connection status with error
     await supabaseAdmin
       .from('profiles')
       .update({ 
