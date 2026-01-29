@@ -3,6 +3,12 @@ import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { decrypt } from '../utils/crypto.ts';
 
+interface ScriptMetadata {
+  title: string;
+  publicationUrl: string;
+  imageUrl: string | null;
+}
+
 /**
  * Fetches all published Pine IDs owned by the authenticated seller.
  * Uses the list_scripts endpoint which returns an array of Pine IDs.
@@ -38,107 +44,144 @@ async function fetchPublishedPineIds(
 }
 
 /**
- * Fetches the user's profile page and extracts script information.
- * The profile page lists all published scripts with their names.
+ * Fetches script metadata from the user's published scripts JSON API.
+ * TradingView provides a JSON endpoint that lists all user scripts.
  */
-async function fetchScriptNamesFromProfile(
+async function fetchScriptsFromUserAPI(
   username: string,
   sessionCookie: string,
   signedSessionCookie: string
-): Promise<Map<string, { title: string; publicationUrl: string | null }>> {
-  // Try the user's published scripts page
-  const url = `https://www.tradingview.com/u/${username}/#published-scripts`;
+): Promise<Map<string, ScriptMetadata>> {
+  const scriptMap = new Map<string, ScriptMetadata>();
   
-  console.log(`Fetching script names from profile page: ${url}`);
-
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.5',
-    },
-  });
-
-  if (!response.ok) {
-    console.error(`Profile page returned status: ${response.status}`);
-    return new Map();
-  }
-
-  const html = await response.text();
-  const scriptMap = new Map<string, { title: string; publicationUrl: string | null }>();
+  // Try fetching the user's scripts via the ideas/scripts API
+  const apiUrl = `https://www.tradingview.com/u/${username}/scripts/?sort=popularity`;
   
-  console.log(`Fetched profile page, HTML length: ${html.length}`);
+  console.log(`Fetching scripts from: ${apiUrl}`);
 
-  // Pattern 1: Look for script cards with links like /script/XXXXX/ and titles
-  // Scripts are usually in cards with the format: <a href="/script/SLUG/">Title</a>
-  const scriptCardPattern = /<a[^>]*href="(\/script\/([^\/]+)\/)"[^>]*>[\s\S]*?<[^>]*class="[^"]*title[^"]*"[^>]*>([^<]+)/gi;
-  let match;
-  while ((match = scriptCardPattern.exec(html)) !== null) {
-    const url = 'https://www.tradingview.com' + match[1];
-    const slug = match[2];
-    const title = match[3].trim();
-    console.log(`Found script via card: ${title} -> ${slug}`);
-    // We don't have pine_id here, but we can try to map by slug
-  }
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+      },
+    });
 
-  // Pattern 2: Look for JSON data in the page that might contain script info
-  // TradingView often embeds data in script tags
-  const jsonPatterns = [
-    /window\.__NUXT__\s*=\s*({[\s\S]*?});?\s*<\/script>/,
-    /window\.__INITIAL_STATE__\s*=\s*({[\s\S]*?});?\s*<\/script>/,
-    /"scripts"\s*:\s*(\[[\s\S]*?\])/,
-    /"publications"\s*:\s*(\[[\s\S]*?\])/,
-  ];
+    if (!response.ok) {
+      console.error(`Scripts API returned status: ${response.status}`);
+      return scriptMap;
+    }
 
-  for (const pattern of jsonPatterns) {
-    const jsonMatch = html.match(pattern);
-    if (jsonMatch) {
-      try {
-        const data = JSON.parse(jsonMatch[1]);
-        console.log(`Found JSON data with pattern, parsing...`);
-        // Try to extract script info from the data
-        if (Array.isArray(data)) {
-          for (const item of data) {
-            if (item.pine_id && item.name) {
-              scriptMap.set(item.pine_id, {
-                title: item.name,
-                publicationUrl: item.url || null,
+    const html = await response.text();
+    console.log(`Fetched scripts page, HTML length: ${html.length}`);
+
+    // Pattern 1: Extract script data from the page
+    // TradingView pages often have script cards with format: /script/SLUG/
+    const scriptCardRegex = /<a[^>]*href="(\/script\/([^"\/]+)\/)"[^>]*>/gi;
+    const titleRegex = /<div[^>]*class="[^"]*(?:tv-widget-idea__title|title)[^"]*"[^>]*>([^<]+)<\/div>/gi;
+    
+    // Find all script URLs
+    const scriptUrls: string[] = [];
+    let match;
+    while ((match = scriptCardRegex.exec(html)) !== null) {
+      const url = 'https://www.tradingview.com' + match[1];
+      if (!scriptUrls.includes(url)) {
+        scriptUrls.push(url);
+        console.log(`Found script URL: ${url}`);
+      }
+    }
+
+    // Also try to find JSON data embedded in the page
+    const jsonDataPatterns = [
+      /"scripts"\s*:\s*(\[[\s\S]*?\])/,
+      /"publications"\s*:\s*(\[[\s\S]*?\])/,
+      /window\.__SCRIPTS__\s*=\s*(\[[\s\S]*?\]);/,
+    ];
+
+    for (const pattern of jsonDataPatterns) {
+      const jsonMatch = html.match(pattern);
+      if (jsonMatch) {
+        try {
+          const data = JSON.parse(jsonMatch[1]);
+          console.log(`Found JSON data with ${Array.isArray(data) ? data.length : 0} items`);
+          if (Array.isArray(data)) {
+            for (const item of data) {
+              if (item.scriptIdPart && item.scriptName) {
+                const pineId = item.scriptIdPart.startsWith('PUB;') ? item.scriptIdPart : `PUB;${item.scriptIdPart}`;
+                scriptMap.set(pineId, {
+                  title: item.scriptName,
+                  publicationUrl: item.publishedUrl || `https://www.tradingview.com/script/${item.slug}/`,
+                  imageUrl: item.imageUrl || null,
+                });
+              }
+            }
+          }
+        } catch (e) {
+          console.log('Could not parse embedded JSON data');
+        }
+      }
+    }
+
+    // If we found script URLs, fetch each one to get the pine_id mapping
+    if (scriptUrls.length > 0 && scriptMap.size === 0) {
+      console.log(`Fetching ${Math.min(scriptUrls.length, 10)} script pages for metadata...`);
+      
+      // Limit to first 10 scripts to avoid rate limiting
+      const urlsToFetch = scriptUrls.slice(0, 10);
+      
+      for (const scriptUrl of urlsToFetch) {
+        try {
+          const scriptResponse = await fetch(scriptUrl, {
+            method: 'GET',
+            headers: {
+              'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            },
+          });
+
+          if (scriptResponse.ok) {
+            const scriptHtml = await scriptResponse.text();
+            
+            // Extract pine_id from the page
+            const pineIdMatch = scriptHtml.match(/["']pine_id["']\s*:\s*["'](PUB;[a-f0-9]+)["']/i) ||
+                                scriptHtml.match(/data-script-id=["'](PUB;[a-f0-9]+)["']/i) ||
+                                scriptHtml.match(/(PUB;[a-f0-9]{32})/i);
+            
+            // Extract title from <title> tag
+            const titleMatch = scriptHtml.match(/<title>([^—<]+)/i);
+            
+            // Extract image URL
+            const imageMatch = scriptHtml.match(/og:image["'][^>]*content=["']([^"']+)["']/i) ||
+                              scriptHtml.match(/content=["']([^"']+)["'][^>]*og:image/i);
+
+            if (pineIdMatch && titleMatch) {
+              const pineId = pineIdMatch[1];
+              const title = titleMatch[1].trim();
+              
+              console.log(`Mapped: ${pineId} -> ${title}`);
+              
+              scriptMap.set(pineId, {
+                title: title,
+                publicationUrl: scriptUrl,
+                imageUrl: imageMatch ? imageMatch[1] : null,
               });
             }
           }
+        } catch (e) {
+          console.error(`Failed to fetch ${scriptUrl}:`, e);
         }
-      } catch (e) {
-        console.log(`Could not parse JSON data`);
       }
     }
+
+  } catch (error) {
+    console.error('Error fetching scripts from user API:', error);
   }
 
-  // Pattern 3: Extract from TV data attributes that might contain pine_ids
-  const dataAttributePattern = /data-script-id="(PUB;[a-f0-9]+)"[^>]*>[\s\S]*?<[^>]*>([^<]+)/gi;
-  while ((match = dataAttributePattern.exec(html)) !== null) {
-    const pineId = match[1];
-    const title = match[2].trim();
-    if (pineId && title && !scriptMap.has(pineId)) {
-      console.log(`Found script via data attribute: ${title} -> ${pineId}`);
-      scriptMap.set(pineId, { title, publicationUrl: null });
-    }
-  }
-
-  // Pattern 4: Look for script titles in typical TV page structure
-  // Often scripts are listed with class names like "tv-widget-idea__title"
-  const titlePattern = /<[^>]*class="[^"]*(?:script-name|idea-title|widget-idea__title)[^"]*"[^>]*>([^<]+)<\/[^>]*>[\s\S]*?(PUB;[a-f0-9]+)/gi;
-  while ((match = titlePattern.exec(html)) !== null) {
-    const title = match[1].trim();
-    const pineId = match[2];
-    if (pineId && title && !scriptMap.has(pineId)) {
-      console.log(`Found script via title class: ${title} -> ${pineId}`);
-      scriptMap.set(pineId, { title, publicationUrl: null });
-    }
-  }
-
-  console.log(`Extracted ${scriptMap.size} script names from profile page`);
+  console.log(`Extracted ${scriptMap.size} scripts with metadata`);
   return scriptMap;
 }
 
@@ -211,15 +254,15 @@ export async function syncUserScripts(
       });
     }
 
-    // Step 2: Fetch script names from profile page (single request)
-    const scriptNamesMap = await fetchScriptNamesFromProfile(profile.tradingview_username, sessionCookie, signedSessionCookie);
+    // Step 2: Fetch script metadata from user's scripts page
+    const scriptMetadataMap = await fetchScriptsFromUserAPI(profile.tradingview_username, sessionCookie, signedSessionCookie);
     
-    // Step 3: Build scripts list using the fetched names
+    // Step 3: Build scripts list using the fetched metadata
     const scriptsToUpsert = [];
     
     for (const pineId of pineIds) {
       const scriptSlug = pineId.replace('PUB;', '');
-      const metadata = scriptNamesMap.get(pineId);
+      const metadata = scriptMetadataMap.get(pineId);
       
       // Build a fallback URL pointing to user's scripts page if we don't have the direct URL
       const fallbackUrl = `https://www.tradingview.com/u/${profile.tradingview_username}/#published-scripts`;
@@ -230,14 +273,14 @@ export async function syncUserScripts(
         pine_id: pineId,
         title: metadata?.title || `Script ${scriptSlug}`,
         publication_url: metadata?.publicationUrl || fallbackUrl,
-        image_url: null,
+        image_url: metadata?.imageUrl || null,
         likes: 0,
         reviews_count: 0,
         last_synced_at: new Date().toISOString(),
       });
     }
 
-    console.log(`Prepared ${scriptsToUpsert.length} scripts for upsert (${scriptNamesMap.size} names found)`);
+    console.log(`Prepared ${scriptsToUpsert.length} scripts for upsert (${scriptMetadataMap.size} metadata found)`);
 
     // Step 4: Upsert scripts to database
     if (scriptsToUpsert.length > 0) {
