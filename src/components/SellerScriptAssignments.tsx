@@ -33,6 +33,7 @@ interface SellerScriptAssignment {
     display_name?: string | null;
     username?: string | null;
   } | null;
+  script_title?: string | null;
 }
 
 const SellerScriptAssignments: React.FC = () => {
@@ -47,7 +48,9 @@ const SellerScriptAssignments: React.FC = () => {
     if (!user) return;
     
     setLoading(true);
-    const { data, error } = await supabase
+    
+    // Fetch assignments
+    const { data: assignmentsData, error } = await supabase
       .from('script_assignments')
       .select(`
         *,
@@ -62,9 +65,38 @@ const SellerScriptAssignments: React.FC = () => {
 
     if (error) {
       toast({ title: 'Error fetching assignments', description: error.message, variant: 'destructive' });
-    } else {
-      setAssignments(data || []);
+      setLoading(false);
+      return;
     }
+
+    // Fetch script titles from tradingview_scripts table
+    const pineIds = [...new Set((assignmentsData || []).map(a => a.pine_id).filter(Boolean))];
+    
+    let scriptTitles: Record<string, string> = {};
+    if (pineIds.length > 0) {
+      const { data: scriptsData } = await supabase
+        .from('tradingview_scripts')
+        .select('pine_id, title')
+        .eq('user_id', user.id)
+        .in('pine_id', pineIds);
+      
+      if (scriptsData) {
+        scriptTitles = scriptsData.reduce((acc, script) => {
+          if (script.pine_id) {
+            acc[script.pine_id] = script.title;
+          }
+          return acc;
+        }, {} as Record<string, string>);
+      }
+    }
+
+    // Merge script titles into assignments
+    const enrichedAssignments = (assignmentsData || []).map(assignment => ({
+      ...assignment,
+      script_title: assignment.pine_id ? scriptTitles[assignment.pine_id] || null : null,
+    }));
+
+    setAssignments(enrichedAssignments);
     setLoading(false);
   };
 
@@ -233,13 +265,19 @@ const SellerScriptAssignments: React.FC = () => {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                      {assignment.script_title && (
+                        <div>
+                          <span className="font-medium">Script Name:</span>
+                          <div className="text-primary">{assignment.script_title}</div>
+                        </div>
+                      )}
                       <div>
                         <span className="font-medium">TradingView Username:</span>
                         <div className="flex items-center gap-1">
                           {assignment.tradingview_username}
                           <ExternalLink 
-                            className="w-3 h-3 text-blue-500 cursor-pointer" 
+                            className="w-3 h-3 text-primary cursor-pointer" 
                             onClick={() => window.open(`https://www.tradingview.com/u/${assignment.tradingview_username}/`, '_blank')}
                           />
                         </div>
