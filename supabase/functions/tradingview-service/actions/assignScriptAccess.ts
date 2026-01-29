@@ -276,15 +276,32 @@ async function performAssignment(
       script_title: scriptData?.title
     });
 
-    const formData = new FormData();
-    formData.append('pine_id', scriptId); // Use the actual script_id (PUB;xxx format)
-    formData.append('username_recip', tradingviewUsername);
+    // Build multipart form data (matching Python implementation)
+    const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
+    const bodyParts = [
+      `--${boundary}`,
+      `Content-Disposition: form-data; name="pine_id"`,
+      '',
+      scriptId,
+      `--${boundary}`,
+      `Content-Disposition: form-data; name="username_recip"`,
+      '',
+      tradingviewUsername,
+    ];
     
     // Add expiration for trials
     if (expirationDate) {
-      formData.append('expiration', expirationDate.toISOString());
+      bodyParts.push(
+        `--${boundary}`,
+        `Content-Disposition: form-data; name="expiration"`,
+        '',
+        expirationDate.toISOString()
+      );
     }
     // For full purchases, no expiration parameter = lifetime access
+    
+    bodyParts.push(`--${boundary}--`);
+    const body = bodyParts.join('\r\n');
 
     console.log(`[ASSIGN] FormData being sent to TradingView:`, {
       pine_id: scriptId,
@@ -295,11 +312,13 @@ async function performAssignment(
     const addAccessResponse = await fetch('https://www.tradingview.com/pine_perm/add/', {
       method: 'POST',
       headers: {
+        'Origin': 'https://www.tradingview.com',
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
         'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Referer': `https://www.tradingview.com/script/${pineId}/`,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.tradingview.com/',
       },
-      body: formData,
+      body: body,
     });
 
     console.log(`[ASSIGN] TradingView add access response:`, {
@@ -405,7 +424,7 @@ async function performAssignment(
   }
 }
 
-// New function to verify script access was actually granted
+// Function to verify script access was actually granted
 async function verifyScriptAccess(
   scriptId: string,
   username: string,
@@ -413,12 +432,16 @@ async function verifyScriptAccess(
   signedSessionCookie: string
 ): Promise<any> {
   try {
-    // Get the list of users with access to this script
-    const verifyResponse = await fetch(`https://www.tradingview.com/pine_perm/list/?pine_id=${encodeURIComponent(scriptId)}`, {
+    // Use list_users endpoint with the pine_id to check access
+    const verifyResponse = await fetch('https://www.tradingview.com/pine_perm/list_users/?limit=100&order_by=-created', {
+      method: 'POST',
       headers: {
+        'Origin': 'https://www.tradingview.com',
+        'Content-Type': 'application/x-www-form-urlencoded',
         'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
+      body: `pine_id=${encodeURIComponent(scriptId)}&username=${encodeURIComponent(username)}`
     });
 
     if (!verifyResponse.ok) {
@@ -433,8 +456,9 @@ async function verifyScriptAccess(
     const verifyData = await verifyResponse.json();
     console.log(`[VERIFY] Access list response:`, verifyData);
 
-    // Check if the username appears in the access list
-    const hasAccess = verifyData.some((accessEntry: any) => 
+    // Check if the username appears in the results
+    const results = verifyData.results || verifyData;
+    const hasAccess = Array.isArray(results) && results.some((accessEntry: any) => 
       accessEntry.username?.toLowerCase() === username.toLowerCase()
     );
 
@@ -442,7 +466,7 @@ async function verifyScriptAccess(
       success: true,
       has_access: hasAccess,
       can_verify: true,
-      access_list: verifyData,
+      results_count: Array.isArray(results) ? results.length : 0,
       verified_at: new Date().toISOString()
     };
   } catch (error: any) {
