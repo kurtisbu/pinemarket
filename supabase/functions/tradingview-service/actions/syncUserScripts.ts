@@ -54,28 +54,47 @@ async function fetchScriptsFromUserAPI(
 ): Promise<Map<string, ScriptMetadata>> {
   const scriptMap = new Map<string, ScriptMetadata>();
   
-  // Try fetching the user's scripts via the ideas/scripts API
-  const apiUrl = `https://www.tradingview.com/u/${username}/scripts/?sort=popularity`;
+  // TradingView has multiple URL variants for the scripts listing; some return 404 depending on account/state.
+  // We try a small set and use the first that returns 200.
+  const apiUrlCandidates = [
+    `https://www.tradingview.com/u/${username}/scripts/`,
+    `https://www.tradingview.com/u/${username}/scripts/?sort=popularity`,
+    `https://www.tradingview.com/u/${username}/scripts/?sort=recent`,
+  ];
   
-  console.log(`Fetching scripts from: ${apiUrl}`);
+  console.log(`Fetching scripts for username '${username}' from candidate URLs...`);
 
   try {
-    const response = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-      },
-    });
+    let html: string | null = null;
+    let usedUrl: string | null = null;
 
-    if (!response.ok) {
-      console.error(`Scripts API returned status: ${response.status}`);
+    for (const apiUrl of apiUrlCandidates) {
+      console.log(`Fetching scripts from: ${apiUrl}`);
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+        },
+      });
+
+      if (response.ok) {
+        html = await response.text();
+        usedUrl = apiUrl;
+        break;
+      }
+
+      console.error(`Scripts page returned status ${response.status} for ${apiUrl}`);
+    }
+
+    if (!html) {
+      console.error('All scripts page URL candidates failed; cannot extract publication URLs');
       return scriptMap;
     }
 
-    const html = await response.text();
+    console.log(`Fetched scripts page OK from: ${usedUrl}`);
     console.log(`Fetched scripts page, HTML length: ${html.length}`);
 
     // Pattern 1: Extract script data from the page
