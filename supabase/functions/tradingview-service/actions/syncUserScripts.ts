@@ -38,56 +38,93 @@ async function fetchPublishedPineIds(
 }
 
 /**
- * Fetches script metadata from TradingView for a given Pine ID.
+ * Fetches the Access Manager page and extracts script names mapped to pine_ids.
+ * The Access Manager page shows all scripts with their names and pine_ids.
  */
-async function fetchScriptMetadata(
-  pineId: string,
+async function fetchScriptNamesFromAccessManager(
   sessionCookie: string,
   signedSessionCookie: string
-): Promise<{ title: string; publicationUrl: string; imageUrl: string | null } | null> {
-  try {
-    // Extract script slug from Pine ID (format: "PUB;xxxxx")
-    const scriptSlug = pineId.replace('PUB;', '');
-    const publicationUrl = `https://www.tradingview.com/script/${scriptSlug}/`;
-    
-    const response = await fetch(publicationUrl, {
-      method: 'GET',
-      headers: {
-        'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      },
-    });
+): Promise<Map<string, { title: string; publicationUrl: string | null }>> {
+  const url = 'https://www.tradingview.com/pine-script-access-manager/';
+  
+  console.log('Fetching script names from Access Manager page...');
 
-    if (!response.ok) {
-      console.log(`Could not fetch metadata for ${pineId}: ${response.status}`);
-      return null;
-    }
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Cookie': `sessionid=${sessionCookie}; sessionid_sign=${signedSessionCookie}`,
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    },
+  });
 
-    const html = await response.text();
-    
-    // Extract title from the page
-    const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
-    let title = `Script ${scriptSlug}`;
-    
-    if (titleMatch && titleMatch[1]) {
-      title = titleMatch[1]
-        .replace(/\s*[—-]\s*(Indicator|Strategy|Library|Script)\s+by\s+.*/i, '')
-        .replace(/\s*[—-]\s*TradingView$/i, '')
-        .trim();
-    }
-
-    // Try to extract image URL
-    let imageUrl: string | null = null;
-    const ogImageMatch = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i);
-    if (ogImageMatch && ogImageMatch[1]) {
-      imageUrl = ogImageMatch[1];
-    }
-
-    return { title, publicationUrl, imageUrl };
-  } catch (error) {
-    console.error(`Error fetching metadata for ${pineId}:`, error);
-    return null;
+  if (!response.ok) {
+    console.error(`Access Manager page returned status: ${response.status}`);
+    return new Map();
   }
+
+  const html = await response.text();
+  const scriptMap = new Map<string, { title: string; publicationUrl: string | null }>();
+
+  // Look for script data in the page - the Access Manager typically has 
+  // a data structure or list items with pine_ids and script names
+  
+  // Pattern 1: Look for JSON data embedded in the page (common in React/Vue apps)
+  const jsonDataMatch = html.match(/window\.__INITIAL_DATA__\s*=\s*({[\s\S]*?});/);
+  if (jsonDataMatch) {
+    try {
+      const data = JSON.parse(jsonDataMatch[1]);
+      console.log('Found __INITIAL_DATA__, parsing scripts...');
+      // Navigate the data structure to find scripts
+      if (data.scripts) {
+        for (const script of data.scripts) {
+          if (script.pine_id && script.name) {
+            scriptMap.set(script.pine_id, {
+              title: script.name,
+              publicationUrl: script.url || null,
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.log('Could not parse __INITIAL_DATA__ JSON');
+    }
+  }
+
+  // Pattern 2: Look for script entries in HTML structure
+  // The access manager typically lists scripts with data attributes or in list items
+  const scriptEntryPattern = /<div[^>]*data-pine-id="(PUB;[a-f0-9]+)"[^>]*>[\s\S]*?<[^>]*class="[^"]*title[^"]*"[^>]*>([^<]+)</gi;
+  let match;
+  while ((match = scriptEntryPattern.exec(html)) !== null) {
+    const pineId = match[1];
+    const title = match[2].trim();
+    if (pineId && title && !scriptMap.has(pineId)) {
+      scriptMap.set(pineId, { title, publicationUrl: null });
+    }
+  }
+
+  // Pattern 3: Look for option elements in select dropdowns (common pattern)
+  const selectPattern = /<option[^>]*value="(PUB;[a-f0-9]+)"[^>]*>([^<]+)</gi;
+  while ((match = selectPattern.exec(html)) !== null) {
+    const pineId = match[1];
+    const title = match[2].trim();
+    if (pineId && title && !scriptMap.has(pineId)) {
+      scriptMap.set(pineId, { title, publicationUrl: null });
+    }
+  }
+
+  // Pattern 4: Look for anchor links to scripts with pine_id references
+  const linkPattern = /<a[^>]*href="(\/script\/[^"\/]+\/)"[^>]*>([^<]+)<\/a>[\s\S]*?(PUB;[a-f0-9]+)/gi;
+  while ((match = linkPattern.exec(html)) !== null) {
+    const url = 'https://www.tradingview.com' + match[1];
+    const title = match[2].trim();
+    const pineId = match[3];
+    if (pineId && title && !scriptMap.has(pineId)) {
+      scriptMap.set(pineId, { title, publicationUrl: url });
+    }
+  }
+
+  console.log(`Extracted ${scriptMap.size} script names from Access Manager`);
+  return scriptMap;
 }
 
 export async function syncUserScripts(
@@ -159,32 +196,32 @@ export async function syncUserScripts(
       });
     }
 
-    // Step 2: Fetch metadata for each script
+    // Step 2: Fetch script names from Access Manager page (single request)
+    const scriptNamesMap = await fetchScriptNamesFromAccessManager(sessionCookie, signedSessionCookie);
+    
+    // Step 3: Build scripts list using the fetched names
     const scriptsToUpsert = [];
     
     for (const pineId of pineIds) {
       const scriptSlug = pineId.replace('PUB;', '');
-      const metadata = await fetchScriptMetadata(pineId, sessionCookie, signedSessionCookie);
+      const metadata = scriptNamesMap.get(pineId);
       
       scriptsToUpsert.push({
         user_id: user_id,
         script_id: pineId,
         pine_id: pineId,
         title: metadata?.title || `Script ${scriptSlug}`,
-        publication_url: metadata?.publicationUrl || `https://www.tradingview.com/script/${scriptSlug}/`,
-        image_url: metadata?.imageUrl || null,
+        publication_url: metadata?.publicationUrl || null,
+        image_url: null,
         likes: 0,
         reviews_count: 0,
         last_synced_at: new Date().toISOString(),
       });
-
-      // Small delay to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 200));
     }
 
-    console.log(`Prepared ${scriptsToUpsert.length} scripts for upsert`);
+    console.log(`Prepared ${scriptsToUpsert.length} scripts for upsert (${scriptNamesMap.size} names found)`);
 
-    // Step 3: Upsert scripts to database
+    // Step 4: Upsert scripts to database
     if (scriptsToUpsert.length > 0) {
       const { error: upsertError } = await supabaseAdmin
         .from('tradingview_scripts')
@@ -196,7 +233,7 @@ export async function syncUserScripts(
       }
     }
 
-    // Step 4: Update connection status
+    // Step 5: Update connection status
     await supabaseAdmin
       .from('profiles')
       .update({ 
