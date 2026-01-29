@@ -7,218 +7,17 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "12.2.3 (519615d)"
-  }
   public: {
     Tables: {
-      assignment_logs: {
-        Row: {
-          assignment_id: string
-          created_at: string | null
-          details: Json | null
-          id: string
-          log_level: string
-          message: string
-          purchase_id: string
-        }
-        Insert: {
-          assignment_id: string
-          created_at?: string | null
-          details?: Json | null
-          id?: string
-          log_level: string
-          message: string
-          purchase_id: string
-        }
-        Update: {
-          assignment_id?: string
-          created_at?: string | null
-          details?: Json | null
-          id?: string
-          log_level?: string
-          message?: string
-          purchase_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "assignment_logs_assignment_id_fkey"
-            columns: ["assignment_id"]
-            isOneToOne: false
-            referencedRelation: "script_assignments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "assignment_logs_purchase_id_fkey"
-            columns: ["purchase_id"]
-            isOneToOne: false
-            referencedRelation: "purchases"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      package_prices: {
-        Row: {
-          amount: number
-          created_at: string
-          currency: string
-          description: string | null
-          display_name: string
-          id: string
-          interval: string | null
-          is_active: boolean
-          package_id: string
-          price_type: string
-          sort_order: number
-          stripe_price_id: string | null
-          updated_at: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          currency?: string
-          description?: string | null
-          display_name: string
-          id?: string
-          interval?: string | null
-          is_active?: boolean
-          package_id: string
-          price_type: string
-          sort_order?: number
-          stripe_price_id?: string | null
-          updated_at?: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          currency?: string
-          description?: string | null
-          display_name?: string
-          id?: string
-          interval?: string | null
-          is_active?: boolean
-          package_id?: string
-          price_type?: string
-          sort_order?: number
-          stripe_price_id?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "package_prices_package_id_fkey"
-            columns: ["package_id"]
-            isOneToOne: false
-            referencedRelation: "program_packages"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      package_programs: {
-        Row: {
-          created_at: string
-          display_order: number
-          id: string
-          package_id: string
-          program_id: string
-        }
-        Insert: {
-          created_at?: string
-          display_order?: number
-          id?: string
-          package_id: string
-          program_id: string
-        }
-        Update: {
-          created_at?: string
-          display_order?: number
-          id?: string
-          package_id?: string
-          program_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "package_programs_package_id_fkey"
-            columns: ["package_id"]
-            isOneToOne: false
-            referencedRelation: "program_packages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "package_programs_program_id_fkey"
-            columns: ["program_id"]
-            isOneToOne: false
-            referencedRelation: "programs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      payouts: {
-        Row: {
-          amount: number
-          completed_at: string | null
-          created_at: string | null
-          currency: string
-          failure_reason: string | null
-          id: string
-          initiated_at: string | null
-          payout_method: string
-          seller_id: string
-          status: string
-          stripe_transfer_id: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          amount: number
-          completed_at?: string | null
-          created_at?: string | null
-          currency?: string
-          failure_reason?: string | null
-          id?: string
-          initiated_at?: string | null
-          payout_method: string
-          seller_id: string
-          status?: string
-          stripe_transfer_id?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          amount?: number
-          completed_at?: string | null
-          created_at?: string | null
-          currency?: string
-          failure_reason?: string | null
-          id?: string
-          initiated_at?: string | null
-          payout_method?: string
-          seller_id?: string
-          status?: string
-          stripe_transfer_id?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           avatar_url: string | null
           bio: string | null
           created_at: string
           display_name: string | null
-          featured_at: string | null
-          featured_description: string | null
-          featured_priority: number | null
           id: string
-          is_featured: boolean | null
           is_tradingview_connected: boolean
           role: string | null
-          stripe_account_id: string | null
-          stripe_charges_enabled: boolean | null
-          stripe_onboarding_completed: boolean | null
-          stripe_payouts_enabled: boolean | null
-          tradingview_connection_status: string | null
-          tradingview_last_error: string | null
-          tradingview_last_validated_at: string | null
           tradingview_session_cookie: string | null
           tradingview_signed_session_cookie: string | null
           tradingview_username: string | null
@@ -230,20 +29,9 @@ export type Database = {
           bio?: string | null
           created_at?: string
           display_name?: string | null
-          featured_at?: string | null
-          featured_description?: string | null
-          featured_priority?: number | null
           id: string
-          is_featured?: boolean | null
           is_tradingview_connected?: boolean
           role?: string | null
-          stripe_account_id?: string | null
-          stripe_charges_enabled?: boolean | null
-          stripe_onboarding_completed?: boolean | null
-          stripe_payouts_enabled?: boolean | null
-          tradingview_connection_status?: string | null
-          tradingview_last_error?: string | null
-          tradingview_last_validated_at?: string | null
           tradingview_session_cookie?: string | null
           tradingview_signed_session_cookie?: string | null
           tradingview_username?: string | null
@@ -255,20 +43,9 @@ export type Database = {
           bio?: string | null
           created_at?: string
           display_name?: string | null
-          featured_at?: string | null
-          featured_description?: string | null
-          featured_priority?: number | null
           id?: string
-          is_featured?: boolean | null
           is_tradingview_connected?: boolean
           role?: string | null
-          stripe_account_id?: string | null
-          stripe_charges_enabled?: boolean | null
-          stripe_onboarding_completed?: boolean | null
-          stripe_payouts_enabled?: boolean | null
-          tradingview_connection_status?: string | null
-          tradingview_last_error?: string | null
-          tradingview_last_validated_at?: string | null
           tradingview_session_cookie?: string | null
           tradingview_signed_session_cookie?: string | null
           tradingview_username?: string | null
@@ -277,191 +54,66 @@ export type Database = {
         }
         Relationships: []
       }
-      program_packages: {
-        Row: {
-          average_rating: number
-          created_at: string
-          description: string
-          id: string
-          image_urls: string[] | null
-          rating_count: number
-          seller_id: string
-          status: string
-          title: string
-          updated_at: string
-          view_count: number
-        }
-        Insert: {
-          average_rating?: number
-          created_at?: string
-          description: string
-          id?: string
-          image_urls?: string[] | null
-          rating_count?: number
-          seller_id: string
-          status?: string
-          title: string
-          updated_at?: string
-          view_count?: number
-        }
-        Update: {
-          average_rating?: number
-          created_at?: string
-          description?: string
-          id?: string
-          image_urls?: string[] | null
-          rating_count?: number
-          seller_id?: string
-          status?: string
-          title?: string
-          updated_at?: string
-          view_count?: number
-        }
-        Relationships: []
-      }
-      program_prices: {
-        Row: {
-          amount: number
-          created_at: string
-          currency: string
-          description: string | null
-          display_name: string
-          id: string
-          interval: string | null
-          is_active: boolean
-          price_type: string
-          program_id: string
-          sort_order: number
-          stripe_price_id: string | null
-          updated_at: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          currency?: string
-          description?: string | null
-          display_name: string
-          id?: string
-          interval?: string | null
-          is_active?: boolean
-          price_type: string
-          program_id: string
-          sort_order?: number
-          stripe_price_id?: string | null
-          updated_at?: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          currency?: string
-          description?: string | null
-          display_name?: string
-          id?: string
-          interval?: string | null
-          is_active?: boolean
-          price_type?: string
-          program_id?: string
-          sort_order?: number
-          stripe_price_id?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "program_prices_program_id_fkey"
-            columns: ["program_id"]
-            isOneToOne: false
-            referencedRelation: "programs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       programs: {
         Row: {
           average_rating: number
-          billing_interval: string | null
           category: string
           created_at: string
           description: string
           download_count: number
           id: string
           image_urls: string[] | null
-          monthly_price: number | null
           price: number
-          pricing_model: string
           rating_count: number
           script_file_path: string | null
           seller_id: string
           status: string
-          stripe_monthly_price_id: string | null
-          stripe_product_id: string | null
-          stripe_yearly_price_id: string | null
-          subscription_plan_id: string | null
           tags: string[] | null
           title: string
           tradingview_publication_url: string | null
           tradingview_script_id: string | null
-          trial_period_days: number | null
           updated_at: string
           view_count: number
-          yearly_price: number | null
         }
         Insert: {
           average_rating?: number
-          billing_interval?: string | null
           category: string
           created_at?: string
           description: string
           download_count?: number
           id?: string
           image_urls?: string[] | null
-          monthly_price?: number | null
           price: number
-          pricing_model?: string
           rating_count?: number
           script_file_path?: string | null
           seller_id: string
           status?: string
-          stripe_monthly_price_id?: string | null
-          stripe_product_id?: string | null
-          stripe_yearly_price_id?: string | null
-          subscription_plan_id?: string | null
           tags?: string[] | null
           title: string
           tradingview_publication_url?: string | null
           tradingview_script_id?: string | null
-          trial_period_days?: number | null
           updated_at?: string
           view_count?: number
-          yearly_price?: number | null
         }
         Update: {
           average_rating?: number
-          billing_interval?: string | null
           category?: string
           created_at?: string
           description?: string
           download_count?: number
           id?: string
           image_urls?: string[] | null
-          monthly_price?: number | null
           price?: number
-          pricing_model?: string
           rating_count?: number
           script_file_path?: string | null
           seller_id?: string
           status?: string
-          stripe_monthly_price_id?: string | null
-          stripe_product_id?: string | null
-          stripe_yearly_price_id?: string | null
-          subscription_plan_id?: string | null
           tags?: string[] | null
           title?: string
           tradingview_publication_url?: string | null
           tradingview_script_id?: string | null
-          trial_period_days?: number | null
           updated_at?: string
           view_count?: number
-          yearly_price?: number | null
         }
         Relationships: [
           {
@@ -469,13 +121,6 @@ export type Database = {
             columns: ["seller_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "programs_subscription_plan_id_fkey"
-            columns: ["subscription_plan_id"]
-            isOneToOne: false
-            referencedRelation: "subscription_plans"
             referencedColumns: ["id"]
           },
         ]
@@ -486,16 +131,11 @@ export type Database = {
           buyer_id: string
           created_at: string
           id: string
-          package_id: string | null
           payment_intent_id: string | null
-          platform_fee: number
           program_id: string
           purchased_at: string
           seller_id: string
-          seller_owed: number | null
           status: Database["public"]["Enums"]["purchase_status"]
-          stripe_transfer_id: string | null
-          tradingview_username: string | null
           updated_at: string
         }
         Insert: {
@@ -503,16 +143,11 @@ export type Database = {
           buyer_id: string
           created_at?: string
           id?: string
-          package_id?: string | null
           payment_intent_id?: string | null
-          platform_fee?: number
           program_id: string
           purchased_at?: string
           seller_id: string
-          seller_owed?: number | null
           status?: Database["public"]["Enums"]["purchase_status"]
-          stripe_transfer_id?: string | null
-          tradingview_username?: string | null
           updated_at?: string
         }
         Update: {
@@ -520,16 +155,11 @@ export type Database = {
           buyer_id?: string
           created_at?: string
           id?: string
-          package_id?: string | null
           payment_intent_id?: string | null
-          platform_fee?: number
           program_id?: string
           purchased_at?: string
           seller_id?: string
-          seller_owed?: number | null
           status?: Database["public"]["Enums"]["purchase_status"]
-          stripe_transfer_id?: string | null
-          tradingview_username?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -538,13 +168,6 @@ export type Database = {
             columns: ["buyer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "purchases_package_id_fkey"
-            columns: ["package_id"]
-            isOneToOne: false
-            referencedRelation: "program_packages"
             referencedColumns: ["id"]
           },
           {
@@ -563,182 +186,47 @@ export type Database = {
           },
         ]
       }
-      rate_limit_configs: {
-        Row: {
-          burst_limit: number
-          created_at: string
-          enabled: boolean
-          endpoint: string
-          id: string
-          requests_per_hour: number
-          requests_per_minute: number
-          updated_at: string
-        }
-        Insert: {
-          burst_limit?: number
-          created_at?: string
-          enabled?: boolean
-          endpoint: string
-          id?: string
-          requests_per_hour?: number
-          requests_per_minute?: number
-          updated_at?: string
-        }
-        Update: {
-          burst_limit?: number
-          created_at?: string
-          enabled?: boolean
-          endpoint?: string
-          id?: string
-          requests_per_hour?: number
-          requests_per_minute?: number
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      rate_limits: {
-        Row: {
-          created_at: string
-          endpoint: string
-          id: string
-          ip_address: unknown
-          request_count: number
-          updated_at: string
-          user_id: string | null
-          window_start: string
-        }
-        Insert: {
-          created_at?: string
-          endpoint: string
-          id?: string
-          ip_address?: unknown
-          request_count?: number
-          updated_at?: string
-          user_id?: string | null
-          window_start?: string
-        }
-        Update: {
-          created_at?: string
-          endpoint?: string
-          id?: string
-          ip_address?: unknown
-          request_count?: number
-          updated_at?: string
-          user_id?: string | null
-          window_start?: string
-        }
-        Relationships: []
-      }
-      ratings: {
-        Row: {
-          created_at: string
-          id: string
-          program_id: string
-          rating: number
-          review_text: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          program_id: string
-          rating: number
-          review_text?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          program_id?: string
-          rating?: number
-          review_text?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ratings_program_id_fkey"
-            columns: ["program_id"]
-            isOneToOne: false
-            referencedRelation: "programs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ratings_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       script_assignments: {
         Row: {
-          access_type: string | null
           assigned_at: string | null
-          assignment_attempts: number
-          assignment_details: Json | null
           buyer_id: string
           created_at: string
           error_message: string | null
-          expires_at: string | null
           id: string
-          is_trial: boolean | null
-          last_attempt_at: string | null
-          pine_id: string | null
           program_id: string
           purchase_id: string
           retry_count: number
           seller_id: string
           status: Database["public"]["Enums"]["assignment_status"]
           tradingview_script_id: string | null
-          tradingview_username: string | null
           updated_at: string
         }
         Insert: {
-          access_type?: string | null
           assigned_at?: string | null
-          assignment_attempts?: number
-          assignment_details?: Json | null
           buyer_id: string
           created_at?: string
           error_message?: string | null
-          expires_at?: string | null
           id?: string
-          is_trial?: boolean | null
-          last_attempt_at?: string | null
-          pine_id?: string | null
           program_id: string
           purchase_id: string
           retry_count?: number
           seller_id: string
           status?: Database["public"]["Enums"]["assignment_status"]
           tradingview_script_id?: string | null
-          tradingview_username?: string | null
           updated_at?: string
         }
         Update: {
-          access_type?: string | null
           assigned_at?: string | null
-          assignment_attempts?: number
-          assignment_details?: Json | null
           buyer_id?: string
           created_at?: string
           error_message?: string | null
-          expires_at?: string | null
           id?: string
-          is_trial?: boolean | null
-          last_attempt_at?: string | null
-          pine_id?: string | null
           program_id?: string
           purchase_id?: string
           retry_count?: number
           seller_id?: string
           status?: Database["public"]["Enums"]["assignment_status"]
           tradingview_script_id?: string | null
-          tradingview_username?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -772,295 +260,6 @@ export type Database = {
           },
         ]
       }
-      security_audit_logs: {
-        Row: {
-          action: string
-          created_at: string | null
-          details: Json | null
-          id: string
-          ip_address: unknown
-          resource_id: string | null
-          resource_type: string
-          risk_level: string | null
-          user_agent: string | null
-          user_id: string | null
-        }
-        Insert: {
-          action: string
-          created_at?: string | null
-          details?: Json | null
-          id?: string
-          ip_address?: unknown
-          resource_id?: string | null
-          resource_type: string
-          risk_level?: string | null
-          user_agent?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          action?: string
-          created_at?: string | null
-          details?: Json | null
-          id?: string
-          ip_address?: unknown
-          resource_id?: string | null
-          resource_type?: string
-          risk_level?: string | null
-          user_agent?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "security_audit_logs_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      seller_access_codes: {
-        Row: {
-          code: string
-          created_at: string
-          created_by: string | null
-          current_uses: number | null
-          expires_at: string | null
-          id: string
-          is_used: boolean
-          max_uses: number | null
-          used_at: string | null
-          used_by_user_id: string | null
-        }
-        Insert: {
-          code: string
-          created_at?: string
-          created_by?: string | null
-          current_uses?: number | null
-          expires_at?: string | null
-          id?: string
-          is_used?: boolean
-          max_uses?: number | null
-          used_at?: string | null
-          used_by_user_id?: string | null
-        }
-        Update: {
-          code?: string
-          created_at?: string
-          created_by?: string | null
-          current_uses?: number | null
-          expires_at?: string | null
-          id?: string
-          is_used?: boolean
-          max_uses?: number | null
-          used_at?: string | null
-          used_by_user_id?: string | null
-        }
-        Relationships: []
-      }
-      seller_balances: {
-        Row: {
-          available_balance: number
-          created_at: string | null
-          id: string
-          last_payout_at: string | null
-          pending_balance: number
-          seller_id: string
-          total_earned: number
-          total_paid_out: number
-          updated_at: string | null
-        }
-        Insert: {
-          available_balance?: number
-          created_at?: string | null
-          id?: string
-          last_payout_at?: string | null
-          pending_balance?: number
-          seller_id: string
-          total_earned?: number
-          total_paid_out?: number
-          updated_at?: string | null
-        }
-        Update: {
-          available_balance?: number
-          created_at?: string | null
-          id?: string
-          last_payout_at?: string | null
-          pending_balance?: number
-          seller_id?: string
-          total_earned?: number
-          total_paid_out?: number
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      seller_notifications: {
-        Row: {
-          created_at: string | null
-          email_on_connection_expiry: boolean | null
-          email_on_program_disabled: boolean | null
-          id: string
-          last_expiry_notification_sent_at: string | null
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          email_on_connection_expiry?: boolean | null
-          email_on_program_disabled?: boolean | null
-          id?: string
-          last_expiry_notification_sent_at?: string | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          email_on_connection_expiry?: boolean | null
-          email_on_program_disabled?: boolean | null
-          id?: string
-          last_expiry_notification_sent_at?: string | null
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "seller_notifications_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      seller_payout_info: {
-        Row: {
-          bank_account_holder_name: string | null
-          bank_account_number: string | null
-          bank_name: string | null
-          bank_routing_number: string | null
-          country: string
-          created_at: string | null
-          currency: string
-          id: string
-          is_verified: boolean | null
-          payout_method: string
-          paypal_email: string | null
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          bank_account_holder_name?: string | null
-          bank_account_number?: string | null
-          bank_name?: string | null
-          bank_routing_number?: string | null
-          country: string
-          created_at?: string | null
-          currency?: string
-          id?: string
-          is_verified?: boolean | null
-          payout_method: string
-          paypal_email?: string | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          bank_account_holder_name?: string | null
-          bank_account_number?: string | null
-          bank_name?: string | null
-          bank_routing_number?: string | null
-          country?: string
-          created_at?: string | null
-          currency?: string
-          id?: string
-          is_verified?: boolean | null
-          payout_method?: string
-          paypal_email?: string | null
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      subscription_access: {
-        Row: {
-          created_at: string
-          expires_at: string | null
-          granted_at: string
-          id: string
-          program_id: string
-          user_subscription_id: string
-        }
-        Insert: {
-          created_at?: string
-          expires_at?: string | null
-          granted_at?: string
-          id?: string
-          program_id: string
-          user_subscription_id: string
-        }
-        Update: {
-          created_at?: string
-          expires_at?: string | null
-          granted_at?: string
-          id?: string
-          program_id?: string
-          user_subscription_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "subscription_access_program_id_fkey"
-            columns: ["program_id"]
-            isOneToOne: false
-            referencedRelation: "programs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "subscription_access_user_subscription_id_fkey"
-            columns: ["user_subscription_id"]
-            isOneToOne: false
-            referencedRelation: "user_subscriptions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      subscription_plans: {
-        Row: {
-          created_at: string
-          description: string | null
-          features: Json | null
-          id: string
-          interval: string
-          is_active: boolean
-          name: string
-          price: number
-          stripe_price_id: string | null
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          features?: Json | null
-          id?: string
-          interval: string
-          is_active?: boolean
-          name: string
-          price: number
-          stripe_price_id?: string | null
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          features?: Json | null
-          id?: string
-          interval?: string
-          is_active?: boolean
-          name?: string
-          price?: number
-          stripe_price_id?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
       tradingview_scripts: {
         Row: {
           created_at: string
@@ -1068,7 +267,6 @@ export type Database = {
           image_url: string | null
           last_synced_at: string
           likes: number
-          pine_id: string | null
           publication_url: string
           reviews_count: number
           script_id: string
@@ -1082,7 +280,6 @@ export type Database = {
           image_url?: string | null
           last_synced_at?: string
           likes?: number
-          pine_id?: string | null
           publication_url: string
           reviews_count?: number
           script_id: string
@@ -1096,7 +293,6 @@ export type Database = {
           image_url?: string | null
           last_synced_at?: string
           likes?: number
-          pine_id?: string | null
           publication_url?: string
           reviews_count?: number
           script_id?: string
@@ -1114,305 +310,17 @@ export type Database = {
           },
         ]
       }
-      trial_usage: {
-        Row: {
-          created_at: string
-          id: string
-          program_id: string
-          used_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          program_id: string
-          used_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          program_id?: string
-          used_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "trial_usage_program_id_fkey"
-            columns: ["program_id"]
-            isOneToOne: false
-            referencedRelation: "programs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "trial_usage_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      user_roles: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
-      }
-      user_subscriptions: {
-        Row: {
-          cancel_at_period_end: boolean
-          created_at: string
-          current_period_end: string | null
-          current_period_start: string | null
-          id: string
-          status: string
-          stripe_customer_id: string | null
-          stripe_subscription_id: string | null
-          subscription_plan_id: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          cancel_at_period_end?: boolean
-          created_at?: string
-          current_period_end?: string | null
-          current_period_start?: string | null
-          id?: string
-          status: string
-          stripe_customer_id?: string | null
-          stripe_subscription_id?: string | null
-          subscription_plan_id: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          cancel_at_period_end?: boolean
-          created_at?: string
-          current_period_end?: string | null
-          current_period_start?: string | null
-          id?: string
-          status?: string
-          stripe_customer_id?: string | null
-          stripe_subscription_id?: string | null
-          subscription_plan_id?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_subscriptions_subscription_plan_id_fkey"
-            columns: ["subscription_plan_id"]
-            isOneToOne: false
-            referencedRelation: "subscription_plans"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_subscriptions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      check_rate_limit: {
-        Args: {
-          p_endpoint?: string
-          p_ip_address?: unknown
-          p_limit?: number
-          p_user_id?: string
-          p_window_minutes?: number
-        }
-        Returns: Json
-      }
-      check_rate_limit_secure: {
-        Args: {
-          p_endpoint?: string
-          p_ip_address?: unknown
-          p_limit?: number
-          p_user_id?: string
-          p_window_minutes?: number
-        }
-        Returns: Json
-      }
-      check_trial_eligibility: {
-        Args: { p_program_id: string; p_user_id: string }
-        Returns: boolean
-      }
-      disable_programs_for_expired_connections: {
-        Args: never
-        Returns: undefined
-      }
-      get_featured_creators_with_stats: {
-        Args: never
-        Returns: {
-          avatar_url: string
-          avg_rating: number
-          bio: string
-          created_at: string
-          display_name: string
-          featured_at: string
-          featured_description: string
-          featured_priority: number
-          id: string
-          is_featured: boolean
-          is_tradingview_connected: boolean
-          role: string
-          total_programs: number
-          total_revenue: number
-          total_sales: number
-          username: string
-        }[]
-      }
-      get_package_programs: {
-        Args: { p_package_id: string }
-        Returns: {
-          description: string
-          display_order: number
-          image_urls: string[]
-          program_id: string
-          title: string
-          tradingview_publication_url: string
-        }[]
-      }
-      get_public_profiles: {
-        Args: never
-        Returns: {
-          avatar_url: string
-          bio: string
-          created_at: string
-          display_name: string
-          featured_at: string
-          featured_description: string
-          featured_priority: number
-          id: string
-          is_featured: boolean
-          is_tradingview_connected: boolean
-          role: string
-          username: string
-        }[]
-      }
-      get_safe_profile: {
-        Args: { profile_id: string }
-        Returns: {
-          avatar_url: string
-          bio: string
-          created_at: string
-          display_name: string
-          featured_at: string
-          featured_description: string
-          featured_priority: number
-          id: string
-          is_featured: boolean
-          is_tradingview_connected: boolean
-          role: string
-          username: string
-        }[]
-      }
-      get_script_download_url: {
-        Args: { program_id_param: string }
-        Returns: string
-      }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
       increment_program_view_count: {
         Args: { program_uuid: string }
         Returns: undefined
       }
-      is_current_user_admin: { Args: never; Returns: boolean }
-      log_security_event: {
-        Args: {
-          p_action: string
-          p_details?: Json
-          p_resource_id?: string
-          p_resource_type: string
-          p_risk_level?: string
-        }
-        Returns: string
-      }
-      record_trial_usage: {
-        Args: { p_program_id: string; p_user_id: string }
-        Returns: undefined
-      }
-      sanitize_user_content: {
-        Args: { content: string; max_length?: number }
-        Returns: string
-      }
-      seller_has_valid_tradingview_connection: {
-        Args: { seller_user_id: string }
-        Returns: boolean
-      }
-      settle_pending_balance: {
-        Args: { p_seller_id: string }
-        Returns: undefined
-      }
-      toggle_creator_featured_status: {
-        Args: {
-          creator_id: string
-          description?: string
-          featured: boolean
-          priority?: number
-        }
-        Returns: undefined
-      }
-      update_program_rating_stats: {
-        Args: { program_uuid: string }
-        Returns: undefined
-      }
-      update_seller_balance: {
-        Args: { p_amount: number; p_seller_id: string; p_type: string }
-        Returns: undefined
-      }
-      validate_file_upload: {
-        Args: {
-          p_bucket_name: string
-          p_file_name: string
-          p_file_size: number
-          p_mime_type: string
-        }
-        Returns: Json
-      }
-      validate_seller_access_code: {
-        Args: { p_code: string; p_user_id: string }
-        Returns: Json
-      }
-      validate_tradingview_url: { Args: { url: string }; Returns: boolean }
-      verify_seller_bank_account: {
-        Args: { p_user_id: string }
-        Returns: undefined
-      }
     }
     Enums: {
-      app_role: "admin" | "moderator" | "user"
       assignment_status: "pending" | "assigned" | "failed" | "expired"
       purchase_status: "pending" | "completed" | "failed" | "refunded"
     }
@@ -1422,25 +330,21 @@ export type Database = {
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+type DefaultSchema = Database[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
+    | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof Database
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
@@ -1458,16 +362,14 @@ export type Tables<
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+    | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof Database
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
@@ -1483,16 +385,14 @@ export type TablesInsert<
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+    | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof Database
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
@@ -1508,16 +408,14 @@ export type TablesUpdate<
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
+    | { schema: keyof Database },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof Database
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+> = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
@@ -1525,16 +423,14 @@ export type Enums<
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
+    | { schema: keyof Database },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof Database
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
-}
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
@@ -1542,7 +438,6 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "moderator", "user"],
       assignment_status: ["pending", "assigned", "failed", "expired"],
       purchase_status: ["pending", "completed", "failed", "refunded"],
     },

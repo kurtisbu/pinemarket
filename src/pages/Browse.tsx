@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import Header from '@/components/Header';
@@ -23,10 +23,6 @@ interface Program {
   average_rating: number;
   rating_count: number;
   created_at: string;
-  pricing_model: string;
-  monthly_price: number | null;
-  yearly_price: number | null;
-  billing_interval: string | null;
   seller: {
     display_name: string;
     username: string;
@@ -35,7 +31,6 @@ interface Program {
 
 const Browse = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState(searchParams.get('category') || 'All');
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
   const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'newest');
@@ -120,10 +115,6 @@ const Browse = () => {
     },
   });
 
-  const handleProgramClick = (programId: string) => {
-    navigate(`/program/${programId}`);
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <Header onSearch={setSearchQuery} searchQuery={searchQuery} />
@@ -166,8 +157,17 @@ const Browse = () => {
             {programs.map((program) => (
               <ProgramCard
                 key={program.id}
-                program={program}
-                onClick={() => handleProgramClick(program.id)}
+                id={program.id}
+                title={program.title}
+                description={program.description}
+                price={program.price}
+                rating={program.average_rating}
+                downloads={program.download_count}
+                views={program.view_count}
+                category={program.category}
+                author={program.seller?.display_name || 'Unknown'}
+                image={program.image_urls?.[0] || '/placeholder.svg'}
+                tags={program.tags || []}
               />
             ))}
           </div>

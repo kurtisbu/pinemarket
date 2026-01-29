@@ -5,7 +5,6 @@ import Header from '@/components/Header';
 import Hero from '@/components/Hero';
 import CategoryFilter from '@/components/CategoryFilter';
 import FeaturedPrograms from '@/components/FeaturedPrograms';
-import FeaturedCreators from '@/components/FeaturedCreators';
 import Footer from '@/components/Footer';
 
 const Index = () => {
@@ -48,7 +47,6 @@ const Index = () => {
           onCategoryChange={handleCategoryChange}
           categoryCounts={categoryCounts}
         />
-        <FeaturedCreators limit={6} />
         <FeaturedPrograms />
       </main>
       <Footer />
