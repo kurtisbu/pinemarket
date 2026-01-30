@@ -375,6 +375,45 @@ export type Database = {
           },
         ]
       }
+      program_scripts: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          program_id: string
+          tradingview_script_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          program_id: string
+          tradingview_script_id: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          program_id?: string
+          tradingview_script_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "program_scripts_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "program_scripts_tradingview_script_id_fkey"
+            columns: ["tradingview_script_id"]
+            isOneToOne: false
+            referencedRelation: "tradingview_scripts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       programs: {
         Row: {
           average_rating: number

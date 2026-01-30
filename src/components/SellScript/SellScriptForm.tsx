@@ -3,7 +3,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import ProgramBasicForm from './ProgramBasicForm';
 import TagManager from './TagManager';
-import ScriptUploadSection from './ScriptUploadSection';
+import ScriptSelector from './ScriptSelector';
 import MediaUploadSection from './MediaUploadSection';
 import { PriceManager, type PriceObject } from './PriceManager';
 
@@ -23,10 +23,8 @@ interface SellScriptFormProps {
   setCurrentTag: (tag: string) => void;
   onAddTag: () => void;
   onRemoveTag: (tag: string) => void;
-  scriptType: 'file' | 'link';
-  setScriptType: (type: 'file' | 'link') => void;
-  scriptFile: File | null;
-  setScriptFile: (file: File | null) => void;
+  selectedScripts: string[];
+  onScriptsChange: (scripts: string[]) => void;
   mediaFiles: File[];
   setMediaFiles: React.Dispatch<React.SetStateAction<File[]>>;
   prices: PriceObject[];
@@ -47,10 +45,8 @@ const SellScriptForm: React.FC<SellScriptFormProps> = ({
   setCurrentTag,
   onAddTag,
   onRemoveTag,
-  scriptType,
-  setScriptType,
-  scriptFile,
-  setScriptFile,
+  selectedScripts,
+  onScriptsChange,
   mediaFiles,
   setMediaFiles,
   prices,
@@ -78,13 +74,9 @@ const SellScriptForm: React.FC<SellScriptFormProps> = ({
         onRemoveTag={onRemoveTag}
       />
 
-      <ScriptUploadSection
-        scriptType={scriptType}
-        setScriptType={setScriptType}
-        scriptFile={scriptFile}
-        setScriptFile={setScriptFile}
-        tradingViewUrl={formData.tradingview_publication_url}
-        onUrlChange={(url) => onInputChange('tradingview_publication_url', url)}
+      <ScriptSelector
+        selectedScripts={selectedScripts}
+        onSelectionChange={onScriptsChange}
       />
 
       <MediaUploadSection

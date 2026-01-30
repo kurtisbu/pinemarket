@@ -10,8 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import Header from '@/components/Header';
+import ScriptSelector from '@/components/SellScript/ScriptSelector';
 import { Upload, X, Plus } from 'lucide-react';
 
 const EditProgram = () => {
@@ -22,13 +22,10 @@ const EditProgram = () => {
   
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [scriptFile, setScriptFile] = useState<File | null>(null);
-  const [scriptType, setScriptType] = useState<'file' | 'link'>('file');
-  const [tradingViewLink, setTradingViewLink] = useState('');
-  const [currentScriptType, setCurrentScriptType] = useState<'file' | 'link'>('file');
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [currentTag, setCurrentTag] = useState('');
   const [existingImageUrls, setExistingImageUrls] = useState<string[]>([]);
+  const [selectedScripts, setSelectedScripts] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -78,16 +75,16 @@ const EditProgram = () => {
       });
       setExistingImageUrls(data.image_urls || []);
       
-      // Determine if current script is a file or link
-      if (data.script_file_path) {
-        if (data.script_file_path.startsWith('http')) {
-          setCurrentScriptType('link');
-          setScriptType('link');
-          setTradingViewLink(data.script_file_path);
-        } else {
-          setCurrentScriptType('file');
-          setScriptType('file');
-        }
+      // Fetch existing program scripts
+      const { data: programScripts, error: psError } = await supabase
+        .from('program_scripts')
+        .select('tradingview_script_id')
+        .eq('program_id', id);
+
+      if (psError) {
+        console.error('Failed to fetch program scripts:', psError);
+      } else {
+        setSelectedScripts(programScripts?.map(ps => ps.tradingview_script_id) || []);
       }
     } catch (error: any) {
       toast({
@@ -125,21 +122,6 @@ const EditProgram = () => {
     }));
   };
 
-  const handleScriptFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (!file.name.endsWith('.txt')) {
-        toast({
-          title: 'Invalid file type',
-          description: 'Please upload a .txt file containing your Pine Script.',
-          variant: 'destructive',
-        });
-        return;
-      }
-      setScriptFile(file);
-    }
-  };
-
   const handleMediaFilesChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     setMediaFiles(prev => [...prev, ...files]);
@@ -175,25 +157,24 @@ const EditProgram = () => {
     e.preventDefault();
     if (!user) return;
 
+    if (selectedScripts.length === 0) {
+      toast({
+        title: 'Select at least one script',
+        description: 'Please select at least one TradingView script to include.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      let scriptPath;
-      
-      // Handle script update based on type
-      if (scriptType === 'file' && scriptFile) {
-        scriptPath = await uploadFile(scriptFile, 'scripts', user.id);
-      } else if (scriptType === 'link' && tradingViewLink.trim()) {
-        scriptPath = tradingViewLink;
-      }
-      // If no new script provided, keep existing path (don't update)
-
       const newImageUrls: string[] = [];
       for (const file of mediaFiles) {
         const url = await uploadFile(file, 'program-media', user.id);
         newImageUrls.push(url);
       }
 
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         title: formData.title,
         description: formData.description,
         price: parseFloat(formData.price),
@@ -202,16 +183,30 @@ const EditProgram = () => {
         image_urls: [...existingImageUrls, ...newImageUrls]
       };
 
-      if (scriptPath) {
-        updateData.script_file_path = scriptPath;
-      }
-
       const { error } = await supabase
         .from('programs')
         .update(updateData)
         .eq('id', id);
 
       if (error) throw error;
+
+      // Update program_scripts: delete old and insert new
+      await supabase
+        .from('program_scripts')
+        .delete()
+        .eq('program_id', id);
+
+      const scriptLinks = selectedScripts.map((scriptId, index) => ({
+        program_id: id,
+        tradingview_script_id: scriptId,
+        display_order: index,
+      }));
+
+      const { error: scriptsError } = await supabase
+        .from('program_scripts')
+        .insert(scriptLinks);
+
+      if (scriptsError) throw scriptsError;
 
       toast({
         title: 'Program updated',
@@ -334,55 +329,10 @@ const EditProgram = () => {
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <Label>Update Pine Script (Optional)</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Current script type: {currentScriptType === 'link' ? 'TradingView link' : 'Uploaded file'}
-                  </p>
-                  <RadioGroup value={scriptType} onValueChange={(value: 'file' | 'link') => setScriptType(value)}>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="file" id="file" />
-                      <Label htmlFor="file">Upload new .txt file</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="link" id="link" />
-                      <Label htmlFor="link">Update TradingView publication link</Label>
-                    </div>
-                  </RadioGroup>
-
-                  {scriptType === 'file' ? (
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
-                      <div className="text-center">
-                        <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                        <div className="mt-4">
-                          <Label htmlFor="script" className="cursor-pointer">
-                            <span className="mt-2 block text-sm font-medium text-gray-900">
-                              {scriptFile ? scriptFile.name : 'Upload new .txt file to replace existing script'}
-                            </span>
-                          </Label>
-                          <Input
-                            id="script"
-                            type="file"
-                            accept=".txt"
-                            onChange={handleScriptFileChange}
-                            className="hidden"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <Input
-                        value={tradingViewLink}
-                        onChange={(e) => setTradingViewLink(e.target.value)}
-                        placeholder="https://www.tradingview.com/script/..."
-                      />
-                      <p className="text-sm text-muted-foreground">
-                        Update the link to your published Pine Script on TradingView
-                      </p>
-                    </div>
-                  )}
-                </div>
+                <ScriptSelector
+                  selectedScripts={selectedScripts}
+                  onSelectionChange={setSelectedScripts}
+                />
 
                 <div className="space-y-2">
                   <Label>Current Images</Label>
@@ -410,12 +360,12 @@ const EditProgram = () => {
 
                 <div className="space-y-2">
                   <Label htmlFor="media">Add More Screenshots & GIFs</Label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
+                  <div className="border-2 border-dashed border-border rounded-lg p-6">
                     <div className="text-center">
-                      <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                      <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
                       <div className="mt-4">
                         <Label htmlFor="media" className="cursor-pointer">
-                          <span className="mt-2 block text-sm font-medium text-gray-900">
+                          <span className="mt-2 block text-sm font-medium">
                             Upload additional images and GIFs
                           </span>
                         </Label>
@@ -435,7 +385,7 @@ const EditProgram = () => {
                       <h4 className="text-sm font-medium mb-2">New files to add:</h4>
                       <div className="space-y-2">
                         {mediaFiles.map((file, index) => (
-                          <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                          <div key={index} className="flex items-center justify-between bg-muted p-2 rounded">
                             <span className="text-sm">{file.name}</span>
                             <Button
                               type="button"
@@ -453,7 +403,7 @@ const EditProgram = () => {
                 </div>
 
                 <div className="flex gap-4">
-                  <Button type="submit" disabled={loading} className="flex-1">
+                  <Button type="submit" disabled={loading || selectedScripts.length === 0} className="flex-1">
                     {loading ? 'Updating...' : 'Update Program'}
                   </Button>
                   <Button type="button" variant="outline" onClick={() => navigate('/my-programs')}>

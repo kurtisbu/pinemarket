@@ -221,30 +221,74 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
       console.log("[WEBHOOK] All script assignments created for package");
     }
   } else if (programId) {
-    // Single program purchase
-    const { data: program } = await supabaseAdmin
-      .from('programs')
-      .select('tradingview_script_id')
-      .eq('id', programId)
-      .single();
+    // Single program purchase - get all linked scripts from program_scripts
+    const { data: programScripts, error: psError } = await supabaseAdmin
+      .from('program_scripts')
+      .select(`
+        tradingview_script_id,
+        tradingview_scripts (
+          pine_id
+        )
+      `)
+      .eq('program_id', programId)
+      .order('display_order');
 
-    if (program) {
-      await supabaseAdmin
-        .from('script_assignments')
-        .insert({
-          purchase_id: purchase.id,
-          program_id: programId,
-          buyer_id: userId,
-          seller_id: sellerId,
-          status: 'pending',
-          access_type: priceType === 'recurring' ? 'subscription' : 'full_purchase',
-          is_trial: false,
-          tradingview_username: tradingviewUsername,
-          pine_id: program.tradingview_script_id,
-          tradingview_script_id: program.tradingview_script_id,
-        });
+    if (psError) {
+      console.error("[WEBHOOK] Error fetching program scripts:", psError);
+    }
+
+    if (programScripts && programScripts.length > 0) {
+      console.log(`[WEBHOOK] Creating ${programScripts.length} script assignments for program`);
       
-      console.log("[WEBHOOK] Script assignment created for program");
+      // Create script assignment for each linked TradingView script
+      for (const ps of programScripts) {
+        const pineId = ps.tradingview_scripts?.pine_id || null;
+        
+        await supabaseAdmin
+          .from('script_assignments')
+          .insert({
+            purchase_id: purchase.id,
+            program_id: programId,
+            buyer_id: userId,
+            seller_id: sellerId,
+            status: 'pending',
+            access_type: priceType === 'recurring' ? 'subscription' : 'full_purchase',
+            is_trial: false,
+            tradingview_username: tradingviewUsername,
+            pine_id: pineId,
+            tradingview_script_id: pineId,
+          });
+      }
+      
+      console.log("[WEBHOOK] All script assignments created for program");
+    } else {
+      // Fallback: Check legacy tradingview_script_id column
+      const { data: program } = await supabaseAdmin
+        .from('programs')
+        .select('tradingview_script_id')
+        .eq('id', programId)
+        .single();
+
+      if (program?.tradingview_script_id) {
+        await supabaseAdmin
+          .from('script_assignments')
+          .insert({
+            purchase_id: purchase.id,
+            program_id: programId,
+            buyer_id: userId,
+            seller_id: sellerId,
+            status: 'pending',
+            access_type: priceType === 'recurring' ? 'subscription' : 'full_purchase',
+            is_trial: false,
+            tradingview_username: tradingviewUsername,
+            pine_id: program.tradingview_script_id,
+            tradingview_script_id: program.tradingview_script_id,
+          });
+        
+        console.log("[WEBHOOK] Script assignment created using legacy tradingview_script_id");
+      } else {
+        console.log("[WEBHOOK] No scripts found for program:", programId);
+      }
     }
   }
 }

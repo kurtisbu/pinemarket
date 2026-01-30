@@ -187,7 +187,7 @@ const ProgramDetail = () => {
           <div className="lg:col-span-2 space-y-6">
             <ImageGallery images={program.image_urls || []} />
             <ProgramHeader program={program} />
-            <ProgramDescription description={program.description} tags={program.tags} />
+            <ProgramDescription description={program.description} tags={program.tags} programId={program.id} />
             
             <UserRatingSection 
               programId={program.id} 
