@@ -33,6 +33,8 @@ const SellScript = () => {
     setMediaFiles,
     prices,
     setPrices,
+    selectedScripts,
+    setSelectedScripts,
     handleSubmit,
     loading,
     securityValidating,
@@ -126,10 +128,8 @@ const SellScript = () => {
                 setCurrentTag={setCurrentTag}
                 onAddTag={addTag}
                 onRemoveTag={removeTag}
-                scriptType={scriptType}
-                setScriptType={setScriptType}
-                scriptFile={scriptFile}
-                setScriptFile={setScriptFile}
+                selectedScripts={selectedScripts}
+                onScriptsChange={setSelectedScripts}
                 mediaFiles={mediaFiles}
                 setMediaFiles={setMediaFiles}
                 prices={prices}

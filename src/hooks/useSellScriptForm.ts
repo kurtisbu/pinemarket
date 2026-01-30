@@ -22,6 +22,7 @@ export const useSellScriptForm = () => {
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [currentTag, setCurrentTag] = useState('');
   const [prices, setPrices] = useState<PriceObject[]>([]);
+  const [selectedScripts, setSelectedScripts] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -99,6 +100,16 @@ export const useSellScriptForm = () => {
       return;
     }
 
+    // Validate at least one script is selected
+    if (selectedScripts.length === 0) {
+      toast({
+        title: 'Select at least one script',
+        description: 'Please select at least one TradingView script to include in this program.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     // Validate prices
     if (prices.length === 0) {
       toast({
@@ -168,31 +179,10 @@ export const useSellScriptForm = () => {
 
     try {
       let scriptPath: string | null = null;
-      let publicationUrl: string | null = null;
-      let scriptId: string | null = null;
 
-      if (scriptType === 'file') {
-        if (!scriptFile) {
-          toast({ title: 'Script file required', description: 'Please upload a .txt file containing your Pine Script.', variant: 'destructive' });
-          setLoading(false);
-          return;
-        }
+      // Legacy file upload support (still available but not primary)
+      if (scriptType === 'file' && scriptFile) {
         scriptPath = await uploadFile(scriptFile, 'pine-scripts', user.id);
-      } else if (scriptType === 'link') {
-        if (!formData.tradingview_publication_url.trim()) {
-          toast({ title: 'TradingView link required', description: 'Please provide a TradingView publication link.', variant: 'destructive' });
-          setLoading(false);
-          return;
-        }
-        publicationUrl = formData.tradingview_publication_url;
-        const scriptIdMatch = publicationUrl.match(/script\/([a-zA-Z0-9-]+)\//);
-        scriptId = scriptIdMatch ? scriptIdMatch[1] : null;
-
-        if (!scriptId) {
-            toast({ title: 'Invalid TradingView URL', description: 'Could not extract script ID from the provided link.', variant: 'destructive' });
-            setLoading(false);
-            return;
-        }
       }
 
       const imageUrls: string[] = [];
@@ -230,10 +220,10 @@ export const useSellScriptForm = () => {
         image_urls: imageUrls,
         status: 'draft',
         script_file_path: scriptPath,
-        tradingview_publication_url: publicationUrl,
-        tradingview_script_id: scriptId,
-        pricing_model: 'flexible', // New flexible pricing model
-        price: 0, // Price is now in program_prices table
+        tradingview_publication_url: null, // No longer a single URL
+        tradingview_script_id: null, // Now using program_scripts junction table
+        pricing_model: 'flexible',
+        price: 0,
         trial_period_days: formData.offer_trial ? formData.trial_period_days : 0
       };
 
@@ -244,6 +234,19 @@ export const useSellScriptForm = () => {
         .single();
 
       if (programError) throw programError;
+
+      // Insert program_scripts junction records
+      const scriptLinks = selectedScripts.map((scriptId, index) => ({
+        program_id: program.id,
+        tradingview_script_id: scriptId,
+        display_order: index,
+      }));
+
+      const { error: scriptsError } = await supabase
+        .from('program_scripts')
+        .insert(scriptLinks);
+
+      if (scriptsError) throw scriptsError;
 
       // Insert all price objects
       const priceData = prices.map((price, index) => ({
@@ -278,12 +281,11 @@ export const useSellScriptForm = () => {
         }
       } catch (stripeError: any) {
         console.error('Stripe integration error:', stripeError);
-        // Don't fail the whole operation if Stripe fails
       }
 
       toast({
         title: 'Program created successfully',
-        description: `Your Pine Script program has been created with ${prices.length} pricing option${prices.length !== 1 ? 's' : ''}${imageUrls.length > 0 ? ` and ${imageUrls.length} image${imageUrls.length !== 1 ? 's' : ''}` : ''}.`,
+        description: `Your program with ${selectedScripts.length} script${selectedScripts.length !== 1 ? 's' : ''} has been created with ${prices.length} pricing option${prices.length !== 1 ? 's' : ''}.`,
       });
 
       navigate('/my-programs');
@@ -303,6 +305,7 @@ export const useSellScriptForm = () => {
   const isFormValid = formData.title.trim() && 
     formData.description.trim() && 
     formData.category && 
+    selectedScripts.length > 0 &&
     prices.length > 0 &&
     prices.every(p => 
       p.display_name.trim() && 
@@ -327,6 +330,8 @@ export const useSellScriptForm = () => {
     setMediaFiles,
     prices,
     setPrices,
+    selectedScripts,
+    setSelectedScripts,
     handleSubmit,
     loading,
     securityValidating,
