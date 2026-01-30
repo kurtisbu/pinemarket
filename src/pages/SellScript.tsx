@@ -62,19 +62,21 @@ const SellScript = () => {
       if (!user) return;
       
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('stripe_account_id, stripe_charges_enabled')
-          .eq('id', user.id)
-          .single();
+        // Use secure RPC function to get Stripe status without exposing account ID
+        const { data, error } = await supabase.rpc('get_user_stripe_status');
 
         if (error) throw error;
 
-        setStripeStatus({
-          account_id: data.stripe_account_id,
-          charges_enabled: data.stripe_charges_enabled,
-          loading: false,
-        });
+        if (data && data.length > 0) {
+          const status = data[0];
+          setStripeStatus({
+            account_id: status.has_stripe_account ? 'connected' : null, // Don't expose actual ID
+            charges_enabled: status.charges_enabled,
+            loading: false,
+          });
+        } else {
+          setStripeStatus(prev => ({ ...prev, loading: false }));
+        }
       } catch (error) {
         console.error('Error fetching Stripe status:', error);
         setStripeStatus(prev => ({ ...prev, loading: false }));
