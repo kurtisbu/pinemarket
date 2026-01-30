@@ -1,170 +1,233 @@
 
-# Fix TradingView Script Sync Using Pine Facade API
+# Bundle Multiple Scripts into a Program
 
-## Problem Summary
+## Summary
 
-The current implementation uses `https://www.tradingview.com/pine_perm/list_scripts/` which only returns Pine IDs without titles or URLs. The subsequent scraping methods (Access Manager, Search API, Profile page) are failing to map Pine IDs to their actual script information.
+Change the program creation flow to allow sellers to select multiple TradingView scripts when creating a sellable product. This transforms a "program" from being tied to a single script into a flexible bundle that can contain one or more scripts.
 
-## Solution
-
-Replace the entire discovery logic with TradingView's **Pine Facade API** endpoint discovered in your Python script:
-
-```
-https://pine-facade.tradingview.com/pine-facade/list?filter=published&limit=100
-```
-
-This endpoint returns complete script objects with `scriptName`, `scriptIdPart`, and `scriptAccess` - eliminating the need for multiple fallback scraping methods.
-
-## What Changes
-
-### 1. Update syncUserScripts.ts
-
-**Replace** the complex multi-method approach with a single, reliable API call:
+## Current vs. Proposed Flow
 
 ```text
-BEFORE (Complex & Failing):
-┌──────────────────────────────────────┐
-│ 1. Fetch /pine_perm/list_scripts/    │ → Only gets Pine IDs
-│ 2. Scrape /pine_perm/add/ page       │ → Unreliable HTML parsing  
-│ 3. Search API with username          │ → May not find all scripts
-│ 4. Profile page scraping             │ → JavaScript-loaded content
-│ 5. Merge results with fallbacks      │ → Usually ends up with "Script [hash]"
-└──────────────────────────────────────┘
+CURRENT FLOW:
++------------------+      +------------------+      +------------------+
+| Create Program   | ---> | Link ONE Script  | ---> | Set Pricing      |
+| (single script)  |      | (URL or file)    |      |                  |
++------------------+      +------------------+      +------------------+
 
-AFTER (Simple & Reliable):
-┌──────────────────────────────────────┐
-│ 1. Fetch /pine-facade/list           │ → Gets FULL script data directly
-│    - scriptName (actual title)       │
-│    - scriptIdPart (pine_id)          │
-│    - scriptAccess (public/invite)    │
-│    - Additional metadata if present  │
-└──────────────────────────────────────┘
+                    OR
+
++------------------+      +------------------+      +------------------+
+| Create Package   | ---> | Select MULTIPLE  | ---> | Set Pricing      |
+| (bundle)         |      | published progs  |      |                  |
++------------------+      +------------------+      +------------------+
+
+
+PROPOSED FLOW:
++------------------+      +------------------+      +------------------+
+| Create Program   | ---> | Select MULTIPLE  | ---> | Set Pricing      |
+| (1+ scripts)     |      | synced scripts   |      |                  |
++------------------+      +------------------+      +------------------+
 ```
 
-### 2. New Primary Function: fetchScriptsFromPineFacade()
+## Database Changes
 
-Create a new function that:
-- Calls `pine-facade.tradingview.com/pine-facade/list?filter=published&limit=100`
-- Uses the same cookie authentication
-- Returns an array of script objects with title, pine_id, and access type
-- This becomes the **primary and most reliable** data source
+### New Junction Table: `program_scripts`
 
-### 3. Keep Existing Methods as Fallbacks
+Create a new table to link programs to multiple TradingView scripts:
 
-The existing methods (Access Manager, Search API, Profile scraping) will become secondary fallbacks in case:
-- The Pine Facade API changes or becomes unavailable
-- Additional metadata (like publication URLs) needs to be fetched separately
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid | Primary key |
+| program_id | uuid | FK to programs |
+| tradingview_script_id | uuid | FK to tradingview_scripts |
+| display_order | integer | Order in which scripts appear |
+| created_at | timestamp | When added |
 
-### 4. Publication URL Discovery
+This table will store the many-to-many relationship between programs and scripts.
 
-The Pine Facade API returns `scriptName` and `scriptIdPart`, but likely **not** the `/script/{slug}/` URL directly. For publication URLs, we'll:
-1. First, try to construct URLs using any `scriptSource` or `slug` field from the response
-2. If not available, use the Search API to find the publication URL by script name
-3. As a last resort, allow manual URL entry (already implemented)
+### Migration for Existing Data
+
+Existing programs with `tradingview_script_id` will be migrated:
+- For each program with a `tradingview_script_id`, create a corresponding entry in `program_scripts`
+- The old `tradingview_script_id` column on `programs` can remain for backward compatibility
+
+## Frontend Changes
+
+### 1. New Component: `ScriptSelector.tsx`
+
+A reusable component that:
+- Displays the seller's synced TradingView scripts from `tradingview_scripts` table
+- Allows multi-select with checkboxes
+- Shows script thumbnails, titles, and pine IDs
+- Supports drag-and-drop reordering
+- Shows a warning if no scripts are synced (with link to sync)
+
+### 2. Update `SellScriptForm.tsx`
+
+Replace the current `ScriptUploadSection` with the new `ScriptSelector`:
+
+```text
+BEFORE:
+- Radio: "TradingView link" or "Upload file"
+- Single URL input or file upload
+
+AFTER:
+- Section header: "Select Scripts to Include"
+- Grid/list of synced TradingView scripts with checkboxes
+- Minimum 1 script required
+- "Sync with TradingView" button if no scripts available
+```
+
+### 3. Update `useSellScriptForm.ts` Hook
+
+- Add `selectedScripts` state (array of script IDs)
+- Remove single `tradingview_publication_url` handling
+- Update form validation to require at least 1 script
+- Update submit handler to:
+  1. Create the program
+  2. Insert entries into `program_scripts` junction table
+
+### 4. Update `ProgramBasicForm.tsx`
+
+Remove any single-script related fields if present.
+
+### 5. Update `EditProgram.tsx`
+
+- Show currently linked scripts
+- Allow adding/removing scripts
+- Update the `program_scripts` junction table on save
+
+## Backend Changes
+
+### 1. Update Edge Function: `stripe-webhook/index.ts`
+
+When processing a purchase:
+- Fetch all scripts linked to the program via `program_scripts`
+- Create a `script_assignment` for EACH linked script
+
+```javascript
+// Fetch scripts for the program
+const { data: programScripts } = await supabaseAdmin
+  .from('program_scripts')
+  .select('tradingview_script_id, tradingview_scripts(pine_id)')
+  .eq('program_id', programId);
+
+// Create assignment for each script
+for (const ps of programScripts) {
+  await supabaseAdmin.from('script_assignments').insert({
+    // ... assignment data with ps.tradingview_scripts.pine_id
+  });
+}
+```
+
+### 2. Update `create-program-prices` Edge Function
+
+No changes needed - pricing is already program-level.
+
+### 3. Update Program Detail Display
+
+When viewing a program, show all included scripts (for buyers to see what they're getting).
+
+## UI/UX Details
+
+### Script Selector Component
+
+```text
++----------------------------------------------------------+
+| Select Scripts to Include *                              |
+| Choose one or more scripts from your TradingView account |
++----------------------------------------------------------+
+| [Sync with TradingView]                                  |
++----------------------------------------------------------+
+| +-------+  +-------+  +-------+                          |
+| |[thumb]|  |[thumb]|  |[thumb]|                          |
+| | ADX   |  | MACD  |  | RSI   |                          |
+| | Strat |  | Cross |  | Div   |                          |
+| |  [x]  |  |  [ ]  |  |  [x]  |                          |
+| +-------+  +-------+  +-------+                          |
++----------------------------------------------------------+
+| Selected: 2 scripts                                      |
++----------------------------------------------------------+
+```
+
+### Program Detail Page (Buyer View)
+
+```text
++----------------------------------------------------------+
+| Complete Trading Suite              $49/month            |
++----------------------------------------------------------+
+| This package includes:                                   |
+| - ADX Strategy (Pine Script)                            |
+| - RSI Divergence Indicator                              |
+|                                                          |
+| [Subscribe Now]                                          |
++----------------------------------------------------------+
+```
+
+## Files to Create
+
+| File | Purpose |
+|------|---------|
+| `src/components/SellScript/ScriptSelector.tsx` | Multi-select script picker component |
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `supabase/functions/tradingview-service/actions/syncUserScripts.ts` | Add `fetchScriptsFromPineFacade()` as primary method, restructure flow |
+| `src/hooks/useSellScriptForm.ts` | Add selectedScripts state, update submit logic |
+| `src/components/SellScript/SellScriptForm.tsx` | Replace ScriptUploadSection with ScriptSelector |
+| `src/pages/EditProgram.tsx` | Add script selection/editing |
+| `src/components/ProgramDetail/ProgramDescription.tsx` | Show included scripts |
+| `supabase/functions/stripe-webhook/index.ts` | Handle multi-script assignments |
 
-## Technical Details
+## Database Migration
 
-### New API Endpoint
+```sql
+-- Create junction table for program-script relationships
+CREATE TABLE program_scripts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  program_id UUID NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+  tradingview_script_id UUID NOT NULL REFERENCES tradingview_scripts(id) ON DELETE CASCADE,
+  display_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(program_id, tradingview_script_id)
+);
 
-```javascript
-const url = 'https://pine-facade.tradingview.com/pine-facade/list';
-const params = new URLSearchParams({
-  filter: 'published',
-  limit: '100'
-});
+-- Enable RLS
+ALTER TABLE program_scripts ENABLE ROW LEVEL SECURITY;
 
-const response = await fetch(`${url}?${params}`, {
-  method: 'GET',
-  headers: {
-    'Origin': 'https://www.tradingview.com',
-    'Referer': 'https://www.tradingview.com/',
-    'User-Agent': 'Mozilla/5.0...',
-  },
-  credentials: 'include',
-  // Cookie: sessionid=...; sessionid_sign=...
-});
+-- Policies
+CREATE POLICY "Sellers can manage their program scripts"
+  ON program_scripts FOR ALL
+  USING (EXISTS (
+    SELECT 1 FROM programs 
+    WHERE programs.id = program_scripts.program_id 
+    AND programs.seller_id = auth.uid()
+  ));
 
-// Response structure based on Python script:
-// [
-//   {
-//     "scriptName": "Patreon - ADX Strategy - Capital Coders",
-//     "scriptIdPart": "PUB;5db34fa27fdb4bbcbb8d656b67273f12",
-//     "scriptAccess": "invite_only" | "open_no_auth",
-//     // Possibly more fields like scriptSource, imageUrl, etc.
-//   },
-//   ...
-// ]
-```
+CREATE POLICY "Everyone can view scripts for published programs"
+  ON program_scripts FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM programs 
+    WHERE programs.id = program_scripts.program_id 
+    AND programs.status = 'published'
+  ));
 
-### Script ID Format
-
-The Python script shows `scriptIdPart` might include the `PUB;` prefix or not. We'll normalize:
-```javascript
-const pineId = item.scriptIdPart.startsWith('PUB;') 
-  ? item.scriptIdPart 
-  : `PUB;${item.scriptIdPart}`;
-```
-
-### Flow Diagram
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                     syncUserScripts()                        │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│  PRIMARY: fetchScriptsFromPineFacade()                       │
-│  GET pine-facade.tradingview.com/pine-facade/list           │
-│  Returns: scriptName, scriptIdPart, scriptAccess            │
-└─────────────────────────────────────────────────────────────┘
-                            │
-              ┌─────────────┴─────────────┐
-              ▼                           ▼
-         Success?                    Failure?
-              │                           │
-              ▼                           ▼
-   ┌──────────────────────┐    ┌──────────────────────┐
-   │ For each script:     │    │ FALLBACK: Use old    │
-   │ - Got title ✓        │    │ methods (Access      │
-   │ - Got pine_id ✓      │    │ Manager, Search API) │
-   │ - Need URL?          │    └──────────────────────┘
-   └──────────────────────┘
-              │
-              ▼
-   ┌──────────────────────┐
-   │ Try to get URL from: │
-   │ 1. scriptSource field│
-   │ 2. Search API lookup │
-   │ 3. Manual entry later│
-   └──────────────────────┘
-              │
-              ▼
-   ┌──────────────────────┐
-   │ Upsert to database   │
-   └──────────────────────┘
+-- Migrate existing programs with tradingview_script_id
+INSERT INTO program_scripts (program_id, tradingview_script_id, display_order)
+SELECT 
+  p.id,
+  ts.id,
+  0
+FROM programs p
+JOIN tradingview_scripts ts ON ts.pine_id = p.tradingview_script_id
+WHERE p.tradingview_script_id IS NOT NULL;
 ```
 
 ## Testing Plan
 
-1. Deploy updated edge function
-2. Trigger a script sync from the seller dashboard
-3. Check edge function logs for:
-   - Successful Pine Facade API call
-   - Correct script names extracted
-   - Any publication URLs found
-4. Verify in UI that scripts show correct titles
-5. Test clicking on scripts to confirm URLs work (or use manual edit if needed)
-
-## Expected Outcome
-
-After this change:
-- **Script titles** will be correct (e.g., "Patreon - ADX Strategy - Capital Coders")
-- **Pine IDs** will be properly linked
-- **Publication URLs** may still need the search API or manual entry, but titles will be accurate
+1. Create a new program with 1 script - verify it works like before
+2. Create a program with 3 scripts - verify all are stored
+3. Edit a program to add/remove scripts
+4. Purchase a multi-script program - verify all scripts get assigned
+5. View program detail page - verify all scripts are displayed to buyers
