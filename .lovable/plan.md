@@ -1,127 +1,170 @@
 
-# Fix TradingView Script Names and Publication URLs
+# Fix TradingView Script Sync Using Pine Facade API
 
 ## Problem Summary
 
-When syncing TradingView scripts, the system correctly fetches **Pine IDs** (e.g., `PUB;5db34fa27fdb4bbcbb8d656b67273f12`) but fails to get the correct:
-- **Script titles** (shows "Script [hash]" instead of "Patreon - ADX Strategy - Capital Coders")
-- **Publication URLs** (shows profile fallback instead of `https://www.tradingview.com/script/2aWqDm4d-...`)
+The current implementation uses `https://www.tradingview.com/pine_perm/list_scripts/` which only returns Pine IDs without titles or URLs. The subsequent scraping methods (Access Manager, Search API, Profile page) are failing to map Pine IDs to their actual script information.
 
-The core issue is that TradingView's URL slug (`2aWqDm4d`) is **completely independent** from the Pine ID - there's no algorithmic way to derive one from the other.
+## Solution
 
-## Root Cause Analysis
+Replace the entire discovery logic with TradingView's **Pine Facade API** endpoint discovered in your Python script:
 
-1. The current code tries to scrape `/u/{username}/scripts/` but this endpoint returns **404**
-2. The user profile page loads scripts via JavaScript, so static HTML scraping doesn't work
-3. TradingView doesn't expose a public API to map Pine IDs to publication URLs
+```
+https://pine-facade.tradingview.com/pine-facade/list?filter=published&limit=100
+```
 
-## Solution: Scrape Script Info Directly from `/pine_perm/add/` Page
+This endpoint returns complete script objects with `scriptName`, `scriptIdPart`, and `scriptAccess` - eliminating the need for multiple fallback scraping methods.
 
-TradingView's **Access Manager** page (`/pine_perm/add/`) shows a dropdown of your scripts with both the title and internal IDs when you're logged in. We can:
+## What Changes
 
-1. Fetch the Access Manager page using the session cookies
-2. Parse the script dropdown options which contain Pine IDs and script names
-3. For each script found, fetch the script's individual page to extract the publication URL
+### 1. Update syncUserScripts.ts
 
-Alternatively, we can use the **HTML of the user's public profile** with an internal API that TradingView uses to load scripts data dynamically.
-
-## Implementation Plan
-
-### Step 1: Update Script Discovery Logic
-
-Modify `syncUserScripts.ts` to:
+**Replace** the complex multi-method approach with a single, reliable API call:
 
 ```text
-+------------------------------------------+
-| 1. Fetch /pine_perm/list_scripts/        |
-|    (Gets all Pine IDs - WORKS)           |
-+------------------------------------------+
-              |
-              v
-+------------------------------------------+
-| 2. Fetch /pine_perm/add/ page            |
-|    (Access Manager with script dropdown) |
-+------------------------------------------+
-              |
-              v
-+------------------------------------------+
-| 3. Parse HTML for <option> or JSON data  |
-|    containing pine_id -> title mapping   |
-+------------------------------------------+
-              |
-              v
-+------------------------------------------+
-| 4. For each pine_id without URL:         |
-|    - Use TradingView search API          |
-|    - OR scrape user's public scripts     |
-|    - OR store title-only for now         |
-+------------------------------------------+
+BEFORE (Complex & Failing):
+┌──────────────────────────────────────┐
+│ 1. Fetch /pine_perm/list_scripts/    │ → Only gets Pine IDs
+│ 2. Scrape /pine_perm/add/ page       │ → Unreliable HTML parsing  
+│ 3. Search API with username          │ → May not find all scripts
+│ 4. Profile page scraping             │ → JavaScript-loaded content
+│ 5. Merge results with fallbacks      │ → Usually ends up with "Script [hash]"
+└──────────────────────────────────────┘
+
+AFTER (Simple & Reliable):
+┌──────────────────────────────────────┐
+│ 1. Fetch /pine-facade/list           │ → Gets FULL script data directly
+│    - scriptName (actual title)       │
+│    - scriptIdPart (pine_id)          │
+│    - scriptAccess (public/invite)    │
+│    - Additional metadata if present  │
+└──────────────────────────────────────┘
 ```
 
-### Step 2: Try Multiple Discovery Methods
+### 2. New Primary Function: fetchScriptsFromPineFacade()
 
-The updated code will try these methods in order:
+Create a new function that:
+- Calls `pine-facade.tradingview.com/pine-facade/list?filter=published&limit=100`
+- Uses the same cookie authentication
+- Returns an array of script objects with title, pine_id, and access type
+- This becomes the **primary and most reliable** data source
 
-1. **Method A**: Parse `/pine_perm/add/` page for script dropdowns containing `pine_id` and titles
-2. **Method B**: Use TradingView's internal scripts search API: `https://www.tradingview.com/pubscripts-suggest-json/?search={username}`
-3. **Method C**: Scrape the user's profile tab content using the hash fragment anchor approach
-4. **Method D**: Store scripts with titles only (fallback), allowing manual URL updates
+### 3. Keep Existing Methods as Fallbacks
 
-### Step 3: Add "Edit Script URL" Feature for Sellers
+The existing methods (Access Manager, Search API, Profile scraping) will become secondary fallbacks in case:
+- The Pine Facade API changes or becomes unavailable
+- Additional metadata (like publication URLs) needs to be fetched separately
 
-Since automated discovery may not always work, add a UI feature allowing sellers to manually update publication URLs for their synced scripts.
+### 4. Publication URL Discovery
 
-## Technical Details
-
-### New API Endpoint to Try
-
-```javascript
-// TradingView's internal scripts search API
-const searchUrl = `https://www.tradingview.com/pubscripts-suggest-json/?search=${encodeURIComponent(scriptTitle)}`;
-```
-
-### Access Manager Page Parsing
-
-```javascript
-// The /pine_perm/add/ page contains a script selector with pine_id values
-// Parse patterns like:
-// <option value="PUB;abc123">Script Title</option>
-// or JSON data embedded in the page
-```
-
-### Manual URL Update (Database)
-
-```sql
--- Allow sellers to update publication_url manually
-UPDATE tradingview_scripts 
-SET publication_url = 'https://www.tradingview.com/script/2aWqDm4d-...'
-WHERE pine_id = 'PUB;5db34fa27fdb4bbcbb8d656b67273f12' 
-AND user_id = :seller_id;
-```
+The Pine Facade API returns `scriptName` and `scriptIdPart`, but likely **not** the `/script/{slug}/` URL directly. For publication URLs, we'll:
+1. First, try to construct URLs using any `scriptSource` or `slug` field from the response
+2. If not available, use the Search API to find the publication URL by script name
+3. As a last resort, allow manual URL entry (already implemented)
 
 ## Files to Modify
 
-1. **`supabase/functions/tradingview-service/actions/syncUserScripts.ts`**
-   - Replace failing scraping logic with Access Manager page parsing
-   - Add TradingView search API fallback
-   - Add better error logging for debugging
+| File | Changes |
+|------|---------|
+| `supabase/functions/tradingview-service/actions/syncUserScripts.ts` | Add `fetchScriptsFromPineFacade()` as primary method, restructure flow |
 
-2. **`src/components/SellerTradingViewIntegration.tsx`** (new feature)
-   - Add "Edit" button next to each script
-   - Allow manual publication URL input
-   - Validate URL format
+## Technical Details
 
-3. **Database** (if needed)
-   - Ensure `publication_url` allows NULL or has a valid fallback
+### New API Endpoint
+
+```javascript
+const url = 'https://pine-facade.tradingview.com/pine-facade/list';
+const params = new URLSearchParams({
+  filter: 'published',
+  limit: '100'
+});
+
+const response = await fetch(`${url}?${params}`, {
+  method: 'GET',
+  headers: {
+    'Origin': 'https://www.tradingview.com',
+    'Referer': 'https://www.tradingview.com/',
+    'User-Agent': 'Mozilla/5.0...',
+  },
+  credentials: 'include',
+  // Cookie: sessionid=...; sessionid_sign=...
+});
+
+// Response structure based on Python script:
+// [
+//   {
+//     "scriptName": "Patreon - ADX Strategy - Capital Coders",
+//     "scriptIdPart": "PUB;5db34fa27fdb4bbcbb8d656b67273f12",
+//     "scriptAccess": "invite_only" | "open_no_auth",
+//     // Possibly more fields like scriptSource, imageUrl, etc.
+//   },
+//   ...
+// ]
+```
+
+### Script ID Format
+
+The Python script shows `scriptIdPart` might include the `PUB;` prefix or not. We'll normalize:
+```javascript
+const pineId = item.scriptIdPart.startsWith('PUB;') 
+  ? item.scriptIdPart 
+  : `PUB;${item.scriptIdPart}`;
+```
+
+### Flow Diagram
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                     syncUserScripts()                        │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  PRIMARY: fetchScriptsFromPineFacade()                       │
+│  GET pine-facade.tradingview.com/pine-facade/list           │
+│  Returns: scriptName, scriptIdPart, scriptAccess            │
+└─────────────────────────────────────────────────────────────┘
+                            │
+              ┌─────────────┴─────────────┐
+              ▼                           ▼
+         Success?                    Failure?
+              │                           │
+              ▼                           ▼
+   ┌──────────────────────┐    ┌──────────────────────┐
+   │ For each script:     │    │ FALLBACK: Use old    │
+   │ - Got title ✓        │    │ methods (Access      │
+   │ - Got pine_id ✓      │    │ Manager, Search API) │
+   │ - Need URL?          │    └──────────────────────┘
+   └──────────────────────┘
+              │
+              ▼
+   ┌──────────────────────┐
+   │ Try to get URL from: │
+   │ 1. scriptSource field│
+   │ 2. Search API lookup │
+   │ 3. Manual entry later│
+   └──────────────────────┘
+              │
+              ▼
+   ┌──────────────────────┐
+   │ Upsert to database   │
+   └──────────────────────┘
+```
 
 ## Testing Plan
 
-1. Re-sync scripts after deploying the updated edge function
-2. Check edge function logs for successful title/URL extraction
-3. Verify clicking on scripts goes to the correct TradingView page
-4. Test manual URL editing as a fallback
+1. Deploy updated edge function
+2. Trigger a script sync from the seller dashboard
+3. Check edge function logs for:
+   - Successful Pine Facade API call
+   - Correct script names extracted
+   - Any publication URLs found
+4. Verify in UI that scripts show correct titles
+5. Test clicking on scripts to confirm URLs work (or use manual edit if needed)
 
-## Timeline
+## Expected Outcome
 
-- Step 1 (Edge function update): Primary fix
-- Step 2 (Manual editing UI): Fallback option if automated discovery still fails
+After this change:
+- **Script titles** will be correct (e.g., "Patreon - ADX Strategy - Capital Coders")
+- **Pine IDs** will be properly linked
+- **Publication URLs** may still need the search API or manual entry, but titles will be accurate
