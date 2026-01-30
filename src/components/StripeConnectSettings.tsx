@@ -28,47 +28,50 @@ const StripeConnectSettings = () => {
 
   const fetchStripeStatus = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('stripe_account_id, stripe_onboarding_completed, stripe_charges_enabled, stripe_payouts_enabled')
-        .eq('id', user.id)
-        .single();
+      // Use secure RPC function to get Stripe status without exposing account ID
+      const { data, error } = await supabase.rpc('get_user_stripe_status');
 
       if (error) throw error;
 
-      setStripeStatus({
-        account_id: data.stripe_account_id,
-        onboarding_completed: data.stripe_onboarding_completed,
-        charges_enabled: data.stripe_charges_enabled,
-        payouts_enabled: data.stripe_payouts_enabled,
-      });
+      if (data && data.length > 0) {
+        const status = data[0];
+        setStripeStatus({
+          account_id: status.has_stripe_account ? 'connected' : null, // Don't expose actual ID
+          onboarding_completed: status.onboarding_completed,
+          charges_enabled: status.charges_enabled,
+          payouts_enabled: status.payouts_enabled,
+        });
 
-      // If account exists, check current status
-      if (data.stripe_account_id) {
-        checkAccountStatus(data.stripe_account_id);
+        // If account exists, refresh status from edge function
+        if (status.has_stripe_account) {
+          checkAccountStatusViaEdgeFunction();
+        }
       }
     } catch (error) {
       console.error('Error fetching Stripe status:', error);
     }
   };
 
-  const checkAccountStatus = async (accountId: string) => {
+  // Secure version - fetches account status via edge function without exposing account ID
+  const checkAccountStatusViaEdgeFunction = async () => {
     try {
       const { data, error } = await supabase.functions.invoke('stripe-connect', {
         body: {
-          action: 'get-account-status',
-          account_id: accountId,
+          action: 'get-my-account-status',
         },
       });
 
       if (error) throw error;
 
-      setStripeStatus(prev => ({
-        ...prev,
-        onboarding_completed: data.details_submitted,
-        charges_enabled: data.charges_enabled,
-        payouts_enabled: data.payouts_enabled,
-      }));
+      if (data?.success) {
+        setStripeStatus(prev => ({
+          ...prev,
+          account_id: data.has_account ? 'connected' : null,
+          onboarding_completed: data.details_submitted,
+          charges_enabled: data.charges_enabled,
+          payouts_enabled: data.payouts_enabled,
+        }));
+      }
     } catch (error) {
       console.error('Error checking account status:', error);
       // If account check fails, it might be inaccessible with current API key
@@ -126,7 +129,7 @@ const StripeConnectSettings = () => {
 
       setStripeStatus(prev => ({
         ...prev,
-        account_id: data.account_id,
+        account_id: 'connected', // Don't expose actual ID
       }));
 
       toast({
@@ -134,8 +137,8 @@ const StripeConnectSettings = () => {
         description: 'Now you need to complete the onboarding process.',
       });
 
-      // Immediately start onboarding
-      startOnboarding(data.account_id);
+      // Immediately start onboarding using secure endpoint
+      startOnboarding();
     } catch (error) {
       toast({
         title: 'Error',
@@ -147,13 +150,13 @@ const StripeConnectSettings = () => {
     }
   };
 
-  const startOnboarding = async (accountId: string) => {
+  // Secure version - doesn't require account_id from client
+  const startOnboarding = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('stripe-connect', {
         body: {
-          action: 'create-account-link',
-          account_id: accountId,
+          action: 'create-my-account-link',
           refresh_url: window.location.href,
           return_url: window.location.href,
         },
@@ -174,6 +177,7 @@ const StripeConnectSettings = () => {
     }
   };
 
+  // Secure version - doesn't require account_id from client
   const openStripeDashboard = async () => {
     if (!stripeStatus.account_id) return;
 
@@ -181,8 +185,7 @@ const StripeConnectSettings = () => {
     try {
       const { data, error } = await supabase.functions.invoke('stripe-connect', {
         body: {
-          action: 'create-dashboard-link',
-          account_id: stripeStatus.account_id,
+          action: 'create-my-dashboard-link',
         },
       });
 
@@ -271,7 +274,7 @@ const StripeConnectSettings = () => {
             </Button>
           ) : !stripeStatus.onboarding_completed ? (
             <Button 
-              onClick={() => startOnboarding(stripeStatus.account_id)}
+              onClick={startOnboarding}
               disabled={loading}
               variant="outline"
               className="flex items-center gap-2"
@@ -294,7 +297,7 @@ const StripeConnectSettings = () => {
           {stripeStatus.account_id && (
             <>
               <Button 
-                onClick={() => checkAccountStatus(stripeStatus.account_id)}
+                onClick={checkAccountStatusViaEdgeFunction}
                 variant="ghost"
                 size="sm"
               >
@@ -317,7 +320,7 @@ const StripeConnectSettings = () => {
 
         {stripeStatus.account_id && (
           <div className="text-xs text-muted-foreground">
-            <p>Account ID: {stripeStatus.account_id}</p>
+            <p>Stripe account connected</p>
             <p className="mt-1">
               If you're having connection issues, try resetting and creating a new account.
             </p>

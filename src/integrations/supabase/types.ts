@@ -1376,6 +1376,15 @@ export type Database = {
         Args: { program_id_param: string }
         Returns: string
       }
+      get_user_stripe_status: {
+        Args: never
+        Returns: {
+          charges_enabled: boolean
+          has_stripe_account: boolean
+          onboarding_completed: boolean
+          payouts_enabled: boolean
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
