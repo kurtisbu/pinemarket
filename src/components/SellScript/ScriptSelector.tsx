@@ -195,7 +195,13 @@ const ScriptSelector: React.FC<ScriptSelectorProps> = ({
                       ? 'ring-2 ring-primary bg-primary/5'
                       : 'hover:bg-muted/50'
                   }`}
-                  onClick={() => toggleScript(script.id)}
+                  onClick={(e) => {
+                    // Prevent double-toggle when clicking checkbox directly
+                    if ((e.target as HTMLElement).closest('button[role="checkbox"]')) {
+                      return;
+                    }
+                    toggleScript(script.id);
+                  }}
                 >
                   <div className="p-4">
                     {script.image_url && (
@@ -213,6 +219,7 @@ const ScriptSelector: React.FC<ScriptSelectorProps> = ({
                         checked={isSelected}
                         onCheckedChange={() => toggleScript(script.id)}
                         className="mt-1"
+                        onClick={(e) => e.stopPropagation()}
                       />
                       <div className="flex-1 min-w-0">
                         <h4 className="font-medium text-sm line-clamp-2">
@@ -232,7 +239,7 @@ const ScriptSelector: React.FC<ScriptSelectorProps> = ({
                         target="_blank"
                         rel="noopener noreferrer"
                         className="mt-2 text-xs text-primary hover:underline flex items-center gap-1"
-                        onClick={e => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
                       >
                         View on TradingView
                         <ExternalLink className="w-3 h-3" />
