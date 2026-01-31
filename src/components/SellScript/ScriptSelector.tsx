@@ -233,19 +233,6 @@ const ScriptSelector: React.FC<ScriptSelectorProps> = ({
                       </div>
                     </div>
 
-                    {script.publication_url && (
-                      <a
-                        href={script.publication_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-2 text-xs text-primary hover:underline flex items-center gap-1"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        View on TradingView
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
-
                     {isSelected && (
                       <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1">
                         <Check className="w-3 h-3" />
