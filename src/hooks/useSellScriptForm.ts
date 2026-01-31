@@ -84,14 +84,20 @@ export const useSellScriptForm = () => {
     e.preventDefault();
     if (!user) return;
 
-    // Check Stripe connection
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('stripe_account_id, stripe_charges_enabled')
-      .eq('id', user.id)
-      .single();
+    // Check Stripe connection using secure RPC function
+    const { data: stripeStatus, error: stripeError } = await supabase.rpc('get_user_stripe_status');
 
-    if (!profile?.stripe_account_id || !profile.stripe_charges_enabled) {
+    if (stripeError || !stripeStatus || stripeStatus.length === 0) {
+      toast({
+        title: 'Error checking Stripe status',
+        description: 'Unable to verify your Stripe account. Please try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const status = stripeStatus[0];
+    if (!status.has_stripe_account || !status.charges_enabled) {
       toast({
         title: 'Stripe Account Required',
         description: 'You must connect and complete your Stripe account setup before publishing programs.',
