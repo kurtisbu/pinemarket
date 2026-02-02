@@ -62,22 +62,39 @@ export const AdminPayoutManagement = () => {
       if (payoutError) throw payoutError;
       setRecentPayouts(payoutData || []);
 
-      // Fetch pending bank verifications
+      // Fetch pending bank verifications - SECURITY: Only fetch non-sensitive fields
+      // Exclude bank_account_number, bank_routing_number to prevent exposure of sensitive data
       const { data: verificationData, error: verificationError } = await supabase
         .from('seller_payout_info')
         .select(`
-          *,
-          profiles!seller_payout_info_user_id_fkey (
-            display_name,
-            username,
-            email
-          )
+          id,
+          user_id,
+          payout_method,
+          bank_account_holder_name,
+          bank_name,
+          country,
+          currency,
+          is_verified,
+          created_at
         `)
         .eq('is_verified', false)
         .order('created_at', { ascending: false });
 
       if (verificationError) throw verificationError;
-      setPendingVerifications(verificationData || []);
+      
+      // Enrich with profile data (only display_name and username)
+      const enrichedVerifications = await Promise.all(
+        (verificationData || []).map(async (v) => {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('display_name, username')
+            .eq('id', v.user_id)
+            .single();
+          return { ...v, profiles: profile || { display_name: 'Unknown', username: 'unknown' } };
+        })
+      );
+      
+      setPendingVerifications(enrichedVerifications);
     } catch (error: any) {
       console.error('Error fetching data:', error);
       toast({
@@ -278,7 +295,6 @@ export const AdminPayoutManagement = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Seller</TableHead>
-                  <TableHead>Email</TableHead>
                   <TableHead>Bank Name</TableHead>
                   <TableHead>Account Holder</TableHead>
                   <TableHead>Country</TableHead>
@@ -288,17 +304,12 @@ export const AdminPayoutManagement = () => {
               </TableHeader>
               <TableBody>
                 {pendingVerifications.map((verification) => {
-                  const profile = Array.isArray(verification.profiles) 
-                    ? verification.profiles[0] 
-                    : verification.profiles;
+                  const profile = verification.profiles;
 
                   return (
                     <TableRow key={verification.id}>
                       <TableCell className="font-medium">
                         {profile?.display_name || profile?.username || 'Unknown'}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {profile?.email || '-'}
                       </TableCell>
                       <TableCell>{verification.bank_name || '-'}</TableCell>
                       <TableCell>{verification.bank_account_holder_name || '-'}</TableCell>
