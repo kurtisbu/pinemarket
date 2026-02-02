@@ -14,12 +14,84 @@ serve(async (req) => {
   }
 
   try {
-    const { action, ...payload } = await req.json();
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: Missing or invalid authorization header' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401,
+        }
+      );
+    }
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
+
+    // Verify the JWT token and get the authenticated user
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (claimsError || !claimsData?.user) {
+      console.error('[AUTH] Token verification failed:', claimsError?.message);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: Invalid token' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401,
+        }
+      );
+    }
+
+    const authenticatedUserId = claimsData.user.id;
+    console.log('[AUTH] Authenticated user:', authenticatedUserId);
+
+    const { action, ...payload } = await req.json();
+
+    // Verify the authenticated user matches the user_id in payload for user-specific actions
+    const userSpecificActions = ['test-connection', 'sync-user-scripts', 'disconnect-tradingview'];
+    if (userSpecificActions.includes(action)) {
+      if (payload.user_id && payload.user_id !== authenticatedUserId) {
+        console.error('[AUTH] User ID mismatch:', payload.user_id, '!==', authenticatedUserId);
+        return new Response(
+          JSON.stringify({ error: 'Forbidden: You can only perform this action for your own account' }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 403,
+          }
+        );
+      }
+      // Override payload.user_id with authenticated user ID for safety
+      payload.user_id = authenticatedUserId;
+    }
+
+    // For assign-script-access and revoke-script-access, verify the authenticated user is the seller
+    const sellerActions = ['assign-script-access', 'revoke-script-access'];
+    if (sellerActions.includes(action)) {
+      // These actions should be called by the seller or service
+      // Verify seller_id matches authenticated user OR user is admin
+      if (payload.seller_id && payload.seller_id !== authenticatedUserId) {
+        // Check if user is admin
+        const { data: isAdmin } = await supabaseAdmin.rpc('has_role', { 
+          _user_id: authenticatedUserId, 
+          _role: 'admin' 
+        });
+        
+        if (!isAdmin) {
+          console.error('[AUTH] Non-admin attempting seller action for another user');
+          return new Response(
+            JSON.stringify({ error: 'Forbidden: You can only manage your own script assignments' }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 403,
+            }
+          );
+        }
+      }
+    }
     
     const encryptionKeyString = Deno.env.get('TRADINGVIEW_ENCRYPTION_KEY');
     if (!encryptionKeyString) {

@@ -19,8 +19,8 @@ interface BankAccount {
   user_id: string;
   payout_method: string;
   bank_account_holder_name: string;
-  bank_account_number: string;
-  bank_routing_number: string;
+  // Note: bank_account_number and bank_routing_number are NOT fetched for security
+  // Only last 4 digits should be displayed (stored masked in the component)
   bank_name: string;
   country: string;
   currency: string;
@@ -43,20 +43,24 @@ export function AdminBankVerification() {
     try {
       setLoading(true);
 
-      // Fetch pending accounts
+      // SECURITY: Only fetch non-sensitive fields - exclude bank_account_number and bank_routing_number
+      // These sensitive fields should never be exposed to the admin UI
+      const safeFields = 'id, user_id, payout_method, bank_account_holder_name, bank_name, country, currency, is_verified, created_at';
+
+      // Fetch pending accounts (without sensitive bank details)
       const { data: pending, error: pendingError } = await supabase
         .from('seller_payout_info')
-        .select('*')
+        .select(safeFields)
         .eq('is_verified', false)
         .eq('payout_method', 'bank_transfer')
         .order('created_at', { ascending: false });
 
       if (pendingError) throw pendingError;
 
-      // Fetch verified accounts
+      // Fetch verified accounts (without sensitive bank details)
       const { data: verified, error: verifiedError } = await supabase
         .from('seller_payout_info')
-        .select('*')
+        .select(safeFields)
         .eq('is_verified', true)
         .eq('payout_method', 'bank_transfer')
         .order('created_at', { ascending: false })
@@ -146,11 +150,6 @@ export function AdminBankVerification() {
     }
   };
 
-  const maskAccountNumber = (accountNumber: string) => {
-    if (!accountNumber || accountNumber.length < 4) return '****';
-    return '****' + accountNumber.slice(-4);
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -184,8 +183,6 @@ export function AdminBankVerification() {
                   <TableHead>Seller</TableHead>
                   <TableHead>Account Holder</TableHead>
                   <TableHead>Bank Name</TableHead>
-                  <TableHead>Account Number</TableHead>
-                  <TableHead>Routing Number</TableHead>
                   <TableHead>Country</TableHead>
                   <TableHead>Currency</TableHead>
                   <TableHead>Submitted</TableHead>
@@ -203,10 +200,6 @@ export function AdminBankVerification() {
                     </TableCell>
                     <TableCell>{account.bank_account_holder_name}</TableCell>
                     <TableCell>{account.bank_name || 'N/A'}</TableCell>
-                    <TableCell className="font-mono">
-                      {maskAccountNumber(account.bank_account_number)}
-                    </TableCell>
-                    <TableCell className="font-mono">{account.bank_routing_number}</TableCell>
                     <TableCell>{account.country}</TableCell>
                     <TableCell>{account.currency}</TableCell>
                     <TableCell>
@@ -271,7 +264,6 @@ export function AdminBankVerification() {
                   <TableHead>Seller</TableHead>
                   <TableHead>Account Holder</TableHead>
                   <TableHead>Bank Name</TableHead>
-                  <TableHead>Account Number</TableHead>
                   <TableHead>Country</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Verified Date</TableHead>
@@ -288,9 +280,6 @@ export function AdminBankVerification() {
                     </TableCell>
                     <TableCell>{account.bank_account_holder_name}</TableCell>
                     <TableCell>{account.bank_name || 'N/A'}</TableCell>
-                    <TableCell className="font-mono">
-                      {maskAccountNumber(account.bank_account_number)}
-                    </TableCell>
                     <TableCell>{account.country}</TableCell>
                     <TableCell>
                       <Badge variant="default" className="bg-green-500">
