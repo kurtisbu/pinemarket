@@ -27,6 +27,8 @@ interface Program {
   monthly_price: number | null;
   yearly_price: number | null;
   billing_interval: string | null;
+  lowestPrice: number;
+  hasMultiplePrices: boolean;
   seller: {
     display_name: string;
     username: string;
@@ -59,6 +61,12 @@ const Browse = () => {
           profiles!seller_id (
             display_name,
             username
+          ),
+          program_prices (
+            amount,
+            price_type,
+            interval,
+            is_active
           )
         `)
         .eq('status', 'published');
@@ -91,10 +99,20 @@ const Browse = () => {
 
       if (error) throw error;
 
-      return data?.map(program => ({
-        ...program,
-        seller: Array.isArray(program.profiles) ? program.profiles[0] : program.profiles
-      })) as Program[];
+      return data?.map(program => {
+        const activePrices = (program.program_prices || []).filter((p: any) => p.is_active);
+        const lowestPrice = activePrices.length > 0 
+          ? Math.min(...activePrices.map((p: any) => p.amount))
+          : program.price;
+        const hasMultiplePrices = activePrices.length > 1;
+        
+        return {
+          ...program,
+          seller: Array.isArray(program.profiles) ? program.profiles[0] : program.profiles,
+          lowestPrice,
+          hasMultiplePrices
+        };
+      }) as Program[];
     },
   });
 

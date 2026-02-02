@@ -16,6 +16,8 @@ interface Program {
   download_count: number;
   average_rating: number;
   rating_count: number;
+  lowestPrice?: number;
+  hasMultiplePrices?: boolean;
   profiles?: {
     display_name: string | null;
     username: string | null;
@@ -75,8 +77,13 @@ const ProgramCard: React.FC<ProgramCardProps> = ({ program, onClick }) => {
           </div>
         </div>
         
-        <div className="font-semibold text-lg">
-          ${program.price}
+        <div className="text-right">
+          {program.hasMultiplePrices && (
+            <span className="text-xs text-muted-foreground">From </span>
+          )}
+          <span className="font-semibold text-lg">
+            ${program.lowestPrice ?? program.price}
+          </span>
         </div>
       </CardFooter>
     </Card>
