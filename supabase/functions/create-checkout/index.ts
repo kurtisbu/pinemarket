@@ -24,6 +24,11 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     );
 
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
     const authHeader = req.headers.get("Authorization")!;
     const token = authHeader.replace("Bearer ", "");
     const { data } = await supabaseClient.auth.getUser(token);
@@ -47,6 +52,8 @@ serve(async (req) => {
     let price: any;
     let isPackage = false;
     let packageId: string | null = null;
+    let sellerId: string;
+    let sellerProfile: any;
 
     if (packagePriceId) {
       // Handle package purchase
@@ -77,7 +84,7 @@ serve(async (req) => {
         throw new Error("Stripe price not configured for this package");
       }
 
-      const sellerProfile = packagePrice.program_packages.profiles;
+      sellerProfile = packagePrice.program_packages.profiles;
       if (!sellerProfile?.stripe_account_id) {
         throw new Error("Seller has not connected their Stripe account yet");
       }
@@ -89,6 +96,7 @@ serve(async (req) => {
       price = packagePrice;
       isPackage = true;
       packageId = packagePrice.program_packages.id;
+      sellerId = packagePrice.program_packages.seller_id;
     } else {
       // Handle single program purchase
       console.log(`[CHECKOUT] Creating checkout session for program price: ${priceId}`);
@@ -119,7 +127,7 @@ serve(async (req) => {
         throw new Error("Stripe price not configured for this pricing option");
       }
 
-      const sellerProfile = programPrice.programs.profiles;
+      sellerProfile = programPrice.programs.profiles;
       if (!sellerProfile?.stripe_account_id) {
         throw new Error("Seller has not connected their Stripe account yet");
       }
@@ -129,7 +137,15 @@ serve(async (req) => {
       }
 
       price = programPrice;
+      sellerId = programPrice.programs.seller_id;
     }
+
+    // Get seller's custom fee rate using the database function
+    const { data: feeRateResult, error: feeRateError } = await supabaseAdmin
+      .rpc('get_seller_fee_rate', { seller_id: sellerId });
+
+    const feePercent = feeRateError ? 10.0 : (feeRateResult ?? 10.0);
+    console.log(`[CHECKOUT] Using fee rate: ${feePercent}% for seller: ${sellerId}`);
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2023-10-16",
@@ -157,11 +173,9 @@ serve(async (req) => {
     // Determine checkout mode based on price type
     const mode = price.price_type === 'recurring' ? 'subscription' : 'payment';
 
-    // Calculate platform fee (10%)
-    const platformFeeAmount = Math.round(price.amount * 0.10 * 100); // Convert to cents
+    // Calculate platform fee using dynamic rate
+    const platformFeeAmount = Math.round(price.amount * (feePercent / 100) * 100); // Convert to cents
     
-    const sellerId = isPackage ? price.program_packages.seller_id : price.programs.seller_id;
-    const sellerProfile = isPackage ? price.program_packages.profiles : price.programs.profiles;
     const resourceId = isPackage ? packageId : price.programs.id;
     const resourceType = isPackage ? 'package' : 'program';
 
@@ -186,10 +200,11 @@ serve(async (req) => {
         price_type: price.price_type,
         tradingview_username: profile.tradingview_username,
         is_package: isPackage.toString(),
+        fee_percent: feePercent.toString(),
       },
     };
 
-    // Add destination charges for Stripe Connect (platform takes 10% fee)
+    // Add destination charges for Stripe Connect (platform takes dynamic fee)
     if (mode === 'payment') {
       sessionData.payment_intent_data = {
         application_fee_amount: platformFeeAmount,
@@ -200,7 +215,7 @@ serve(async (req) => {
     } else {
       // For subscriptions, use application_fee_percent
       sessionData.subscription_data = {
-        application_fee_percent: 10,
+        application_fee_percent: feePercent,
         transfer_data: {
           destination: sellerProfile.stripe_account_id,
         },
