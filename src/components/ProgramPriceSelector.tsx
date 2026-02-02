@@ -94,16 +94,28 @@ export const ProgramPriceSelector = ({ programId, onPurchase }: ProgramPriceSele
 
       if (error) throw error;
 
-      if (data.url) {
+      // Check for error in the response data (edge function returns { error: message })
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      if (data?.url) {
         window.location.href = data.url;
       } else {
         throw new Error('No checkout URL received');
       }
     } catch (error: any) {
       console.error('Checkout error:', error);
+      
+      // Check if this is a TradingView username error and provide actionable guidance
+      const errorMessage = error.message || 'An unexpected error occurred';
+      const isTradingViewError = errorMessage.toLowerCase().includes('tradingview username');
+      
       toast({
-        title: 'Checkout failed',
-        description: error.message,
+        title: isTradingViewError ? 'Profile Setup Required' : 'Checkout failed',
+        description: isTradingViewError 
+          ? 'Please add your TradingView username to your profile before purchasing. Go to Profile Settings to update it.'
+          : errorMessage,
         variant: 'destructive',
       });
       setPurchasing(false);
