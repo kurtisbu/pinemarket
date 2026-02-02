@@ -18,6 +18,12 @@ const FeaturedPrograms = () => {
           profiles!seller_id (
             display_name,
             username
+          ),
+          program_prices (
+            amount,
+            price_type,
+            interval,
+            is_active
           )
         `)
         .eq('status', 'published')
@@ -26,10 +32,20 @@ const FeaturedPrograms = () => {
 
       if (error) throw error;
 
-      return data?.map(program => ({
-        ...program,
-        seller: Array.isArray(program.profiles) ? program.profiles[0] : program.profiles
-      }));
+      return data?.map(program => {
+        const activePrices = (program.program_prices || []).filter((p: any) => p.is_active);
+        const lowestPrice = activePrices.length > 0 
+          ? Math.min(...activePrices.map((p: any) => p.amount))
+          : program.price;
+        const hasMultiplePrices = activePrices.length > 1;
+        
+        return {
+          ...program,
+          seller: Array.isArray(program.profiles) ? program.profiles[0] : program.profiles,
+          lowestPrice,
+          hasMultiplePrices
+        };
+      });
     },
   });
 
