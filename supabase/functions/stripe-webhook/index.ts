@@ -83,6 +83,7 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
   const priceType = session.metadata.price_type;
   const isPackage = session.metadata.is_package === 'true';
   const tradingviewUsername = session.metadata.tradingview_username;
+  const feePercentFromMetadata = session.metadata.fee_percent ? parseFloat(session.metadata.fee_percent) : null;
 
   if ((!programId && !packageId) || !priceId || !userId) {
     console.error("[WEBHOOK] Missing required metadata");
@@ -154,8 +155,18 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
     amount = programPrice?.amount || 0;
   }
 
-  // Calculate platform fee (10%) - money already transferred via Stripe Connect
-  const platformFee = amount * 0.10;
+  // Get seller's fee rate - use metadata if available, otherwise fetch from DB
+  let feePercent = feePercentFromMetadata;
+  if (feePercent === null) {
+    const { data: feeRateResult } = await supabaseAdmin
+      .rpc('get_seller_fee_rate', { seller_id: sellerId });
+    feePercent = feeRateResult ?? 10.0;
+  }
+  
+  console.log(`[WEBHOOK] Using fee rate: ${feePercent}% for seller: ${sellerId}`);
+
+  // Calculate platform fee using dynamic rate
+  const platformFee = amount * (feePercent / 100);
   const sellerOwed = amount - platformFee;
 
   // Create purchase record (for tracking only, payment handled by Stripe Connect)

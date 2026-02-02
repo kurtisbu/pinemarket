@@ -1316,6 +1316,7 @@ export type Database = {
           avg_rating: number
           bio: string
           created_at: string
+          custom_platform_fee_percent: number
           display_name: string
           featured_at: string
           featured_description: string
@@ -1379,6 +1380,7 @@ export type Database = {
         Args: { program_id_param: string }
         Returns: string
       }
+      get_seller_fee_rate: { Args: { seller_id: string }; Returns: number }
       get_user_stripe_status: {
         Args: never
         Returns: {
@@ -1426,15 +1428,26 @@ export type Database = {
         Args: { p_seller_id: string }
         Returns: undefined
       }
-      toggle_creator_featured_status: {
-        Args: {
-          creator_id: string
-          description?: string
-          featured: boolean
-          priority?: number
-        }
-        Returns: undefined
-      }
+      toggle_creator_featured_status:
+        | {
+            Args: {
+              creator_id: string
+              description?: string
+              featured: boolean
+              priority?: number
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              creator_id: string
+              custom_fee_percent?: number
+              description?: string
+              featured: boolean
+              priority?: number
+            }
+            Returns: undefined
+          }
       update_program_rating_stats: {
         Args: { program_uuid: string }
         Returns: undefined
