@@ -1,233 +1,182 @@
 
-# Bundle Multiple Scripts into a Program
+# Admin Featured Creators with Custom Fee Management
 
-## Summary
+## Overview
+This plan enhances the existing featured creators system to allow platform admins to set custom platform fee rates for individual creators. Featured creators can receive reduced fees as a promotional benefit.
 
-Change the program creation flow to allow sellers to select multiple TradingView scripts when creating a sellable product. This transforms a "program" from being tied to a single script into a flexible bundle that can contain one or more scripts.
+## Current State Analysis
+- Featured creator functionality already exists with `is_featured`, `featured_priority`, and `featured_description` on the `profiles` table
+- Platform fee is hardcoded at 10% in edge functions
+- No per-creator fee customization exists
 
-## Current vs. Proposed Flow
+## Implementation Plan
 
+### Phase 1: Database Schema Updates
+
+**Add custom fee column to profiles table:**
+```sql
+ALTER TABLE public.profiles 
+ADD COLUMN custom_platform_fee_percent numeric 
+  DEFAULT NULL 
+  CHECK (custom_platform_fee_percent IS NULL OR 
+         (custom_platform_fee_percent >= 0 AND custom_platform_fee_percent <= 100));
+
+COMMENT ON COLUMN public.profiles.custom_platform_fee_percent IS 
+  'Custom platform fee percentage for featured creators. NULL means use default (10%).';
+```
+
+**Create a helper function to get effective fee rate:**
+```sql
+CREATE OR REPLACE FUNCTION public.get_seller_fee_rate(seller_id uuid)
+RETURNS numeric
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT COALESCE(
+    (SELECT custom_platform_fee_percent FROM profiles WHERE id = seller_id),
+    10.0  -- Default 10% platform fee
+  );
+$$;
+```
+
+**Update toggle_creator_featured_status to accept fee parameter:**
+```sql
+CREATE OR REPLACE FUNCTION public.toggle_creator_featured_status(
+  creator_id uuid, 
+  featured boolean, 
+  priority integer DEFAULT 0, 
+  description text DEFAULT NULL,
+  custom_fee_percent numeric DEFAULT NULL
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT public.has_role(auth.uid(), 'admin') THEN
+    RAISE EXCEPTION 'Access denied: Admin role required';
+  END IF;
+  
+  UPDATE public.profiles
+  SET 
+    is_featured = featured,
+    featured_at = CASE WHEN featured THEN now() ELSE NULL END,
+    featured_priority = CASE WHEN featured THEN priority ELSE 0 END,
+    featured_description = CASE WHEN featured THEN description ELSE NULL END,
+    custom_platform_fee_percent = CASE WHEN featured THEN custom_fee_percent ELSE NULL END
+  WHERE id = creator_id;
+  
+  PERFORM public.log_security_event(
+    'toggle_creator_featured_status',
+    'profile',
+    creator_id::text,
+    jsonb_build_object(
+      'featured', featured,
+      'priority', priority,
+      'description', description,
+      'custom_fee_percent', custom_fee_percent
+    ),
+    'low'
+  );
+END;
+$$;
+```
+
+### Phase 2: Edge Function Updates
+
+**Update `supabase/functions/create-checkout/index.ts`:**
+- Query the seller's `custom_platform_fee_percent` from profiles
+- Calculate fee using custom rate if set, otherwise use default 10%
+- Pass the fee rate to Stripe checkout session
+
+**Update `supabase/functions/stripe-webhook/index.ts`:**
+- Query the seller's fee rate using the new `get_seller_fee_rate` function
+- Calculate `platformFee` and `sellerOwed` using the dynamic rate
+- Store the actual fee percentage in purchase record for audit
+
+### Phase 3: Admin UI Enhancements
+
+**Update `src/components/AdminFeaturedCreators.tsx`:**
+1. Add a fee percentage input to the `FeaturedCreatorForm`
+2. Display current fee rate for each creator
+3. Show "Custom Fee" badge when a creator has reduced fees
+4. Pass the custom fee to the updated RPC function
+
+**UI Additions:**
+- Slider or input for fee percentage (0-10% for discounts)
+- Display showing "Standard 10%" or "Custom X%" per creator
+- Clear indication of potential revenue impact
+
+### Phase 4: Seller Dashboard Visibility
+
+**Update seller-facing components to show their fee rate:**
+- Display current fee rate on `SellerDashboard.tsx`
+- Show savings from featured status in `SellerPayoutSettings.tsx`
+
+---
+
+## Technical Details
+
+### Database Migration
 ```text
-CURRENT FLOW:
-+------------------+      +------------------+      +------------------+
-| Create Program   | ---> | Link ONE Script  | ---> | Set Pricing      |
-| (single script)  |      | (URL or file)    |      |                  |
-+------------------+      +------------------+      +------------------+
-
-                    OR
-
-+------------------+      +------------------+      +------------------+
-| Create Package   | ---> | Select MULTIPLE  | ---> | Set Pricing      |
-| (bundle)         |      | published progs  |      |                  |
-+------------------+      +------------------+      +------------------+
-
-
-PROPOSED FLOW:
-+------------------+      +------------------+      +------------------+
-| Create Program   | ---> | Select MULTIPLE  | ---> | Set Pricing      |
-| (1+ scripts)     |      | synced scripts   |      |                  |
-+------------------+      +------------------+      +------------------+
++--------------------------------------+
+|           profiles                   |
++--------------------------------------+
+| + custom_platform_fee_percent        |
+|   (numeric, nullable, 0-100 check)   |
++--------------------------------------+
 ```
 
-## Database Changes
-
-### New Junction Table: `program_scripts`
-
-Create a new table to link programs to multiple TradingView scripts:
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid | Primary key |
-| program_id | uuid | FK to programs |
-| tradingview_script_id | uuid | FK to tradingview_scripts |
-| display_order | integer | Order in which scripts appear |
-| created_at | timestamp | When added |
-
-This table will store the many-to-many relationship between programs and scripts.
-
-### Migration for Existing Data
-
-Existing programs with `tradingview_script_id` will be migrated:
-- For each program with a `tradingview_script_id`, create a corresponding entry in `program_scripts`
-- The old `tradingview_script_id` column on `programs` can remain for backward compatibility
-
-## Frontend Changes
-
-### 1. New Component: `ScriptSelector.tsx`
-
-A reusable component that:
-- Displays the seller's synced TradingView scripts from `tradingview_scripts` table
-- Allows multi-select with checkboxes
-- Shows script thumbnails, titles, and pine IDs
-- Supports drag-and-drop reordering
-- Shows a warning if no scripts are synced (with link to sync)
-
-### 2. Update `SellScriptForm.tsx`
-
-Replace the current `ScriptUploadSection` with the new `ScriptSelector`:
-
+### Fee Calculation Flow
 ```text
-BEFORE:
-- Radio: "TradingView link" or "Upload file"
-- Single URL input or file upload
-
-AFTER:
-- Section header: "Select Scripts to Include"
-- Grid/list of synced TradingView scripts with checkboxes
-- Minimum 1 script required
-- "Sync with TradingView" button if no scripts available
+Purchase Request
+      |
+      v
++------------------+
+| Fetch Seller's   |
+| custom_fee_rate  |
++------------------+
+      |
+      v
++------------------+
+| Fee = custom OR  |
+| default (10%)    |
++------------------+
+      |
+      v
++------------------+
+| Calculate:       |
+| platformFee      |
+| sellerOwed       |
++------------------+
+      |
+      v
++------------------+
+| Stripe Checkout  |
+| with dynamic fee |
++------------------+
 ```
 
-### 3. Update `useSellScriptForm.ts` Hook
+### Security Considerations
+- Only admins can modify `custom_platform_fee_percent`
+- RLS policies prevent creators from self-modifying their fee rate
+- All fee changes are logged via `log_security_event`
+- The `get_seller_fee_rate` function is SECURITY DEFINER to prevent unauthorized access
 
-- Add `selectedScripts` state (array of script IDs)
-- Remove single `tradingview_publication_url` handling
-- Update form validation to require at least 1 script
-- Update submit handler to:
-  1. Create the program
-  2. Insert entries into `program_scripts` junction table
-
-### 4. Update `ProgramBasicForm.tsx`
-
-Remove any single-script related fields if present.
-
-### 5. Update `EditProgram.tsx`
-
-- Show currently linked scripts
-- Allow adding/removing scripts
-- Update the `program_scripts` junction table on save
-
-## Backend Changes
-
-### 1. Update Edge Function: `stripe-webhook/index.ts`
-
-When processing a purchase:
-- Fetch all scripts linked to the program via `program_scripts`
-- Create a `script_assignment` for EACH linked script
-
-```javascript
-// Fetch scripts for the program
-const { data: programScripts } = await supabaseAdmin
-  .from('program_scripts')
-  .select('tradingview_script_id, tradingview_scripts(pine_id)')
-  .eq('program_id', programId);
-
-// Create assignment for each script
-for (const ps of programScripts) {
-  await supabaseAdmin.from('script_assignments').insert({
-    // ... assignment data with ps.tradingview_scripts.pine_id
-  });
-}
-```
-
-### 2. Update `create-program-prices` Edge Function
-
-No changes needed - pricing is already program-level.
-
-### 3. Update Program Detail Display
-
-When viewing a program, show all included scripts (for buyers to see what they're getting).
-
-## UI/UX Details
-
-### Script Selector Component
-
-```text
-+----------------------------------------------------------+
-| Select Scripts to Include *                              |
-| Choose one or more scripts from your TradingView account |
-+----------------------------------------------------------+
-| [Sync with TradingView]                                  |
-+----------------------------------------------------------+
-| +-------+  +-------+  +-------+                          |
-| |[thumb]|  |[thumb]|  |[thumb]|                          |
-| | ADX   |  | MACD  |  | RSI   |                          |
-| | Strat |  | Cross |  | Div   |                          |
-| |  [x]  |  |  [ ]  |  |  [x]  |                          |
-| +-------+  +-------+  +-------+                          |
-+----------------------------------------------------------+
-| Selected: 2 scripts                                      |
-+----------------------------------------------------------+
-```
-
-### Program Detail Page (Buyer View)
-
-```text
-+----------------------------------------------------------+
-| Complete Trading Suite              $49/month            |
-+----------------------------------------------------------+
-| This package includes:                                   |
-| - ADX Strategy (Pine Script)                            |
-| - RSI Divergence Indicator                              |
-|                                                          |
-| [Subscribe Now]                                          |
-+----------------------------------------------------------+
-```
-
-## Files to Create
-
-| File | Purpose |
-|------|---------|
-| `src/components/SellScript/ScriptSelector.tsx` | Multi-select script picker component |
-
-## Files to Modify
+### Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/hooks/useSellScriptForm.ts` | Add selectedScripts state, update submit logic |
-| `src/components/SellScript/SellScriptForm.tsx` | Replace ScriptUploadSection with ScriptSelector |
-| `src/pages/EditProgram.tsx` | Add script selection/editing |
-| `src/components/ProgramDetail/ProgramDescription.tsx` | Show included scripts |
-| `supabase/functions/stripe-webhook/index.ts` | Handle multi-script assignments |
+| Database migration | Add `custom_platform_fee_percent` column, update functions |
+| `supabase/functions/create-checkout/index.ts` | Dynamic fee calculation |
+| `supabase/functions/stripe-webhook/index.ts` | Dynamic fee calculation |
+| `src/components/AdminFeaturedCreators.tsx` | Add fee input to featured form |
+| `src/integrations/supabase/types.ts` | Auto-updated from schema |
 
-## Database Migration
-
-```sql
--- Create junction table for program-script relationships
-CREATE TABLE program_scripts (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  program_id UUID NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
-  tradingview_script_id UUID NOT NULL REFERENCES tradingview_scripts(id) ON DELETE CASCADE,
-  display_order INTEGER NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE(program_id, tradingview_script_id)
-);
-
--- Enable RLS
-ALTER TABLE program_scripts ENABLE ROW LEVEL SECURITY;
-
--- Policies
-CREATE POLICY "Sellers can manage their program scripts"
-  ON program_scripts FOR ALL
-  USING (EXISTS (
-    SELECT 1 FROM programs 
-    WHERE programs.id = program_scripts.program_id 
-    AND programs.seller_id = auth.uid()
-  ));
-
-CREATE POLICY "Everyone can view scripts for published programs"
-  ON program_scripts FOR SELECT
-  USING (EXISTS (
-    SELECT 1 FROM programs 
-    WHERE programs.id = program_scripts.program_id 
-    AND programs.status = 'published'
-  ));
-
--- Migrate existing programs with tradingview_script_id
-INSERT INTO program_scripts (program_id, tradingview_script_id, display_order)
-SELECT 
-  p.id,
-  ts.id,
-  0
-FROM programs p
-JOIN tradingview_scripts ts ON ts.pine_id = p.tradingview_script_id
-WHERE p.tradingview_script_id IS NOT NULL;
-```
-
-## Testing Plan
-
-1. Create a new program with 1 script - verify it works like before
-2. Create a program with 3 scripts - verify all are stored
-3. Edit a program to add/remove scripts
-4. Purchase a multi-script program - verify all scripts get assigned
-5. View program detail page - verify all scripts are displayed to buyers
+### Default Behavior
+- **Standard creators**: 10% platform fee
+- **Featured creators**: Can have 0-10% custom fee (set by admin)
+- **NULL custom_fee**: Falls back to default 10%
