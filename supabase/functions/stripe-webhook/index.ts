@@ -32,7 +32,7 @@ async function triggerScriptAssignment(
         'Authorization': `Bearer ${supabaseServiceKey}`,
       },
       body: JSON.stringify({
-        action: 'assign_script_access',
+        action: 'assign-script-access',
         pine_id: pineId,
         tradingview_username: tradingviewUsername,
         assignment_id: assignmentId,
