@@ -110,6 +110,18 @@ serve(async (req) => {
 
     console.log(`[CREATE-PRICES] Created Stripe product: ${stripeProduct.id}`);
 
+    // Persist product ID when supported (programs table has stripe_product_id)
+    if (finalResourceType === 'program') {
+      const { error: productUpdateError } = await supabaseAdmin
+        .from('programs')
+        .update({ stripe_product_id: stripeProduct.id })
+        .eq('id', resource.id);
+
+      if (productUpdateError) {
+        console.error('[CREATE-PRICES] Failed to persist stripe_product_id:', productUpdateError);
+      }
+    }
+
     // Create Stripe prices for each price object
     const createdPrices = [];
     for (const price of pricesData) {
@@ -152,6 +164,33 @@ serve(async (req) => {
       const stripePrice = await stripe.prices.create(stripePriceData);
       
       console.log(`[CREATE-PRICES] Created Stripe price: ${stripePrice.id} for ${price.display_name}`);
+
+      // Persist Stripe price ID back to DB so checkout can use it
+      if (finalResourceType === 'program') {
+        const { error: priceUpdateError } = await supabaseAdmin
+          .from('program_prices')
+          .update({ stripe_price_id: stripePrice.id })
+          .eq('id', price.id);
+
+        if (priceUpdateError) {
+          console.error('[CREATE-PRICES] Failed to persist program_prices.stripe_price_id:', {
+            price_id: price.id,
+            error: priceUpdateError,
+          });
+        }
+      } else if (finalResourceType === 'package') {
+        const { error: priceUpdateError } = await supabaseAdmin
+          .from('package_prices')
+          .update({ stripe_price_id: stripePrice.id })
+          .eq('id', price.id);
+
+        if (priceUpdateError) {
+          console.error('[CREATE-PRICES] Failed to persist package_prices.stripe_price_id:', {
+            price_id: price.id,
+            error: priceUpdateError,
+          });
+        }
+      }
 
       createdPrices.push({
         ...price,
