@@ -65,7 +65,7 @@ serve(async (req) => {
       // Handle package purchase
       console.log(`[CHECKOUT] Creating checkout session for package price: ${packagePriceId}`);
       
-      const { data: packagePrice, error: packagePriceError } = await supabaseClient
+      const { data: packagePrice, error: packagePriceError } = await supabaseAdmin
         .from('package_prices')
         .select(`
           *,
@@ -127,7 +127,7 @@ serve(async (req) => {
       // Handle single program purchase
       console.log(`[CHECKOUT] Creating checkout session for program price: ${priceId}`);
       
-      const { data: programPrice, error: priceError } = await supabaseClient
+      const { data: programPrice, error: priceError } = await supabaseAdmin
         .from('program_prices')
         .select(`
           *,
