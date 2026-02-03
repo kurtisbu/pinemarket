@@ -1,24 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, DollarSign, Play, RefreshCw, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Loader2, DollarSign, Play, RefreshCw, CheckCircle2, XCircle, Clock, Info } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export const AdminPayoutManagement = () => {
-  const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [settling, setSettling] = useState(false);
   const [balances, setBalances] = useState<any[]>([]);
   const [recentPayouts, setRecentPayouts] = useState<any[]>([]);
-  const [pendingVerifications, setPendingVerifications] = useState<any[]>([]);
-  const [verifying, setVerifying] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -27,18 +23,16 @@ export const AdminPayoutManagement = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch seller balances
+      // Fetch seller balances with Stripe Connect status from profiles
       const { data: balanceData, error: balanceError } = await supabase
         .from('seller_balances')
         .select(`
           *,
           profiles!seller_balances_seller_id_fkey (
             display_name,
-            username
-          ),
-          seller_payout_info!seller_payout_info_user_id_fkey (
-            payout_method,
-            is_verified
+            username,
+            stripe_payouts_enabled,
+            stripe_charges_enabled
           )
         `)
         .order('available_balance', { ascending: false });
@@ -61,40 +55,6 @@ export const AdminPayoutManagement = () => {
 
       if (payoutError) throw payoutError;
       setRecentPayouts(payoutData || []);
-
-      // Fetch pending bank verifications - SECURITY: Only fetch non-sensitive fields
-      // Exclude bank_account_number, bank_routing_number to prevent exposure of sensitive data
-      const { data: verificationData, error: verificationError } = await supabase
-        .from('seller_payout_info')
-        .select(`
-          id,
-          user_id,
-          payout_method,
-          bank_account_holder_name,
-          bank_name,
-          country,
-          currency,
-          is_verified,
-          created_at
-        `)
-        .eq('is_verified', false)
-        .order('created_at', { ascending: false });
-
-      if (verificationError) throw verificationError;
-      
-      // Enrich with profile data (only display_name and username)
-      const enrichedVerifications = await Promise.all(
-        (verificationData || []).map(async (v) => {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('display_name, username')
-            .eq('id', v.user_id)
-            .single();
-          return { ...v, profiles: profile || { display_name: 'Unknown', username: 'unknown' } };
-        })
-      );
-      
-      setPendingVerifications(enrichedVerifications);
     } catch (error: any) {
       console.error('Error fetching data:', error);
       toast({
@@ -157,33 +117,6 @@ export const AdminPayoutManagement = () => {
     }
   };
 
-  const handleVerifyBankAccount = async (userId: string) => {
-    setVerifying(userId);
-    try {
-      const { error } = await supabase.rpc('verify_seller_bank_account', {
-        p_user_id: userId
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: 'Success',
-        description: 'Bank account verified successfully'
-      });
-
-      fetchData();
-    } catch (error: any) {
-      console.error('Error verifying bank account:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to verify bank account',
-        variant: 'destructive'
-      });
-    } finally {
-      setVerifying(null);
-    }
-  };
-
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: any; icon: any }> = {
       completed: { variant: 'default', icon: CheckCircle2 },
@@ -214,7 +147,10 @@ export const AdminPayoutManagement = () => {
 
   const totalAvailable = balances.reduce((sum, b) => sum + (b.available_balance || 0), 0);
   const totalPending = balances.reduce((sum, b) => sum + (b.pending_balance || 0), 0);
-  const eligibleForPayout = balances.filter(b => b.available_balance >= 50).length;
+  const eligibleForPayout = balances.filter(b => {
+    const profile = Array.isArray(b.profiles) ? b.profiles[0] : b.profiles;
+    return b.available_balance >= 50 && profile?.stripe_payouts_enabled;
+  }).length;
 
   return (
     <div className="space-y-6">
@@ -246,7 +182,7 @@ export const AdminPayoutManagement = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-accent">{eligibleForPayout}</div>
-            <p className="text-xs text-muted-foreground mt-1">Above $50 threshold</p>
+            <p className="text-xs text-muted-foreground mt-1">Above $50 with Stripe enabled</p>
           </CardContent>
         </Card>
       </div>
@@ -261,9 +197,10 @@ export const AdminPayoutManagement = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <Alert>
+            <Info className="h-4 w-4" />
             <AlertDescription>
-              <strong>Note:</strong> Automated jobs run daily (9 AM UTC for settlement) and weekly (Fridays 10 AM UTC for payouts).
-              Use these controls for testing or emergency processing.
+              <strong>Note:</strong> Payouts are processed via Stripe Connect. Sellers must have Stripe Connect enabled
+              with payouts active to receive funds. No manual bank verification is required.
             </AlertDescription>
           </Alert>
 
@@ -281,65 +218,6 @@ export const AdminPayoutManagement = () => {
         </CardContent>
       </Card>
 
-      {/* Pending Bank Verifications */}
-      {pendingVerifications.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Pending Bank Verifications</CardTitle>
-            <CardDescription>
-              Review and approve seller bank account information before payouts can be processed
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Seller</TableHead>
-                  <TableHead>Bank Name</TableHead>
-                  <TableHead>Account Holder</TableHead>
-                  <TableHead>Country</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead>Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pendingVerifications.map((verification) => {
-                  const profile = verification.profiles;
-
-                  return (
-                    <TableRow key={verification.id}>
-                      <TableCell className="font-medium">
-                        {profile?.display_name || profile?.username || 'Unknown'}
-                      </TableCell>
-                      <TableCell>{verification.bank_name || '-'}</TableCell>
-                      <TableCell>{verification.bank_account_holder_name || '-'}</TableCell>
-                      <TableCell>{verification.country}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {new Date(verification.created_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          onClick={() => handleVerifyBankAccount(verification.user_id)}
-                          disabled={verifying === verification.user_id}
-                        >
-                          {verifying === verification.user_id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <CheckCircle2 className="h-4 w-4 mr-1" />
-                          )}
-                          Approve
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Seller Balances */}
       <Card>
         <CardHeader>
@@ -354,16 +232,12 @@ export const AdminPayoutManagement = () => {
                 <TableHead className="text-right">Available</TableHead>
                 <TableHead className="text-right">Pending</TableHead>
                 <TableHead className="text-right">Total Earned</TableHead>
-                <TableHead>Payout Method</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Stripe Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {balances.map((balance) => {
                 const profile = Array.isArray(balance.profiles) ? balance.profiles[0] : balance.profiles;
-                const payoutInfo = Array.isArray(balance.seller_payout_info) 
-                  ? balance.seller_payout_info[0] 
-                  : balance.seller_payout_info;
 
                 return (
                   <TableRow key={balance.seller_id}>
@@ -380,13 +254,13 @@ export const AdminPayoutManagement = () => {
                       ${balance.total_earned?.toFixed(2)}
                     </TableCell>
                     <TableCell>
-                      {payoutInfo?.payout_method || 'Not set'}
-                    </TableCell>
-                    <TableCell>
-                      {payoutInfo?.is_verified ? (
-                        <Badge variant="default">Verified</Badge>
+                      {profile?.stripe_payouts_enabled ? (
+                        <Badge variant="default">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Payouts Enabled
+                        </Badge>
                       ) : (
-                        <Badge variant="secondary">Unverified</Badge>
+                        <Badge variant="secondary">Not Connected</Badge>
                       )}
                     </TableCell>
                   </TableRow>
