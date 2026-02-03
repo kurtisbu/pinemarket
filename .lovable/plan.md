@@ -1,69 +1,221 @@
 
-# Fix: Allow Multiple Script Assignments Per Purchase
+
+# Fix: Subscription Expiration and Renewal Logic
 
 ## Problem Summary
 
-The recent test purchase for a 2-script package only created **1 script assignment** instead of 2. 
+Your test purchase revealed two critical issues with subscription-based script access:
 
-### Root Cause
-The `script_assignments` table has a **unique constraint on `purchase_id`**:
+### Issue 1: Assignments Have No Expiration
+When you purchased a monthly subscription, the script assignments were created with:
+- `access_type: 'subscription'` (correct)
+- `expires_at: null` (wrong - should be 1 month from now)
+
+The current code only sets expiration for trial access, not for subscription access.
+
+### Issue 2: No Renewal/Extension Logic
+While Stripe correctly handles recurring billing, the platform has no logic to:
+- Extend `expires_at` when a subscription payment succeeds
+- Track which subscription is linked to which assignments
+- Properly revoke access when a subscription is canceled
+
+---
+
+## Solution Overview
+
+```text
++-------------------+       +-------------------+       +-------------------+
+|  Initial Purchase | ----> | Stripe Webhook    | ----> | Script Assignment |
+|  (Checkout)       |       | checkout.session  |       | expires_at: +1mo  |
++-------------------+       +-------------------+       +-------------------+
+                                    |
+                                    v
+                            Store stripe_subscription_id
+                            in purchases table
+                                    |
++-------------------+       +-------------------+       +-------------------+
+|  Monthly Renewal  | ----> | Stripe Webhook    | ----> | Extend expires_at |
+|  (Auto-charged)   |       | invoice.paid      |       | by billing period |
++-------------------+       +-------------------+       +-------------------+
+                                    |
++-------------------+       +-------------------+       +-------------------+
+|  Cancellation     | ----> | Stripe Webhook    | ----> | Revoke Access     |
+|  (User cancels)   |       | subscription.     |       | (set to expired)  |
+|                   |       | deleted           |       |                   |
++-------------------+       +-------------------+       +-------------------+
+```
+
+---
+
+## Implementation Steps
+
+### Step 1: Add `stripe_subscription_id` Column to Purchases Table
+
+The purchases table needs to track which Stripe subscription it belongs to for renewal processing.
+
 ```sql
-UNIQUE (purchase_id)
+ALTER TABLE purchases 
+ADD COLUMN stripe_subscription_id TEXT;
+
+-- Index for quick lookup during renewal webhooks
+CREATE INDEX idx_purchases_stripe_subscription_id 
+ON purchases(stripe_subscription_id);
 ```
 
-This constraint prevents multiple scripts from being assigned to a single purchase. When the webhook tries to insert the second script assignment with the same `purchase_id`, the database rejects it due to the unique constraint violation.
+### Step 2: Update Webhook - Set Expiration on Initial Assignment
 
-### Evidence
-- Webhook logged: "Creating 2 script assignments for program"
-- Only 1 assignment record exists in the database for the purchase
-- Database constraint query shows: `UNIQUE (purchase_id)` on `script_assignments`
+Modify `stripe-webhook/index.ts` to:
+1. Retrieve subscription details from Stripe to get `current_period_end`
+2. Pass subscription period end date to the assignment creation
+3. Store `stripe_subscription_id` in the purchase record
 
-## Solution
+For subscriptions, the assignment's `expires_at` should be set to the subscription's `current_period_end` timestamp.
 
-### Step 1: Remove the Incorrect Unique Constraint
+### Step 3: Update Webhook - Add Subscription Renewal Handler
 
-Run a database migration to drop the unique constraint on `purchase_id`:
+Add proper handling for `invoice.paid` events (subscription renewals):
+1. Look up the purchase by `stripe_subscription_id`
+2. Retrieve the updated subscription from Stripe
+3. Update all related script assignments with the new `current_period_end`
 
-```sql
-ALTER TABLE script_assignments 
-DROP CONSTRAINT script_assignments_purchase_id_key;
+### Step 4: Update Webhook - Fix Subscription Cancellation Handler
+
+Fix `handleSubscriptionDeleted()` to:
+1. Look up purchases by `stripe_subscription_id` (not `payment_intent_id`)
+2. Update assignments to `status: 'revoked'` and set `expires_at` to now
+
+### Step 5: Update Assignment Logic for Subscription Expiration
+
+Modify `assignScriptAccess.ts` to handle subscription access type:
+- Accept `expires_at` as a parameter when `access_type === 'subscription'`
+- Set the expiration on TradingView if their API supports it (or handle expiration on our side only)
+
+---
+
+## Technical Details
+
+### Changes to `stripe-webhook/index.ts`
+
+**In `handleCheckoutCompleted`:**
+```typescript
+// After getting session metadata, retrieve subscription details
+if (mode === 'subscription' && session.subscription) {
+  const subscription = await stripe.subscriptions.retrieve(session.subscription);
+  const expiresAt = new Date(subscription.current_period_end * 1000).toISOString();
+  
+  // Store subscription ID with purchase
+  // Pass expiresAt to script assignment creation
+}
 ```
 
-This is the core fix. A single purchase of a multi-script package/program should create multiple assignment records - one per script.
-
-### Step 2: Add Proper Composite Unique Constraint (Optional)
-
-To prevent duplicate assignments of the same script to the same purchase, add a composite unique constraint:
-
-```sql
-ALTER TABLE script_assignments 
-ADD CONSTRAINT script_assignments_purchase_script_unique 
-UNIQUE (purchase_id, pine_id);
+**New `handleInvoicePaid` function:**
+```typescript
+async function handleInvoicePaid(invoice: any, supabaseAdmin: any) {
+  const subscriptionId = invoice.subscription;
+  if (!subscriptionId) return;
+  
+  // Get subscription to find new period end
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  const newExpiresAt = new Date(subscription.current_period_end * 1000);
+  
+  // Find purchase by subscription ID
+  const { data: purchases } = await supabaseAdmin
+    .from('purchases')
+    .select('id')
+    .eq('stripe_subscription_id', subscriptionId);
+  
+  // Extend all related script assignments
+  for (const purchase of purchases) {
+    await supabaseAdmin
+      .from('script_assignments')
+      .update({ expires_at: newExpiresAt.toISOString() })
+      .eq('purchase_id', purchase.id);
+  }
+}
 ```
 
-This ensures:
-- Multiple scripts per purchase are allowed
-- The same script cannot be assigned twice for the same purchase
+**Fix `handleSubscriptionDeleted`:**
+```typescript
+async function handleSubscriptionDeleted(subscription: any, supabaseAdmin: any) {
+  // Use stripe_subscription_id, not payment_intent_id
+  const { data: purchases } = await supabaseAdmin
+    .from('purchases')
+    .select('id')
+    .eq('stripe_subscription_id', subscription.id);
 
-## Additional Finding: TradingView Access Verification
-
-The verification endpoint is returning 400 errors. This is a separate issue that doesn't prevent access from being granted, but it does mean we can't confirm access was granted. The assignment is still marked as "assigned" because TradingView returned `{ status: "exists" }` (user already has access) or `{ status: "ok" }` (access granted).
-
-### Verification Fix (Secondary Priority)
-
-The `list_users` endpoint may require different formatting. Current implementation sends:
+  for (const purchase of purchases) {
+    await supabaseAdmin
+      .from('script_assignments')
+      .update({ 
+        status: 'revoked',
+        expires_at: new Date().toISOString()
+      })
+      .eq('purchase_id', purchase.id);
+      
+    // Optionally: trigger TradingView access revocation
+  }
+}
 ```
-POST https://www.tradingview.com/pine_perm/list_users/
-Content-Type: application/x-www-form-urlencoded
-Body: pine_id=PUB;xxx&username=test
+
+### Changes to `assignScriptAccess.ts`
+
+Accept and use `subscription_expires_at` parameter:
+```typescript
+const { 
+  pine_id, 
+  tradingview_username, 
+  assignment_id, 
+  access_type, 
+  trial_duration_days,
+  subscription_expires_at  // New parameter
+} = payload;
+
+// In performAssignment:
+let expirationDate = null;
+if (accessType === 'trial' && trialDurationDays) {
+  expirationDate = new Date(Date.now() + (trialDurationDays * 24 * 60 * 60 * 1000));
+} else if (accessType === 'subscription' && subscription_expires_at) {
+  expirationDate = new Date(subscription_expires_at);
+}
 ```
 
-This may need to be changed to `multipart/form-data` format like the add endpoint uses.
+---
 
-## Testing Plan
+## How Recurring Billing Works
 
-After applying the database migration:
-1. Complete another test purchase for the 2-script package
-2. Verify both script assignments are created in the database
-3. Confirm both scripts show "assigned" status
-4. Check TradingView Access Manager to verify the buyer has access to both scripts
+With these changes, here's the complete subscription lifecycle:
+
+1. **Initial Purchase**: User selects monthly subscription, pays first month
+   - Stripe creates subscription with `current_period_end` = 1 month from now
+   - Webhook creates purchase with `stripe_subscription_id`
+   - Script assignments created with `expires_at` = `current_period_end`
+
+2. **Automatic Renewal** (after 1 month):
+   - Stripe automatically charges the card
+   - Stripe sends `invoice.paid` webhook event
+   - Your webhook updates all related assignments with new `expires_at`
+
+3. **Cancellation**:
+   - User cancels via Stripe billing portal
+   - Stripe sends `customer.subscription.deleted` webhook
+   - Your webhook revokes access by updating assignment status
+
+---
+
+## Files to Modify
+
+1. **Database Migration**: Add `stripe_subscription_id` column to `purchases`
+2. **`supabase/functions/stripe-webhook/index.ts`**: 
+   - Set expiration on initial subscription purchase
+   - Add `invoice.paid` handler for renewals
+   - Fix `subscription.deleted` handler
+3. **`supabase/functions/tradingview-service/actions/assignScriptAccess.ts`**: Accept subscription expiration parameter
+
+---
+
+## Cleanup Note
+
+The existing `supabase/functions/subscription-webhook/index.ts` appears to be an older/parallel implementation that uses different tables (`user_subscriptions`, `subscription_access`). After this fix, you may want to:
+- Delete `subscription-webhook` if unused
+- Or consolidate both approaches if you need the separate tables
+
