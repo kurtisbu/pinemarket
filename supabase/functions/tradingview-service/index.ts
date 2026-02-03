@@ -26,34 +26,52 @@ serve(async (req) => {
       );
     }
 
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    );
-
-    // Verify the JWT token and get the authenticated user
-    const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await supabaseAdmin.auth.getUser(token);
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     
-    if (claimsError || !claimsData?.user) {
-      console.error('[AUTH] Token verification failed:', claimsError?.message);
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized: Invalid token' }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401,
-        }
-      );
-    }
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-    const authenticatedUserId = claimsData.user.id;
-    console.log('[AUTH] Authenticated user:', authenticatedUserId);
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Check if this is a service-to-service call using the service role key
+    const isServiceCall = token === serviceRoleKey;
+    let authenticatedUserId: string | null = null;
+    
+    if (isServiceCall) {
+      console.log('[AUTH] Service-to-service call detected');
+    } else {
+      // Verify the JWT token and get the authenticated user
+      const { data: claimsData, error: claimsError } = await supabaseAdmin.auth.getUser(token);
+      
+      if (claimsError || !claimsData?.user) {
+        console.error('[AUTH] Token verification failed:', claimsError?.message);
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized: Invalid token' }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 401,
+          }
+        );
+      }
+
+      authenticatedUserId = claimsData.user.id;
+      console.log('[AUTH] Authenticated user:', authenticatedUserId);
+    }
 
     const { action, ...payload } = await req.json();
 
-    // Verify the authenticated user matches the user_id in payload for user-specific actions
+    // For user-specific actions, require a real user (not service call) unless explicitly allowed
     const userSpecificActions = ['test-connection', 'sync-user-scripts', 'disconnect-tradingview'];
     if (userSpecificActions.includes(action)) {
+      if (isServiceCall) {
+        return new Response(
+          JSON.stringify({ error: 'Forbidden: This action requires user authentication' }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 403,
+          }
+        );
+      }
       if (payload.user_id && payload.user_id !== authenticatedUserId) {
         console.error('[AUTH] User ID mismatch:', payload.user_id, '!==', authenticatedUserId);
         return new Response(
@@ -68,11 +86,12 @@ serve(async (req) => {
       payload.user_id = authenticatedUserId;
     }
 
-    // For assign-script-access and revoke-script-access, verify the authenticated user is the seller
+    // For assign-script-access and revoke-script-access:
+    // - Service calls are allowed (server-to-server from webhook)
+    // - User calls require seller verification
     const sellerActions = ['assign-script-access', 'revoke-script-access'];
-    if (sellerActions.includes(action)) {
-      // These actions should be called by the seller or service
-      // Verify seller_id matches authenticated user OR user is admin
+    if (sellerActions.includes(action) && !isServiceCall) {
+      // User call - verify the authenticated user is the seller or admin
       if (payload.seller_id && payload.seller_id !== authenticatedUserId) {
         // Check if user is admin
         const { data: isAdmin } = await supabaseAdmin.rpc('has_role', { 
