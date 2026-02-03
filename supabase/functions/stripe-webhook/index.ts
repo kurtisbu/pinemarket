@@ -7,6 +7,51 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Helper function to trigger TradingView script access assignment
+async function triggerScriptAssignment(
+  assignmentId: string,
+  pineId: string,
+  tradingviewUsername: string,
+  accessType: string
+): Promise<void> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.error("[WEBHOOK] Missing Supabase credentials for TradingView service call");
+    return;
+  }
+  
+  try {
+    console.log(`[WEBHOOK] Triggering TradingView assignment for: ${assignmentId}`);
+    
+    const response = await fetch(`${supabaseUrl}/functions/v1/tradingview-service`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({
+        action: 'assign_script_access',
+        pine_id: pineId,
+        tradingview_username: tradingviewUsername,
+        assignment_id: assignmentId,
+        access_type: accessType,
+      }),
+    });
+    
+    const result = await response.json();
+    
+    if (response.ok) {
+      console.log(`[WEBHOOK] TradingView assignment successful for ${assignmentId}:`, result);
+    } else {
+      console.error(`[WEBHOOK] TradingView assignment failed for ${assignmentId}:`, result);
+    }
+  } catch (error) {
+    console.error(`[WEBHOOK] Error calling TradingView service for ${assignmentId}:`, error);
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -211,9 +256,13 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
     if (packagePrograms && packagePrograms.length > 0) {
       console.log(`[WEBHOOK] Creating ${packagePrograms.length} script assignments for package`);
       
+      const accessType = priceType === 'recurring' ? 'subscription' : 'full_purchase';
+      
       // Create script assignment for each program in the package
       for (const packageProgram of packagePrograms) {
-        await supabaseAdmin
+        const pineId = packageProgram.programs.tradingview_script_id;
+        
+        const { data: assignment, error: assignError } = await supabaseAdmin
           .from('script_assignments')
           .insert({
             purchase_id: purchase.id,
@@ -221,15 +270,27 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
             buyer_id: userId,
             seller_id: sellerId,
             status: 'pending',
-            access_type: priceType === 'recurring' ? 'subscription' : 'full_purchase',
+            access_type: accessType,
             is_trial: false,
             tradingview_username: tradingviewUsername,
-            pine_id: packageProgram.programs.tradingview_script_id,
-            tradingview_script_id: packageProgram.programs.tradingview_script_id,
-          });
+            pine_id: pineId,
+            tradingview_script_id: pineId,
+          })
+          .select()
+          .single();
+        
+        // Immediately trigger TradingView access grant
+        if (!assignError && assignment && pineId && tradingviewUsername) {
+          await triggerScriptAssignment(
+            assignment.id,
+            pineId,
+            tradingviewUsername,
+            accessType
+          );
+        }
       }
       
-      console.log("[WEBHOOK] All script assignments created for package");
+      console.log("[WEBHOOK] All script assignments created and triggered for package");
     }
   } else if (programId) {
     // Single program purchase - get all linked scripts from program_scripts
@@ -251,11 +312,13 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
     if (programScripts && programScripts.length > 0) {
       console.log(`[WEBHOOK] Creating ${programScripts.length} script assignments for program`);
       
+      const accessType = priceType === 'recurring' ? 'subscription' : 'full_purchase';
+      
       // Create script assignment for each linked TradingView script
       for (const ps of programScripts) {
         const pineId = ps.tradingview_scripts?.pine_id || null;
         
-        await supabaseAdmin
+        const { data: assignment, error: assignError } = await supabaseAdmin
           .from('script_assignments')
           .insert({
             purchase_id: purchase.id,
@@ -263,15 +326,27 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
             buyer_id: userId,
             seller_id: sellerId,
             status: 'pending',
-            access_type: priceType === 'recurring' ? 'subscription' : 'full_purchase',
+            access_type: accessType,
             is_trial: false,
             tradingview_username: tradingviewUsername,
             pine_id: pineId,
             tradingview_script_id: pineId,
-          });
+          })
+          .select()
+          .single();
+        
+        // Immediately trigger TradingView access grant
+        if (!assignError && assignment && pineId && tradingviewUsername) {
+          await triggerScriptAssignment(
+            assignment.id,
+            pineId,
+            tradingviewUsername,
+            accessType
+          );
+        }
       }
       
-      console.log("[WEBHOOK] All script assignments created for program");
+      console.log("[WEBHOOK] All script assignments created and triggered for program");
     } else {
       // Fallback: Check legacy tradingview_script_id column
       const { data: program } = await supabaseAdmin
@@ -281,7 +356,10 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
         .single();
 
       if (program?.tradingview_script_id) {
-        await supabaseAdmin
+        const accessType = priceType === 'recurring' ? 'subscription' : 'full_purchase';
+        const pineId = program.tradingview_script_id;
+        
+        const { data: assignment, error: assignError } = await supabaseAdmin
           .from('script_assignments')
           .insert({
             purchase_id: purchase.id,
@@ -289,14 +367,26 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
             buyer_id: userId,
             seller_id: sellerId,
             status: 'pending',
-            access_type: priceType === 'recurring' ? 'subscription' : 'full_purchase',
+            access_type: accessType,
             is_trial: false,
             tradingview_username: tradingviewUsername,
-            pine_id: program.tradingview_script_id,
-            tradingview_script_id: program.tradingview_script_id,
-          });
+            pine_id: pineId,
+            tradingview_script_id: pineId,
+          })
+          .select()
+          .single();
         
-        console.log("[WEBHOOK] Script assignment created using legacy tradingview_script_id");
+        // Immediately trigger TradingView access grant
+        if (!assignError && assignment && tradingviewUsername) {
+          await triggerScriptAssignment(
+            assignment.id,
+            pineId,
+            tradingviewUsername,
+            accessType
+          );
+        }
+        
+        console.log("[WEBHOOK] Script assignment created and triggered using legacy tradingview_script_id");
       } else {
         console.log("[WEBHOOK] No scripts found for program:", programId);
       }
