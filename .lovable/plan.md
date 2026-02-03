@@ -1,49 +1,69 @@
 
-# Fix Stripe Webhook - Script Assignment Not Working
+# Fix: Allow Multiple Script Assignments Per Purchase
 
-## Problem Identified
-The Stripe webhook is failing with every request due to an incompatibility between the Stripe SDK and Deno's runtime:
+## Problem Summary
 
+The recent test purchase for a 2-script package only created **1 script assignment** instead of 2. 
+
+### Root Cause
+The `script_assignments` table has a **unique constraint on `purchase_id`**:
+```sql
+UNIQUE (purchase_id)
 ```
-SubtleCryptoProvider cannot be used in a synchronous context.
-Use `await constructEventAsync(...)` instead of `constructEvent(...)`
-```
 
-**Impact**: After checkout completes, the webhook fails to:
-1. Create purchase records
-2. Create script assignment records
-3. Grant TradingView script access to buyers
+This constraint prevents multiple scripts from being assigned to a single purchase. When the webhook tries to insert the second script assignment with the same `purchase_id`, the database rejects it due to the unique constraint violation.
 
-## Root Cause
-The Stripe SDK v14+ in Deno requires using the **async** version of the webhook signature verification method. The current code uses `constructEvent()` (sync) instead of `constructEventAsync()` (async).
+### Evidence
+- Webhook logged: "Creating 2 script assignments for program"
+- Only 1 assignment record exists in the database for the purchase
+- Database constraint query shows: `UNIQUE (purchase_id)` on `script_assignments`
 
 ## Solution
 
-### Change Required
-Update `supabase/functions/stripe-webhook/index.ts` line 28:
+### Step 1: Remove the Incorrect Unique Constraint
 
-**Before:**
-```typescript
-const event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+Run a database migration to drop the unique constraint on `purchase_id`:
+
+```sql
+ALTER TABLE script_assignments 
+DROP CONSTRAINT script_assignments_purchase_id_key;
 ```
 
-**After:**
-```typescript
-const event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
+This is the core fix. A single purchase of a multi-script package/program should create multiple assignment records - one per script.
+
+### Step 2: Add Proper Composite Unique Constraint (Optional)
+
+To prevent duplicate assignments of the same script to the same purchase, add a composite unique constraint:
+
+```sql
+ALTER TABLE script_assignments 
+ADD CONSTRAINT script_assignments_purchase_script_unique 
+UNIQUE (purchase_id, pine_id);
 ```
 
-This is a one-line fix that changes the synchronous method call to its async equivalent.
+This ensures:
+- Multiple scripts per purchase are allowed
+- The same script cannot be assigned twice for the same purchase
+
+## Additional Finding: TradingView Access Verification
+
+The verification endpoint is returning 400 errors. This is a separate issue that doesn't prevent access from being granted, but it does mean we can't confirm access was granted. The assignment is still marked as "assigned" because TradingView returned `{ status: "exists" }` (user already has access) or `{ status: "ok" }` (access granted).
+
+### Verification Fix (Secondary Priority)
+
+The `list_users` endpoint may require different formatting. Current implementation sends:
+```
+POST https://www.tradingview.com/pine_perm/list_users/
+Content-Type: application/x-www-form-urlencoded
+Body: pine_id=PUB;xxx&username=test
+```
+
+This may need to be changed to `multipart/form-data` format like the add endpoint uses.
 
 ## Testing Plan
-After deploying the fix:
-1. Complete another test checkout
-2. Verify purchase record appears in the database
-3. Verify script_assignment record is created with status "pending"
-4. Check assignment_logs for any activity
-5. Confirm TradingView access is granted (or queued for processing)
 
-## Technical Details
-- **File**: `supabase/functions/stripe-webhook/index.ts`
-- **Line**: 28
-- **Change**: `constructEvent` → `constructEventAsync` with `await`
-- **Risk**: Low - this is the documented fix from Stripe for Deno environments
+After applying the database migration:
+1. Complete another test purchase for the 2-script package
+2. Verify both script assignments are created in the database
+3. Confirm both scripts show "assigned" status
+4. Check TradingView Access Manager to verify the buyer has access to both scripts
