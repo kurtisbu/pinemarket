@@ -8,7 +8,7 @@ export async function assignScriptAccess(
   supabaseAdmin: SupabaseClient,
   key: CryptoKey
 ): Promise<Response> {
-  const { pine_id, tradingview_username, assignment_id, access_type, trial_duration_days } = payload;
+  const { pine_id, tradingview_username, assignment_id, access_type, trial_duration_days, subscription_expires_at } = payload;
   
   if (!pine_id || !tradingview_username || !assignment_id) {
     return new Response(JSON.stringify({ 
@@ -25,7 +25,8 @@ export async function assignScriptAccess(
       tradingview_username,
       assignment_id,
       access_type,
-      trial_duration_days
+      trial_duration_days,
+      subscription_expires_at
     });
 
     // Get assignment details
@@ -171,7 +172,8 @@ export async function assignScriptAccess(
           supabaseAdmin,
           access_type,
           trial_duration_days,
-          scriptDataById
+          scriptDataById,
+          subscription_expires_at
         );
       }
       
@@ -204,7 +206,8 @@ export async function assignScriptAccess(
       supabaseAdmin,
       access_type,
       trial_duration_days,
-      scriptData
+      scriptData,
+      subscription_expires_at
     );
 
   } catch (error: any) {
@@ -255,15 +258,20 @@ async function performAssignment(
   supabaseAdmin: SupabaseClient,
   accessType?: string,
   trialDurationDays?: number,
-  scriptData?: any
+  scriptData?: any,
+  subscriptionExpiresAt?: string
 ): Promise<Response> {
   try {
-    // Calculate expiration for trials
+    // Calculate expiration based on access type
     let expirationDate = null;
     if (accessType === 'trial' && trialDurationDays) {
       expirationDate = new Date(Date.now() + (trialDurationDays * 24 * 60 * 60 * 1000));
       console.log(`[ASSIGN] Setting trial expiration: ${expirationDate.toISOString()}`);
+    } else if (accessType === 'subscription' && subscriptionExpiresAt) {
+      expirationDate = new Date(subscriptionExpiresAt);
+      console.log(`[ASSIGN] Setting subscription expiration: ${expirationDate.toISOString()}`);
     }
+    // For full_purchase, expirationDate stays null = lifetime access
 
     // Step 3: Add script access using the actual script_id
     console.log(`[ASSIGN] Adding script access:`, {

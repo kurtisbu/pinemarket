@@ -19,11 +19,11 @@ interface Purchase {
     category: string;
     image_urls: string[];
   };
-  script_assignments?: {
+  script_assignments?: Array<{
     status: string;
     assigned_at: string | null;
     error_message: string | null;
-  };
+  }>;
 }
 
 interface PurchaseItemProps {
@@ -42,7 +42,7 @@ const PurchaseItem: React.FC<PurchaseItemProps> = ({ purchase }) => {
           <div className="flex items-center gap-2 mt-2">
             <Badge variant="outline">{purchase.programs.category}</Badge>
             <PurchaseStatusBadge status={purchase.status} />
-            <AssignmentStatusBadge assignment={purchase.script_assignments} />
+            <AssignmentStatusBadge assignments={purchase.script_assignments} />
           </div>
         </div>
         {purchase.programs.image_urls && purchase.programs.image_urls[0] && (
@@ -83,11 +83,13 @@ const PurchaseItem: React.FC<PurchaseItemProps> = ({ purchase }) => {
         </Button>
       </div>
 
-      {purchase.script_assignments?.error_message && (
+      {purchase.script_assignments?.some(a => a.error_message) && (
         <div className="bg-red-50 border border-red-200 rounded p-3 mt-2">
-          <p className="text-sm text-red-700">
-            <strong>Delivery Error:</strong> {purchase.script_assignments.error_message}
-          </p>
+          {purchase.script_assignments.filter(a => a.error_message).map((a, idx) => (
+            <p key={idx} className="text-sm text-red-700">
+              <strong>Delivery Error:</strong> {a.error_message}
+            </p>
+          ))}
         </div>
       )}
     </div>

@@ -12,7 +12,8 @@ async function triggerScriptAssignment(
   assignmentId: string,
   pineId: string,
   tradingviewUsername: string,
-  accessType: string
+  accessType: string,
+  subscriptionExpiresAt?: string
 ): Promise<void> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -37,6 +38,7 @@ async function triggerScriptAssignment(
         tradingview_username: tradingviewUsername,
         assignment_id: assignmentId,
         access_type: accessType,
+        subscription_expires_at: subscriptionExpiresAt,
       }),
     });
     
@@ -50,6 +52,13 @@ async function triggerScriptAssignment(
   } catch (error) {
     console.error(`[WEBHOOK] Error calling TradingView service for ${assignmentId}:`, error);
   }
+}
+
+// Get stripe instance
+function getStripe(): Stripe {
+  return new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+    apiVersion: "2023-10-16",
+  });
 }
 
 serve(async (req) => {
@@ -66,9 +75,7 @@ serve(async (req) => {
 
   try {
     const body = await req.text();
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2023-10-16",
-    });
+    const stripe = getStripe();
 
     const event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
 
@@ -81,11 +88,15 @@ serve(async (req) => {
 
     switch (event.type) {
       case "checkout.session.completed":
-        await handleCheckoutCompleted(event.data.object, supabaseAdmin);
+        await handleCheckoutCompleted(event.data.object, supabaseAdmin, stripe);
         break;
       
       case "payment_intent.succeeded":
         await handlePaymentSucceeded(event.data.object, supabaseAdmin);
+        break;
+
+      case "invoice.paid":
+        await handleInvoicePaid(event.data.object, supabaseAdmin, stripe);
         break;
 
       case "customer.subscription.created":
@@ -117,7 +128,7 @@ serve(async (req) => {
   }
 });
 
-async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
+async function handleCheckoutCompleted(session: any, supabaseAdmin: any, stripe: Stripe) {
   console.log("[WEBHOOK] Processing checkout.session.completed", session.id);
 
   const programId = session.metadata.program_id;
@@ -182,6 +193,21 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
     }
   }
 
+  // Handle subscription - get expiration from Stripe
+  let subscriptionExpiresAt: string | null = null;
+  let stripeSubscriptionId: string | null = null;
+  
+  if (priceType === 'recurring' && session.subscription) {
+    stripeSubscriptionId = session.subscription;
+    try {
+      const subscription = await stripe.subscriptions.retrieve(session.subscription);
+      subscriptionExpiresAt = new Date(subscription.current_period_end * 1000).toISOString();
+      console.log(`[WEBHOOK] Subscription ${stripeSubscriptionId} expires at: ${subscriptionExpiresAt}`);
+    } catch (subError) {
+      console.error("[WEBHOOK] Failed to retrieve subscription details:", subError);
+    }
+  }
+
   // Get price details (either program or package price)
   let amount = 0;
   if (isPackage) {
@@ -214,7 +240,7 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
   const platformFee = amount * (feePercent / 100);
   const sellerOwed = amount - platformFee;
 
-  // Create purchase record (for tracking only, payment handled by Stripe Connect)
+  // Create purchase record with stripe_subscription_id for tracking
   const { data: purchase, error: purchaseError } = await supabaseAdmin
     .from('purchases')
     .insert({
@@ -228,6 +254,7 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
       status: 'completed',
       payment_intent_id: session.payment_intent || session.id,
       tradingview_username: tradingviewUsername,
+      stripe_subscription_id: stripeSubscriptionId,
     })
     .select()
     .single();
@@ -237,159 +264,190 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any) {
     return;
   }
 
-  console.log("[WEBHOOK] Purchase created:", purchase.id);
+  console.log("[WEBHOOK] Purchase created:", purchase.id, "with stripe_subscription_id:", stripeSubscriptionId);
 
   // Create script assignments
   if (isPackage && packageId) {
-    // Get all programs in the package
-    const { data: packagePrograms } = await supabaseAdmin
-      .from('package_programs')
-      .select(`
-        program_id,
-        programs (
-          id,
-          tradingview_script_id
-        )
-      `)
-      .eq('package_id', packageId);
-
-    if (packagePrograms && packagePrograms.length > 0) {
-      console.log(`[WEBHOOK] Creating ${packagePrograms.length} script assignments for package`);
-      
-      const accessType = priceType === 'recurring' ? 'subscription' : 'full_purchase';
-      
-      // Create script assignment for each program in the package
-      for (const packageProgram of packagePrograms) {
-        const pineId = packageProgram.programs.tradingview_script_id;
-        
-        const { data: assignment, error: assignError } = await supabaseAdmin
-          .from('script_assignments')
-          .insert({
-            purchase_id: purchase.id,
-            program_id: packageProgram.program_id,
-            buyer_id: userId,
-            seller_id: sellerId,
-            status: 'pending',
-            access_type: accessType,
-            is_trial: false,
-            tradingview_username: tradingviewUsername,
-            pine_id: pineId,
-            tradingview_script_id: pineId,
-          })
-          .select()
-          .single();
-        
-        // Immediately trigger TradingView access grant
-        if (!assignError && assignment && pineId && tradingviewUsername) {
-          await triggerScriptAssignment(
-            assignment.id,
-            pineId,
-            tradingviewUsername,
-            accessType
-          );
-        }
-      }
-      
-      console.log("[WEBHOOK] All script assignments created and triggered for package");
-    }
+    await createPackageAssignments(packageId, purchase.id, userId, sellerId, priceType, tradingviewUsername, subscriptionExpiresAt, supabaseAdmin);
   } else if (programId) {
-    // Single program purchase - get all linked scripts from program_scripts
-    const { data: programScripts, error: psError } = await supabaseAdmin
-      .from('program_scripts')
-      .select(`
-        tradingview_script_id,
-        tradingview_scripts (
-          pine_id
-        )
-      `)
-      .eq('program_id', programId)
-      .order('display_order');
+    await createProgramAssignments(programId, purchase.id, userId, sellerId, priceType, tradingviewUsername, subscriptionExpiresAt, supabaseAdmin);
+  }
+}
 
-    if (psError) {
-      console.error("[WEBHOOK] Error fetching program scripts:", psError);
-    }
+async function createPackageAssignments(
+  packageId: string,
+  purchaseId: string,
+  userId: string,
+  sellerId: string,
+  priceType: string,
+  tradingviewUsername: string,
+  subscriptionExpiresAt: string | null,
+  supabaseAdmin: any
+) {
+  // Get all programs in the package
+  const { data: packagePrograms } = await supabaseAdmin
+    .from('package_programs')
+    .select(`
+      program_id,
+      programs (
+        id,
+        tradingview_script_id
+      )
+    `)
+    .eq('package_id', packageId);
 
-    if (programScripts && programScripts.length > 0) {
-      console.log(`[WEBHOOK] Creating ${programScripts.length} script assignments for program`);
+  if (packagePrograms && packagePrograms.length > 0) {
+    console.log(`[WEBHOOK] Creating ${packagePrograms.length} script assignments for package`);
+    
+    const accessType = priceType === 'recurring' ? 'subscription' : 'full_purchase';
+    
+    // Create script assignment for each program in the package
+    for (const packageProgram of packagePrograms) {
+      const pineId = packageProgram.programs.tradingview_script_id;
       
-      const accessType = priceType === 'recurring' ? 'subscription' : 'full_purchase';
-      
-      // Create script assignment for each linked TradingView script
-      for (const ps of programScripts) {
-        const pineId = ps.tradingview_scripts?.pine_id || null;
-        
-        const { data: assignment, error: assignError } = await supabaseAdmin
-          .from('script_assignments')
-          .insert({
-            purchase_id: purchase.id,
-            program_id: programId,
-            buyer_id: userId,
-            seller_id: sellerId,
-            status: 'pending',
-            access_type: accessType,
-            is_trial: false,
-            tradingview_username: tradingviewUsername,
-            pine_id: pineId,
-            tradingview_script_id: pineId,
-          })
-          .select()
-          .single();
-        
-        // Immediately trigger TradingView access grant
-        if (!assignError && assignment && pineId && tradingviewUsername) {
-          await triggerScriptAssignment(
-            assignment.id,
-            pineId,
-            tradingviewUsername,
-            accessType
-          );
-        }
-      }
-      
-      console.log("[WEBHOOK] All script assignments created and triggered for program");
-    } else {
-      // Fallback: Check legacy tradingview_script_id column
-      const { data: program } = await supabaseAdmin
-        .from('programs')
-        .select('tradingview_script_id')
-        .eq('id', programId)
+      const { data: assignment, error: assignError } = await supabaseAdmin
+        .from('script_assignments')
+        .insert({
+          purchase_id: purchaseId,
+          program_id: packageProgram.program_id,
+          buyer_id: userId,
+          seller_id: sellerId,
+          status: 'pending',
+          access_type: accessType,
+          is_trial: false,
+          tradingview_username: tradingviewUsername,
+          pine_id: pineId,
+          tradingview_script_id: pineId,
+          expires_at: subscriptionExpiresAt,
+        })
+        .select()
         .single();
-
-      if (program?.tradingview_script_id) {
-        const accessType = priceType === 'recurring' ? 'subscription' : 'full_purchase';
-        const pineId = program.tradingview_script_id;
-        
-        const { data: assignment, error: assignError } = await supabaseAdmin
-          .from('script_assignments')
-          .insert({
-            purchase_id: purchase.id,
-            program_id: programId,
-            buyer_id: userId,
-            seller_id: sellerId,
-            status: 'pending',
-            access_type: accessType,
-            is_trial: false,
-            tradingview_username: tradingviewUsername,
-            pine_id: pineId,
-            tradingview_script_id: pineId,
-          })
-          .select()
-          .single();
-        
-        // Immediately trigger TradingView access grant
-        if (!assignError && assignment && tradingviewUsername) {
-          await triggerScriptAssignment(
-            assignment.id,
-            pineId,
-            tradingviewUsername,
-            accessType
-          );
-        }
-        
-        console.log("[WEBHOOK] Script assignment created and triggered using legacy tradingview_script_id");
-      } else {
-        console.log("[WEBHOOK] No scripts found for program:", programId);
+      
+      // Immediately trigger TradingView access grant
+      if (!assignError && assignment && pineId && tradingviewUsername) {
+        await triggerScriptAssignment(
+          assignment.id,
+          pineId,
+          tradingviewUsername,
+          accessType,
+          subscriptionExpiresAt || undefined
+        );
       }
+    }
+    
+    console.log("[WEBHOOK] All script assignments created and triggered for package");
+  }
+}
+
+async function createProgramAssignments(
+  programId: string,
+  purchaseId: string,
+  userId: string,
+  sellerId: string,
+  priceType: string,
+  tradingviewUsername: string,
+  subscriptionExpiresAt: string | null,
+  supabaseAdmin: any
+) {
+  // Single program purchase - get all linked scripts from program_scripts
+  const { data: programScripts, error: psError } = await supabaseAdmin
+    .from('program_scripts')
+    .select(`
+      tradingview_script_id,
+      tradingview_scripts (
+        pine_id
+      )
+    `)
+    .eq('program_id', programId)
+    .order('display_order');
+
+  if (psError) {
+    console.error("[WEBHOOK] Error fetching program scripts:", psError);
+  }
+
+  const accessType = priceType === 'recurring' ? 'subscription' : 'full_purchase';
+
+  if (programScripts && programScripts.length > 0) {
+    console.log(`[WEBHOOK] Creating ${programScripts.length} script assignments for program`);
+    
+    // Create script assignment for each linked TradingView script
+    for (const ps of programScripts) {
+      const pineId = ps.tradingview_scripts?.pine_id || null;
+      
+      const { data: assignment, error: assignError } = await supabaseAdmin
+        .from('script_assignments')
+        .insert({
+          purchase_id: purchaseId,
+          program_id: programId,
+          buyer_id: userId,
+          seller_id: sellerId,
+          status: 'pending',
+          access_type: accessType,
+          is_trial: false,
+          tradingview_username: tradingviewUsername,
+          pine_id: pineId,
+          tradingview_script_id: pineId,
+          expires_at: subscriptionExpiresAt,
+        })
+        .select()
+        .single();
+      
+      // Immediately trigger TradingView access grant
+      if (!assignError && assignment && pineId && tradingviewUsername) {
+        await triggerScriptAssignment(
+          assignment.id,
+          pineId,
+          tradingviewUsername,
+          accessType,
+          subscriptionExpiresAt || undefined
+        );
+      }
+    }
+    
+    console.log("[WEBHOOK] All script assignments created and triggered for program");
+  } else {
+    // Fallback: Check legacy tradingview_script_id column
+    const { data: program } = await supabaseAdmin
+      .from('programs')
+      .select('tradingview_script_id')
+      .eq('id', programId)
+      .single();
+
+    if (program?.tradingview_script_id) {
+      const pineId = program.tradingview_script_id;
+      
+      const { data: assignment, error: assignError } = await supabaseAdmin
+        .from('script_assignments')
+        .insert({
+          purchase_id: purchaseId,
+          program_id: programId,
+          buyer_id: userId,
+          seller_id: sellerId,
+          status: 'pending',
+          access_type: accessType,
+          is_trial: false,
+          tradingview_username: tradingviewUsername,
+          pine_id: pineId,
+          tradingview_script_id: pineId,
+          expires_at: subscriptionExpiresAt,
+        })
+        .select()
+        .single();
+      
+      // Immediately trigger TradingView access grant
+      if (!assignError && assignment && tradingviewUsername) {
+        await triggerScriptAssignment(
+          assignment.id,
+          pineId,
+          tradingviewUsername,
+          accessType,
+          subscriptionExpiresAt || undefined
+        );
+      }
+      
+      console.log("[WEBHOOK] Script assignment created and triggered using legacy tradingview_script_id");
+    } else {
+      console.log("[WEBHOOK] No scripts found for program:", programId);
     }
   }
 }
@@ -404,6 +462,71 @@ async function handlePaymentSucceeded(paymentIntent: any, supabaseAdmin: any) {
     .eq('payment_intent_id', paymentIntent.id);
 }
 
+async function handleInvoicePaid(invoice: any, supabaseAdmin: any, stripe: Stripe) {
+  console.log("[WEBHOOK] Processing invoice.paid", invoice.id);
+  
+  const subscriptionId = invoice.subscription;
+  if (!subscriptionId) {
+    console.log("[WEBHOOK] Invoice has no subscription, skipping renewal logic");
+    return;
+  }
+  
+  // Skip initial invoice (billing_reason: 'subscription_create')
+  if (invoice.billing_reason === 'subscription_create') {
+    console.log("[WEBHOOK] Initial subscription invoice, skipping (handled by checkout.session.completed)");
+    return;
+  }
+  
+  console.log(`[WEBHOOK] Processing subscription renewal for: ${subscriptionId}`);
+  
+  try {
+    // Get subscription to find new period end
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    const newExpiresAt = new Date(subscription.current_period_end * 1000).toISOString();
+    
+    console.log(`[WEBHOOK] New subscription period end: ${newExpiresAt}`);
+    
+    // Find purchases by subscription ID
+    const { data: purchases, error: purchasesError } = await supabaseAdmin
+      .from('purchases')
+      .select('id')
+      .eq('stripe_subscription_id', subscriptionId);
+    
+    if (purchasesError) {
+      console.error("[WEBHOOK] Error fetching purchases for renewal:", purchasesError);
+      return;
+    }
+    
+    if (!purchases || purchases.length === 0) {
+      console.log("[WEBHOOK] No purchases found for subscription:", subscriptionId);
+      return;
+    }
+    
+    console.log(`[WEBHOOK] Extending access for ${purchases.length} purchase(s)`);
+    
+    // Extend all related script assignments
+    for (const purchase of purchases) {
+      const { error: updateError } = await supabaseAdmin
+        .from('script_assignments')
+        .update({ 
+          expires_at: newExpiresAt,
+          status: 'assigned' // Ensure status is assigned (not expired)
+        })
+        .eq('purchase_id', purchase.id);
+      
+      if (updateError) {
+        console.error(`[WEBHOOK] Error extending assignment for purchase ${purchase.id}:`, updateError);
+      } else {
+        console.log(`[WEBHOOK] Extended assignments for purchase ${purchase.id} to ${newExpiresAt}`);
+      }
+    }
+    
+    console.log("[WEBHOOK] Subscription renewal processed successfully");
+  } catch (error) {
+    console.error("[WEBHOOK] Error processing subscription renewal:", error);
+  }
+}
+
 async function handleSubscriptionUpdate(subscription: any, supabaseAdmin: any) {
   console.log("[WEBHOOK] Processing subscription update", subscription.id);
   
@@ -414,23 +537,42 @@ async function handleSubscriptionUpdate(subscription: any, supabaseAdmin: any) {
 async function handleSubscriptionDeleted(subscription: any, supabaseAdmin: any) {
   console.log("[WEBHOOK] Processing subscription deletion", subscription.id);
   
-  // Find and revoke access for this subscription
-  const { data: purchases } = await supabaseAdmin
+  // Find purchases by stripe_subscription_id (not payment_intent_id)
+  const { data: purchases, error: purchasesError } = await supabaseAdmin
     .from('purchases')
     .select('id')
-    .eq('payment_intent_id', subscription.id)
-    .eq('status', 'completed');
+    .eq('stripe_subscription_id', subscription.id);
 
-  if (purchases && purchases.length > 0) {
-    for (const purchase of purchases) {
-      // Update assignment status to revoked
-      await supabaseAdmin
-        .from('script_assignments')
-        .update({ 
-          status: 'revoked',
-          expires_at: new Date().toISOString()
-        })
-        .eq('purchase_id', purchase.id);
-    }
+  if (purchasesError) {
+    console.error("[WEBHOOK] Error fetching purchases for revocation:", purchasesError);
+    return;
   }
+
+  if (!purchases || purchases.length === 0) {
+    console.log("[WEBHOOK] No purchases found for subscription:", subscription.id);
+    return;
+  }
+
+  console.log(`[WEBHOOK] Revoking access for ${purchases.length} purchase(s)`);
+
+  for (const purchase of purchases) {
+    // Update assignment status to expired and set expires_at to now
+    const { error: updateError } = await supabaseAdmin
+      .from('script_assignments')
+      .update({ 
+        status: 'expired',
+        expires_at: new Date().toISOString()
+      })
+      .eq('purchase_id', purchase.id);
+    
+    if (updateError) {
+      console.error(`[WEBHOOK] Error revoking assignment for purchase ${purchase.id}:`, updateError);
+    } else {
+      console.log(`[WEBHOOK] Revoked assignments for purchase ${purchase.id}`);
+    }
+    
+    // TODO: Optionally trigger TradingView access revocation here
+  }
+  
+  console.log("[WEBHOOK] Subscription cancellation processed successfully");
 }

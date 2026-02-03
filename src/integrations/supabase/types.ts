@@ -536,6 +536,7 @@ export type Database = {
           seller_id: string
           seller_owed: number | null
           status: Database["public"]["Enums"]["purchase_status"]
+          stripe_subscription_id: string | null
           stripe_transfer_id: string | null
           tradingview_username: string | null
           updated_at: string
@@ -553,6 +554,7 @@ export type Database = {
           seller_id: string
           seller_owed?: number | null
           status?: Database["public"]["Enums"]["purchase_status"]
+          stripe_subscription_id?: string | null
           stripe_transfer_id?: string | null
           tradingview_username?: string | null
           updated_at?: string
@@ -570,6 +572,7 @@ export type Database = {
           seller_id?: string
           seller_owed?: number | null
           status?: Database["public"]["Enums"]["purchase_status"]
+          stripe_subscription_id?: string | null
           stripe_transfer_id?: string | null
           tradingview_username?: string | null
           updated_at?: string
