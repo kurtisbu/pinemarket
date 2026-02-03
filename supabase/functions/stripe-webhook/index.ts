@@ -25,7 +25,7 @@ serve(async (req) => {
       apiVersion: "2023-10-16",
     });
 
-    const event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+    const event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
 
     console.log(`[WEBHOOK] Received event: ${event.type}`);
 
