@@ -38,14 +38,19 @@ serve(async (req) => {
       throw new Error("User not authenticated");
     }
 
-    // Fetch buyer's TradingView username from profile
-    const { data: profile, error: profileError } = await supabaseClient
+    // Fetch buyer's TradingView username from profile using admin client to bypass RLS
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('tradingview_username')
       .eq('id', user.id)
       .single();
 
-    if (profileError || !profile?.tradingview_username) {
+    if (profileError) {
+      console.error("[CHECKOUT] Profile fetch error:", profileError);
+      throw new Error("Could not fetch profile. Please try again.");
+    }
+
+    if (!profile?.tradingview_username) {
       throw new Error("TradingView username not found. Please add your TradingView username to your profile before purchasing.");
     }
 
