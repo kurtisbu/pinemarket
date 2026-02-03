@@ -39,10 +39,6 @@ Deno.serve(async (req) => {
         ),
         seller_payout_info!seller_payout_info_user_id_fkey (
           payout_method,
-          bank_account_holder_name,
-          bank_account_number,
-          bank_routing_number,
-          paypal_email,
           is_verified,
           currency
         )
