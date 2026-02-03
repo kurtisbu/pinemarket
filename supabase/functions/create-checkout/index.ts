@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { ensureStripePriceForPackagePrice, ensureStripePriceForProgramPrice } from "./stripeEnsure.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -71,6 +72,7 @@ serve(async (req) => {
           program_packages (
             id,
             title,
+            description,
             seller_id,
             profiles!program_packages_seller_id_fkey (
               stripe_account_id,
@@ -86,7 +88,26 @@ serve(async (req) => {
       }
 
       if (!packagePrice.stripe_price_id) {
-        throw new Error("Stripe price not configured for this package");
+        // Auto-heal: create Stripe product+price and persist stripe_price_id
+        const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+          apiVersion: "2023-10-16",
+        });
+
+        packagePrice.stripe_price_id = await ensureStripePriceForPackagePrice(stripe, supabaseAdmin, {
+          id: packagePrice.id,
+          price_type: packagePrice.price_type,
+          amount: packagePrice.amount,
+          currency: packagePrice.currency,
+          interval: packagePrice.interval,
+          display_name: packagePrice.display_name,
+          stripe_price_id: packagePrice.stripe_price_id,
+          program_packages: {
+            id: packagePrice.program_packages.id,
+            title: packagePrice.program_packages.title,
+            description: packagePrice.program_packages.description ?? null,
+            seller_id: packagePrice.program_packages.seller_id,
+          },
+        });
       }
 
       sellerProfile = packagePrice.program_packages.profiles;
@@ -113,7 +134,9 @@ serve(async (req) => {
           programs (
             id,
             title,
+            description,
             seller_id,
+            stripe_product_id,
             trial_period_days,
             profiles!programs_seller_id_fkey (
               stripe_account_id,
@@ -129,7 +152,27 @@ serve(async (req) => {
       }
 
       if (!programPrice.stripe_price_id) {
-        throw new Error("Stripe price not configured for this pricing option");
+        // Auto-heal: create Stripe product+price and persist stripe IDs
+        const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+          apiVersion: "2023-10-16",
+        });
+
+        programPrice.stripe_price_id = await ensureStripePriceForProgramPrice(stripe, supabaseAdmin, {
+          id: programPrice.id,
+          price_type: programPrice.price_type,
+          amount: programPrice.amount,
+          currency: programPrice.currency,
+          interval: programPrice.interval,
+          display_name: programPrice.display_name,
+          stripe_price_id: programPrice.stripe_price_id,
+          programs: {
+            id: programPrice.programs.id,
+            title: programPrice.programs.title,
+            description: (programPrice.programs as any).description ?? null,
+            seller_id: programPrice.programs.seller_id,
+            stripe_product_id: (programPrice.programs as any).stripe_product_id ?? null,
+          },
+        });
       }
 
       sellerProfile = programPrice.programs.profiles;
