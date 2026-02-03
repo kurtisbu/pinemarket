@@ -18,11 +18,11 @@ interface Purchase {
     category: string;
     image_urls: string[];
   };
-  script_assignments?: {
+  script_assignments?: Array<{
     status: string;
     assigned_at: string | null;
     error_message: string | null;
-  };
+  }>;
 }
 
 interface UserPurchasesProps {
