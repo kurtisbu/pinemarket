@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Card } from '@/components/ui/card';
-import { CreditCard, Package, ExternalLink } from 'lucide-react';
+import { Package, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface IncludedScript {
@@ -111,18 +111,6 @@ const ProgramDescription: React.FC<ProgramDescriptionProps> = ({ description, ta
           </div>
         </div>
       )}
-
-      <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-        <h3 className="text-lg font-semibold mb-2">Pricing Details</h3>
-        <div className="space-y-2 text-sm">
-          <p className="flex items-center gap-2">
-            <CreditCard className="w-4 h-4" />
-            <strong>One-time Purchase:</strong> Pay once and own this script forever
-          </p>
-          <p>No recurring charges or subscription fees</p>
-          <p>Lifetime access to updates and improvements</p>
-        </div>
-      </div>
       
       {tags && tags.length > 0 && (
         <div className="mt-6">
