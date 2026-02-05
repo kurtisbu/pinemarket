@@ -1,27 +1,49 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Check, Clock, AlertTriangle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface DeliveryInfoProps {
   program: any;
 }
 
 const DeliveryInfo: React.FC<DeliveryInfoProps> = ({ program }) => {
-  const getAssignmentMethod = () => {
-    if (program?.tradingview_script_id && program?.profiles?.is_tradingview_connected) {
-      return 'automatic';
-    }
-    return 'manual';
-  };
+  const [hasLinkedScripts, setHasLinkedScripts] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkLinkedScripts = async () => {
+      if (!program?.id) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const { count, error } = await supabase
+          .from('program_scripts')
+          .select('id', { count: 'exact', head: true })
+          .eq('program_id', program.id);
+
+        if (!error) {
+          setHasLinkedScripts((count ?? 0) > 0);
+        }
+      } catch (error) {
+        console.error('Failed to check linked scripts:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkLinkedScripts();
+  }, [program?.id]);
 
   const getDeliveryInfo = () => {
-    const assignmentMethod = getAssignmentMethod();
-    const hasScript = program?.tradingview_script_id;
+    const hasScript = program?.tradingview_script_id || hasLinkedScripts;
     const sellerConnected = program?.profiles?.is_tradingview_connected;
 
-    if (assignmentMethod === 'automatic') {
+    if (hasScript && sellerConnected) {
       return {
         type: 'success',
         icon: <Check className="w-4 h-4" />,
@@ -45,7 +67,7 @@ const DeliveryInfo: React.FC<DeliveryInfoProps> = ({ program }) => {
           'Seller will contact you for TradingView username'
         ]
       };
-    } else {
+    } else if (program?.script_file_path) {
       return {
         type: 'info',
         icon: <AlertTriangle className="w-4 h-4" />,
@@ -58,9 +80,19 @@ const DeliveryInfo: React.FC<DeliveryInfoProps> = ({ program }) => {
         ]
       };
     }
+    
+    return null;
   };
 
+  if (loading) {
+    return null;
+  }
+
   const deliveryInfo = getDeliveryInfo();
+
+  if (!deliveryInfo) {
+    return null;
+  }
 
   return (
     <Card>
@@ -93,7 +125,7 @@ const DeliveryInfo: React.FC<DeliveryInfoProps> = ({ program }) => {
                     href={program.tradingview_publication_url} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline"
+                    className="text-primary hover:underline"
                   >
                     View on TradingView
                   </a>
