@@ -97,16 +97,16 @@ const RatingsList: React.FC<RatingsListProps> = ({ programId }) => {
           <div key={rating.id} className="border-b pb-4 last:border-b-0">
             <div className="flex items-start gap-3">
               <Avatar className="w-10 h-10">
-                <AvatarImage src={rating.profiles.avatar_url || undefined} />
+                <AvatarImage src={rating.profiles?.avatar_url || undefined} />
                 <AvatarFallback>
-                  {(rating.profiles.display_name || rating.profiles.username || 'U')[0].toUpperCase()}
+                  {(rating.profiles?.display_name || rating.profiles?.username || 'U')[0].toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="font-medium">
-                    {rating.profiles.display_name || rating.profiles.username || 'Anonymous User'}
+                    {rating.profiles?.display_name || rating.profiles?.username || 'Anonymous User'}
                   </span>
                   <div className="flex items-center gap-1">
                     {[...Array(5)].map((_, i) => (
