@@ -41,7 +41,9 @@ const DeliveryInfo: React.FC<DeliveryInfoProps> = ({ program }) => {
 
   const getDeliveryInfo = () => {
     const hasScript = program?.tradingview_script_id || hasLinkedScripts;
-    const sellerConnected = program?.profiles?.is_tradingview_connected;
+    // Access profiles - might be nested under different key depending on query
+    const profiles = program?.profiles;
+    const sellerConnected = profiles?.is_tradingview_connected === true;
 
     if (hasScript && sellerConnected) {
       return {
