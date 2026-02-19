@@ -17,9 +17,6 @@ import SellerDashboard from "./pages/SellerDashboard";
 import SellerOnboardingPage from "./pages/SellerOnboarding";
 import EditProgram from "./pages/EditProgram";
 import AdminDashboard from "./pages/AdminDashboard";
-import Subscriptions from "./pages/Subscriptions";
-import SubscriptionSuccess from "./pages/SubscriptionSuccess";
-import SubscriptionCancel from "./pages/SubscriptionCancel";
 import Creators from "./pages/Creators";
 import CreatePackage from "./pages/CreatePackage";
 import NotFound from "./pages/NotFound";
@@ -47,9 +44,6 @@ const App = () => (
           <Route path="/my-purchases" element={<MyPurchases />} />
           <Route path="/edit-program/:id" element={<EditProgram />} />
           <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/subscriptions" element={<Subscriptions />} />
-          <Route path="/subscription/success" element={<SubscriptionSuccess />} />
-          <Route path="/subscription/cancel" element={<SubscriptionCancel />} />
           <Route path="/creators" element={<Creators />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
