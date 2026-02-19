@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import Header from '@/components/Header';
-import { Shield, Users, FileText, BarChart3, AlertTriangle, Clock, Star, DollarSign } from 'lucide-react';
+import { Shield, Users, FileText, BarChart3, AlertTriangle, Clock, Star, DollarSign, FlaskConical } from 'lucide-react';
 import AdminScriptAssignments from '@/components/AdminScriptAssignments';
 import SecurityAuditDashboard from '@/components/SecurityAuditDashboard';
 import AdminTrialManagement from '@/components/AdminTrialManagement';
@@ -15,6 +15,7 @@ import AdminAccessCodes from '@/components/AdminAccessCodes';
 import AdminFeaturedCreators from '@/components/AdminFeaturedCreators';
 import { AdminPayoutManagement } from '@/components/AdminPayoutManagement';
 import AdminPayoutDashboard from '@/components/AdminPayoutDashboard';
+import AdminTestData from '@/components/AdminTestData';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -174,7 +175,7 @@ const AdminDashboard = () => {
           </div>
 
           <Tabs defaultValue="assignments" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-6">
+            <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="assignments" className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4" />
                 Assignments
@@ -198,6 +199,10 @@ const AdminDashboard = () => {
               <TabsTrigger value="payout-mgmt" className="flex items-center gap-2">
                 <DollarSign className="w-4 h-4" />
                 Payouts
+              </TabsTrigger>
+              <TabsTrigger value="test-data" className="flex items-center gap-2">
+                <FlaskConical className="w-4 h-4" />
+                Test Data
               </TabsTrigger>
             </TabsList>
 
@@ -223,6 +228,10 @@ const AdminDashboard = () => {
 
             <TabsContent value="payout-mgmt" className="space-y-6">
               <AdminPayoutDashboard />
+            </TabsContent>
+
+            <TabsContent value="test-data" className="space-y-6">
+              <AdminTestData />
             </TabsContent>
           </Tabs>
         </div>
