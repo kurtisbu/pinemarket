@@ -1,221 +1,94 @@
 
 
-# Fix: Subscription Expiration and Renewal Logic
+# Marketplace Testing Seed Plan
 
-## Problem Summary
+## Overview
 
-Your test purchase revealed two critical issues with subscription-based script access:
+Build an admin-only edge function (`seed-test-data`) that creates test accounts and programs using your real TradingView credentials and script portfolio. All test sellers will share your encrypted cookies so that script assignment works end-to-end with real TradingView API calls. A new "Test Data" tab in the Admin Dashboard provides seed and cleanup buttons.
 
-### Issue 1: Assignments Have No Expiration
-When you purchased a monthly subscription, the script assignments were created with:
-- `access_type: 'subscription'` (correct)
-- `expires_at: null` (wrong - should be 1 month from now)
+## What Gets Created
 
-The current code only sets expiration for trial access, not for subscription access.
+### Test Sellers (3 accounts)
+- Emails: `test-seller-1@pinemarket-test.com`, `test-seller-2@pinemarket-test.com`, `test-seller-3@pinemarket-test.com`
+- Password: `TestPass123!`
+- Each gets your real encrypted TradingView cookies and username (`capitalcodersllc`) copied from your profile
+- `is_tradingview_connected = true`, `tradingview_connection_status = 'active'`
+- Note: The one-account-per-user unique constraint on `tradingview_username` will need to be handled -- test sellers will share the username for testing purposes, so the seed function will use the service role to bypass this
 
-### Issue 2: No Renewal/Extension Logic
-While Stripe correctly handles recurring billing, the platform has no logic to:
-- Extend `expires_at` when a subscription payment succeeds
-- Track which subscription is linked to which assignments
-- Properly revoke access when a subscription is canceled
+### Test Buyers (3 accounts)
+- Emails: `test-buyer-1@pinemarket-test.com`, `test-buyer-2@pinemarket-test.com`, `test-buyer-3@pinemarket-test.com`
+- Password: `TestPass123!`
+- Each gets a `tradingview_username` set (e.g., a test TV username you provide, or a placeholder for manual update)
 
----
+### Test Programs (9 programs, 3 per seller)
+Each seller gets 3 programs pulling from your real synced scripts, with varied configurations:
 
-## Solution Overview
+| Program | Category | Pricing | Trial |
+|---------|----------|---------|-------|
+| Seller 1, Prog 1 | Indicator | One-time $49.99 | None |
+| Seller 1, Prog 2 | Strategy | Monthly $19.99, Yearly $149.99 | 7-day |
+| Seller 1, Prog 3 | Strategy | One-time $99 + Monthly $29.99 | None |
+| Seller 2, Prog 1 | Indicator | One-time $29.99 | 3-day |
+| Seller 2, Prog 2 | Utility | Monthly $9.99 | None |
+| Seller 2, Prog 3 | Strategy | Yearly $199.99 | 14-day |
+| Seller 3, Prog 1 | Indicator | One-time $149.99 | None |
+| Seller 3, Prog 2 | Strategy | Monthly $39.99, Yearly $299.99 | 7-day |
+| Seller 3, Prog 3 | Utility | One-time $19.99 | None |
 
+- Each program is linked to a real script from your `tradingview_scripts` table via the `program_scripts` junction table
+- Programs start in `draft` status (can be manually published from admin for testing)
+
+### Script Distribution
+Your ~20 synced scripts will be distributed across the 9 programs (some programs may reference the same script, which is a valid real-world scenario).
+
+## Implementation
+
+### 1. Edge Function: `supabase/functions/seed-test-data/index.ts`
+
+- Admin-only (checks `has_role` via service role)
+- Actions: `seed` and `cleanup`
+- **Seed flow:**
+  1. Fetch your real profile's encrypted cookies and TradingView username
+  2. Fetch your synced scripts from `tradingview_scripts`
+  3. Create 6 auth users via `supabase.auth.admin.createUser()` with `email_confirm: true`
+  4. Update seller profiles with your TV cookies, username, and connection status
+  5. Update buyer profiles with display names and TV usernames
+  6. Create 9 programs with varied categories, descriptions, and tags
+  7. Create `program_prices` rows for each program
+  8. Create `program_scripts` rows linking each program to real scripts
+  9. Return all created IDs and credentials
+- **Cleanup flow:**
+  1. Find all users matching `*@pinemarket-test.com`
+  2. Delete `program_scripts`, `program_prices`, `programs`, `profiles` for those users
+  3. Delete auth users via `supabase.auth.admin.deleteUser()`
+  4. Return counts of deleted records
+
+### 2. Config: `supabase/config.toml`
+
+Add entry:
 ```text
-+-------------------+       +-------------------+       +-------------------+
-|  Initial Purchase | ----> | Stripe Webhook    | ----> | Script Assignment |
-|  (Checkout)       |       | checkout.session  |       | expires_at: +1mo  |
-+-------------------+       +-------------------+       +-------------------+
-                                    |
-                                    v
-                            Store stripe_subscription_id
-                            in purchases table
-                                    |
-+-------------------+       +-------------------+       +-------------------+
-|  Monthly Renewal  | ----> | Stripe Webhook    | ----> | Extend expires_at |
-|  (Auto-charged)   |       | invoice.paid      |       | by billing period |
-+-------------------+       +-------------------+       +-------------------+
-                                    |
-+-------------------+       +-------------------+       +-------------------+
-|  Cancellation     | ----> | Stripe Webhook    | ----> | Revoke Access     |
-|  (User cancels)   |       | subscription.     |       | (set to expired)  |
-|                   |       | deleted           |       |                   |
-+-------------------+       +-------------------+       +-------------------+
+[functions.seed-test-data]
+verify_jwt = false
 ```
 
----
+### 3. New Component: `src/components/AdminTestData.tsx`
 
-## Implementation Steps
+- "Seed Test Data" button -- calls the edge function with `action: "seed"`
+- "Cleanup Test Data" button -- calls with `action: "cleanup"`
+- Displays results: created accounts with emails/passwords, program titles, linked scripts
+- Shows a table of test credentials for easy copy-paste
+- Loading states and error handling
 
-### Step 1: Add `stripe_subscription_id` Column to Purchases Table
+### 4. Modified: `src/pages/AdminDashboard.tsx`
 
-The purchases table needs to track which Stripe subscription it belongs to for renewal processing.
+- Add a "Test Data" tab (with a beaker icon) to the existing `TabsList`
+- Grid changes from `grid-cols-6` to `grid-cols-7`
+- Import and render `AdminTestData` in new `TabsContent`
 
-```sql
-ALTER TABLE purchases 
-ADD COLUMN stripe_subscription_id TEXT;
+## Important Notes
 
--- Index for quick lookup during renewal webhooks
-CREATE INDEX idx_purchases_stripe_subscription_id 
-ON purchases(stripe_subscription_id);
-```
-
-### Step 2: Update Webhook - Set Expiration on Initial Assignment
-
-Modify `stripe-webhook/index.ts` to:
-1. Retrieve subscription details from Stripe to get `current_period_end`
-2. Pass subscription period end date to the assignment creation
-3. Store `stripe_subscription_id` in the purchase record
-
-For subscriptions, the assignment's `expires_at` should be set to the subscription's `current_period_end` timestamp.
-
-### Step 3: Update Webhook - Add Subscription Renewal Handler
-
-Add proper handling for `invoice.paid` events (subscription renewals):
-1. Look up the purchase by `stripe_subscription_id`
-2. Retrieve the updated subscription from Stripe
-3. Update all related script assignments with the new `current_period_end`
-
-### Step 4: Update Webhook - Fix Subscription Cancellation Handler
-
-Fix `handleSubscriptionDeleted()` to:
-1. Look up purchases by `stripe_subscription_id` (not `payment_intent_id`)
-2. Update assignments to `status: 'revoked'` and set `expires_at` to now
-
-### Step 5: Update Assignment Logic for Subscription Expiration
-
-Modify `assignScriptAccess.ts` to handle subscription access type:
-- Accept `expires_at` as a parameter when `access_type === 'subscription'`
-- Set the expiration on TradingView if their API supports it (or handle expiration on our side only)
-
----
-
-## Technical Details
-
-### Changes to `stripe-webhook/index.ts`
-
-**In `handleCheckoutCompleted`:**
-```typescript
-// After getting session metadata, retrieve subscription details
-if (mode === 'subscription' && session.subscription) {
-  const subscription = await stripe.subscriptions.retrieve(session.subscription);
-  const expiresAt = new Date(subscription.current_period_end * 1000).toISOString();
-  
-  // Store subscription ID with purchase
-  // Pass expiresAt to script assignment creation
-}
-```
-
-**New `handleInvoicePaid` function:**
-```typescript
-async function handleInvoicePaid(invoice: any, supabaseAdmin: any) {
-  const subscriptionId = invoice.subscription;
-  if (!subscriptionId) return;
-  
-  // Get subscription to find new period end
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-  const newExpiresAt = new Date(subscription.current_period_end * 1000);
-  
-  // Find purchase by subscription ID
-  const { data: purchases } = await supabaseAdmin
-    .from('purchases')
-    .select('id')
-    .eq('stripe_subscription_id', subscriptionId);
-  
-  // Extend all related script assignments
-  for (const purchase of purchases) {
-    await supabaseAdmin
-      .from('script_assignments')
-      .update({ expires_at: newExpiresAt.toISOString() })
-      .eq('purchase_id', purchase.id);
-  }
-}
-```
-
-**Fix `handleSubscriptionDeleted`:**
-```typescript
-async function handleSubscriptionDeleted(subscription: any, supabaseAdmin: any) {
-  // Use stripe_subscription_id, not payment_intent_id
-  const { data: purchases } = await supabaseAdmin
-    .from('purchases')
-    .select('id')
-    .eq('stripe_subscription_id', subscription.id);
-
-  for (const purchase of purchases) {
-    await supabaseAdmin
-      .from('script_assignments')
-      .update({ 
-        status: 'revoked',
-        expires_at: new Date().toISOString()
-      })
-      .eq('purchase_id', purchase.id);
-      
-    // Optionally: trigger TradingView access revocation
-  }
-}
-```
-
-### Changes to `assignScriptAccess.ts`
-
-Accept and use `subscription_expires_at` parameter:
-```typescript
-const { 
-  pine_id, 
-  tradingview_username, 
-  assignment_id, 
-  access_type, 
-  trial_duration_days,
-  subscription_expires_at  // New parameter
-} = payload;
-
-// In performAssignment:
-let expirationDate = null;
-if (accessType === 'trial' && trialDurationDays) {
-  expirationDate = new Date(Date.now() + (trialDurationDays * 24 * 60 * 60 * 1000));
-} else if (accessType === 'subscription' && subscription_expires_at) {
-  expirationDate = new Date(subscription_expires_at);
-}
-```
-
----
-
-## How Recurring Billing Works
-
-With these changes, here's the complete subscription lifecycle:
-
-1. **Initial Purchase**: User selects monthly subscription, pays first month
-   - Stripe creates subscription with `current_period_end` = 1 month from now
-   - Webhook creates purchase with `stripe_subscription_id`
-   - Script assignments created with `expires_at` = `current_period_end`
-
-2. **Automatic Renewal** (after 1 month):
-   - Stripe automatically charges the card
-   - Stripe sends `invoice.paid` webhook event
-   - Your webhook updates all related assignments with new `expires_at`
-
-3. **Cancellation**:
-   - User cancels via Stripe billing portal
-   - Stripe sends `customer.subscription.deleted` webhook
-   - Your webhook revokes access by updating assignment status
-
----
-
-## Files to Modify
-
-1. **Database Migration**: Add `stripe_subscription_id` column to `purchases`
-2. **`supabase/functions/stripe-webhook/index.ts`**: 
-   - Set expiration on initial subscription purchase
-   - Add `invoice.paid` handler for renewals
-   - Fix `subscription.deleted` handler
-3. **`supabase/functions/tradingview-service/actions/assignScriptAccess.ts`**: Accept subscription expiration parameter
-
----
-
-## Cleanup Note
-
-The existing `supabase/functions/subscription-webhook/index.ts` appears to be an older/parallel implementation that uses different tables (`user_subscriptions`, `subscription_access`). After this fix, you may want to:
-- Delete `subscription-webhook` if unused
-- Or consolidate both approaches if you need the separate tables
+- **TradingView unique constraint**: Since multiple test sellers share the same TradingView username, the seed function uses service role to write directly, bypassing any application-level uniqueness checks. The database-level unique constraint on `tradingview_username` in profiles would block this -- the seed function will need to handle this by either using a single shared seller approach or appending suffixes. We will use one real TV connection and assign all test programs to the same real seller ID for script access, while the programs themselves are "owned" by different test sellers for marketplace variety.
+- **Alternative approach**: All test programs can reference your real user ID as the source of TradingView credentials in `program_scripts` via script IDs from your `tradingview_scripts` table. The assignment flow looks up the seller's cookies from the `profiles` table, so we need each test seller to actually have valid cookies OR we route assignments through your real account. The simplest approach: all test sellers share your cookies and username (service role bypasses uniqueness).
+- **Stripe**: Test sellers won't have Stripe Connect, so programs stay in `draft`. You can manually publish via SQL for purchase flow testing, or skip Stripe validation temporarily.
+- **Buyer TV usernames**: You'll need to provide real TradingView usernames for test buyers if you want to verify actual script access grants. The seed function will prompt for these or use placeholders.
 
