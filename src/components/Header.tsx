@@ -1,5 +1,5 @@
-import React from 'react';
-import { Search, User, ShoppingCart, LogOut, LayoutDashboard, Settings, UserCircle, Shield } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, User, LogOut, LayoutDashboard, Settings, UserCircle, Shield, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,8 +12,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 interface HeaderProps {
   onSearch?: (query: string) => void;
@@ -26,12 +26,12 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
   const location = useLocation();
   const [profile, setProfile] = useState<{ username: string; avatar_url: string; display_name: string; is_tradingview_connected: boolean; role?: string } | null>(null);
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
       const fetchProfile = async () => {
         try {
-          // Fetch basic profile info
           const { data } = await supabase
             .from('profiles')
             .select('username, avatar_url, display_name, is_tradingview_connected')
@@ -39,15 +39,13 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
             .single();
           
           if (data) {
-            // Check admin status via secure RPC
             const { data: isAdmin } = await supabase
               .rpc('is_current_user_admin');
             
-            console.log('Header - Profile loaded:', data, 'isAdmin:', isAdmin);
             setProfile({ ...data, role: isAdmin ? 'admin' : 'user' });
           }
         } catch (error) {
-          console.error('Error fetching profile:', error);
+          // Silently handle profile fetch errors
         }
       };
       fetchProfile();
@@ -84,7 +82,6 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
     if (onSearch) {
       onSearch(localSearchQuery);
     } else {
-      // Navigate to browse page with search query
       const params = new URLSearchParams();
       if (localSearchQuery) params.set('search', localSearchQuery);
       navigate(`/browse?${params.toString()}`);
@@ -94,8 +91,6 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setLocalSearchQuery(value);
-    
-    // If we're on the browse page and have an onSearch callback, update immediately
     if (onSearch && location.pathname === '/browse') {
       onSearch(value);
     }
@@ -112,9 +107,14 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
   };
 
   const handleAdminDashboard = () => {
-    console.log('Header - Navigating to admin dashboard, current role:', profile?.role);
     navigate('/admin');
   };
+
+  const navLinks = [
+    { label: 'Browse', onClick: () => navigate('/browse') },
+    { label: 'Creators', onClick: () => navigate('/creators') },
+    { label: 'New', onClick: () => navigate('/browse?sort=newest') },
+  ];
 
   return (
     <header className="bg-background border-b border-border sticky top-0 z-50">
@@ -129,15 +129,15 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
             </div>
             
             <nav className="hidden md:flex space-x-6">
-              <button 
-                onClick={() => navigate('/browse')}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Browse
-              </button>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Categories</a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Top Sellers</a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">New</a>
+              {navLinks.map((link) => (
+                <button
+                  key={link.label}
+                  onClick={link.onClick}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {link.label}
+                </button>
+              ))}
             </nav>
           </div>
           
@@ -152,10 +152,48 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
               />
             </form>
             
-            <Button variant="ghost" size="icon">
-              <ShoppingCart className="w-5 h-5" />
-            </Button>
-            
+            {/* Mobile menu */}
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="md:hidden">
+                  <Menu className="w-5 h-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-72">
+                <div className="flex flex-col space-y-4 mt-8">
+                  <form onSubmit={(e) => { handleSearchSubmit(e); setMobileMenuOpen(false); }}>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                      <Input 
+                        placeholder="Search..." 
+                        className="pl-10"
+                        value={localSearchQuery}
+                        onChange={handleSearchChange}
+                      />
+                    </div>
+                  </form>
+                  {navLinks.map((link) => (
+                    <button
+                      key={link.label}
+                      onClick={() => { link.onClick(); setMobileMenuOpen(false); }}
+                      className="text-left text-foreground hover:text-primary transition-colors py-2 text-lg"
+                    >
+                      {link.label}
+                    </button>
+                  ))}
+                  {user && (
+                    <>
+                      <hr className="border-border" />
+                      <button onClick={() => { handleMyPurchases(); setMobileMenuOpen(false); }} className="text-left py-2">My Purchases</button>
+                      {profile?.is_tradingview_connected && (
+                        <button onClick={() => { handleDashboard(); setMobileMenuOpen(false); }} className="text-left py-2">Seller Dashboard</button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
+
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -169,16 +207,12 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                    Role: {profile?.role || 'user'}
-                  </div>
-                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleMyProfile}>
                     <UserCircle className="w-4 h-4 mr-2" />
                     My Profile
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleMyPurchases}>
-                    <ShoppingCart className="w-4 h-4 mr-2" />
+                    <LayoutDashboard className="w-4 h-4 mr-2" />
                     My Purchases
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -212,11 +246,11 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
             )}
             
             {user ? (
-              <Button onClick={handleSellScript}>
+              <Button onClick={handleSellScript} className="hidden sm:inline-flex">
                 {profile?.is_tradingview_connected ? 'Sell Your Script' : 'Become a Seller'}
               </Button>
             ) : (
-              <Button onClick={() => navigate('/auth')}>Join PineMarket</Button>
+              <Button onClick={() => navigate('/auth')} className="hidden sm:inline-flex">Join PineMarket</Button>
             )}
           </div>
         </div>
