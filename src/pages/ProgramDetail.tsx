@@ -89,7 +89,7 @@ const ProgramDetail = () => {
             refetch();
           }
         } catch (error: any) {
-          console.error('Purchase completion failed:', error);
+          
           toast({
             title: 'Payment processed, but setup incomplete',
             description: 'Your payment was successful, but there was an issue setting up script access. Please contact support.',
