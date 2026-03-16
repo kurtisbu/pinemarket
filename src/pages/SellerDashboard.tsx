@@ -39,9 +39,7 @@ const SellerDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('SellerDashboard - user state:', user);
     if (!user) {
-      console.log('SellerDashboard - No user, redirecting to auth');
       navigate('/auth');
       return;
     }
