@@ -214,6 +214,7 @@ const ProfileSettings = () => {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 };
