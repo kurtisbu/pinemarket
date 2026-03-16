@@ -61,7 +61,7 @@ const ProgramDetail = () => {
       const sessionId = searchParams.get('session_id');
       
       if (success === 'true' && sessionId && user && id) {
-        console.log('Stripe success detected, processing purchase completion...', { sessionId, programId: id });
+        
         
         try {
           const { data, error } = await supabase.functions.invoke('stripe-connect', {
