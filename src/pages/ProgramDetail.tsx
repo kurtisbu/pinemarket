@@ -73,7 +73,7 @@ const ProgramDetail = () => {
           });
 
           if (error) {
-            console.error('Purchase completion error:', error);
+            
             toast({
               title: 'Payment processed, but setup incomplete',
               description: 'Your payment was successful, but there was an issue setting up script access. Please contact support.',
