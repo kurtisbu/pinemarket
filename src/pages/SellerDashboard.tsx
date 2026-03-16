@@ -70,7 +70,6 @@ const SellerDashboard = () => {
       
       // Redirect non-sellers to profile settings
       if (!data.is_tradingview_connected) {
-        console.log('User not connected to TradingView, redirecting to settings');
         navigate('/settings/profile');
         return;
       }
