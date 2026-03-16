@@ -61,13 +61,9 @@ const SellerDashboard = () => {
         .eq('id', user.id)
         .maybeSingle();
 
-      if (error) {
-        console.error('Error fetching profile:', error);
-        throw error;
-      }
+      if (error) throw error;
 
       if (!data) {
-        console.log('No profile found, redirecting to settings');
         navigate('/settings/profile');
         return;
       }
