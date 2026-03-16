@@ -146,7 +146,7 @@ const SellerDashboard = () => {
                 <Button 
                   variant="link" 
                   className="p-0 h-auto font-normal underline ml-1"
-                  onClick={() => navigate('/seller-dashboard?tab=settings')}
+                  onClick={() => navigate('/dashboard?tab=settings')}
                 >
                   Fix connection
                 </Button>

@@ -22,12 +22,9 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [debugInfo, setDebugInfo] = useState<any>(null);
 
   useEffect(() => {
-    console.log('AdminDashboard - user state:', user);
     if (!user) {
-      console.log('AdminDashboard - No user, redirecting to auth');
       navigate('/auth');
       return;
     }
@@ -37,57 +34,33 @@ const AdminDashboard = () => {
   const checkAdminAccess = async () => {
     if (!user) return;
     
-    console.log('AdminDashboard - Checking admin access for user:', user.id);
-    
     try {
-      // Use secure server-side admin check
       const { data: isAdmin, error } = await supabase
         .rpc('is_current_user_admin');
 
-      console.log('AdminDashboard - Admin check result:', { isAdmin, error });
-      
-      const debugData = {
-        userId: user.id,
-        userEmail: user.email,
-        isAdmin: isAdmin,
-        error: error?.message,
-        timestamp: new Date().toISOString()
-      };
-      
-      setDebugInfo(debugData);
-      console.log('AdminDashboard - Debug info:', debugData);
-
       if (error) {
-        console.error('AdminDashboard - Error checking admin status:', error);
         toast({
           title: 'Error',
           description: `Failed to verify admin access: ${error.message}`,
           variant: 'destructive',
         });
-        // Don't redirect immediately, show debug info
         setLoading(false);
         return;
       }
       
-      console.log('AdminDashboard - User is admin:', isAdmin);
-      
       if (!isAdmin) {
-        console.log('AdminDashboard - User is not admin');
         toast({
           title: 'Access Denied',
           description: 'You do not have admin privileges.',
           variant: 'destructive',
         });
-        // Add a small delay before redirecting to let user see the message
         setTimeout(() => navigate('/'), 2000);
         setLoading(false);
         return;
       }
       
-      console.log('AdminDashboard - Admin access granted');
       setIsAdmin(true);
     } catch (error: any) {
-      console.error('AdminDashboard - Unexpected error:', error);
       toast({
         title: 'Error',
         description: 'Failed to verify admin access',
@@ -97,13 +70,6 @@ const AdminDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Force refresh profile data
-  const refreshAdminCheck = async () => {
-    setLoading(true);
-    setIsAdmin(false);
-    await checkAdminAccess();
   };
 
   if (!user) return null;
@@ -130,28 +96,13 @@ const AdminDashboard = () => {
       <div className="min-h-screen bg-background">
         <Header />
         <div className="container mx-auto px-4 py-8">
-          <div className="max-w-4xl mx-auto space-y-6">
+          <div className="max-w-4xl mx-auto">
             <Alert>
               <Shield className="w-4 h-4" />
               <AlertDescription>
                 Admin access required to view this page.
               </AlertDescription>
             </Alert>
-            
-            {debugInfo && (
-              <div className="bg-muted p-4 rounded-lg">
-                <h3 className="font-semibold mb-2">Debug Information:</h3>
-                <pre className="text-sm overflow-auto">
-                  {JSON.stringify(debugInfo, null, 2)}
-                </pre>
-                <button
-                  onClick={refreshAdminCheck}
-                  className="mt-2 px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
-                >
-                  Retry Admin Check
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>

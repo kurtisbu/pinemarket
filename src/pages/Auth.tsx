@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { Mail, Chrome } from 'lucide-react';
 
 const Auth = () => {
@@ -15,6 +16,7 @@ const Auth = () => {
   const [tradingviewUsername, setTradingviewUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const [wantsToSell, setWantsToSell] = useState(false);
+  const [forgotPassword, setForgotPassword] = useState(false);
   
   const { signIn, signUp, signInWithProvider, user } = useAuth();
   const { toast } = useToast();
@@ -25,6 +27,47 @@ const Auth = () => {
       navigate('/');
     }
   }, [user, navigate]);
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      toast({
+        title: 'Email required',
+        description: 'Please enter your email address.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        toast({
+          title: 'Error',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Check your email',
+          description: 'A password reset link has been sent to your email.',
+        });
+        setForgotPassword(false);
+      }
+    } catch {
+      toast({
+        title: 'An error occurred',
+        description: 'Please try again later.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +89,7 @@ const Auth = () => {
           });
         }
       } else {
-        const { error } = await signUp(email, password, tradingviewUsername);
+        const { error } = await signUp(email, password, tradingviewUsername || undefined);
         if (error) {
           toast({
             title: "Error signing up",
@@ -61,14 +104,12 @@ const Auth = () => {
               : "Please check your email to verify your account.",
           });
           
-          // If they want to sell, we'll redirect them to onboarding after verification
           if (wantsToSell) {
-            // Store intent in localStorage so we can redirect after email verification
             localStorage.setItem('pendingSellerOnboarding', 'true');
           }
         }
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "An error occurred",
         description: "Please try again later.",
@@ -90,7 +131,7 @@ const Auth = () => {
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "An error occurred",
         description: "Please try again later.",
@@ -100,6 +141,55 @@ const Auth = () => {
       setLoading(false);
     }
   };
+
+  if (forgotPassword) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <div className="max-w-md w-full space-y-8">
+          <div className="text-center">
+            <div className="flex items-center justify-center space-x-2 mb-6">
+              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-green-500 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">PS</span>
+              </div>
+              <h1 className="text-2xl font-bold">PineMarket</h1>
+            </div>
+            <h2 className="text-3xl font-bold">Reset Password</h2>
+            <p className="mt-2 text-muted-foreground">
+              Enter your email and we'll send you a reset link.
+            </p>
+          </div>
+
+          <form onSubmit={handleForgotPassword} className="space-y-4">
+            <div>
+              <label htmlFor="reset-email" className="block text-sm font-medium mb-2">
+                Email address
+              </label>
+              <Input
+                id="reset-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Sending...' : 'Send Reset Link'}
+            </Button>
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => setForgotPassword(false)}
+                className="text-primary hover:underline"
+              >
+                Back to Sign In
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
@@ -158,9 +248,20 @@ const Auth = () => {
               />
             </div>
             <div>
-              <label htmlFor="password" className="block text-sm font-medium mb-2">
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label htmlFor="password" className="block text-sm font-medium">
+                  Password
+                </label>
+                {isLogin && (
+                  <button
+                    type="button"
+                    onClick={() => setForgotPassword(true)}
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                )}
+              </div>
               <Input
                 id="password"
                 type="password"
@@ -172,9 +273,9 @@ const Auth = () => {
             </div>
             {!isLogin && (
               <>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <label htmlFor="tradingviewUsername" className="block text-sm font-semibold mb-2 text-blue-900">
-                    TradingView Username (Required)
+                <div className="bg-muted border border-border rounded-lg p-4">
+                  <label htmlFor="tradingviewUsername" className="block text-sm font-semibold mb-2">
+                    TradingView Username (Optional)
                   </label>
                   <Input
                     id="tradingviewUsername"
@@ -182,18 +283,16 @@ const Auth = () => {
                     value={tradingviewUsername}
                     onChange={(e) => setTradingviewUsername(e.target.value)}
                     placeholder="Your TradingView username"
-                    required
-                    className="bg-white"
                   />
                   <div className="mt-2 space-y-1">
-                    <p className="text-xs text-blue-800 font-medium">
+                    <p className="text-xs text-muted-foreground font-medium">
                       ✓ Auto-fills at checkout for faster purchases
                     </p>
-                    <p className="text-xs text-blue-700">
+                    <p className="text-xs text-muted-foreground">
                       ✓ Required to receive access to Pine Scripts you purchase
                     </p>
-                    <p className="text-xs text-blue-700">
-                      ✓ Must match your exact TradingView profile username
+                    <p className="text-xs text-muted-foreground">
+                      ✓ Can be added later in Profile Settings
                     </p>
                   </div>
                 </div>
@@ -203,7 +302,7 @@ const Auth = () => {
                     id="wantsToSell"
                     checked={wantsToSell}
                     onChange={(e) => setWantsToSell(e.target.checked)}
-                    className="rounded border-gray-300"
+                    className="rounded border-border"
                   />
                   <label htmlFor="wantsToSell" className="text-sm">
                     I want to sell Pine Scripts (we'll guide you through the setup)

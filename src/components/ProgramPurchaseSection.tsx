@@ -58,14 +58,6 @@ const ProgramPurchaseSection: React.FC<ProgramPurchaseSectionProps> = ({ program
     checkTrialEligibility();
   }, [user, program.id, program.trial_period_days]);
 
-  console.log('ProgramPurchaseSection - Program data:', {
-    id: program.id,
-    pricing_model: program.pricing_model,
-    price: program.price,
-    trial_period_days: program.trial_period_days,
-    isTrialEligible,
-    checkingEligibility
-  });
 
   const hasTrialOption = program.trial_period_days && program.trial_period_days > 0;
   const showTrialTab = hasTrialOption && user && isTrialEligible && !checkingEligibility;

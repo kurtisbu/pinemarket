@@ -225,7 +225,7 @@ const CreatePackage = () => {
         description: 'Your package has been created as a draft. You can publish it from your dashboard.',
       });
 
-      navigate('/seller-dashboard');
+      navigate('/dashboard');
     } catch (error: any) {
       console.error('Error creating package:', error);
       toast({

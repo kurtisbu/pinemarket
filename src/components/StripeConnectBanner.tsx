@@ -55,7 +55,7 @@ const StripeConnectBanner: React.FC<StripeConnectBannerProps> = ({
         {message.description}
         {showAction && (
           <Button
-            onClick={() => navigate('/seller-dashboard')}
+            onClick={() => navigate('/dashboard')}
             variant="outline"
             size="sm"
             className="mt-3"

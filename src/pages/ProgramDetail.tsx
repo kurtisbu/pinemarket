@@ -122,7 +122,7 @@ const ProgramDetail = () => {
 
         setHasTradingViewUsername(!!(data?.tradingview_username));
       } catch (error) {
-        console.error('Error checking profile:', error);
+        // Profile check failed silently
       }
     };
 

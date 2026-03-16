@@ -46,6 +46,7 @@ const App = () => (
           <Route path="/edit-program/:id" element={<EditProgram />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/creators" element={<Creators />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
