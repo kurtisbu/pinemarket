@@ -19,6 +19,7 @@ import EditProgram from "./pages/EditProgram";
 import AdminDashboard from "./pages/AdminDashboard";
 import Creators from "./pages/Creators";
 import CreatePackage from "./pages/CreatePackage";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
