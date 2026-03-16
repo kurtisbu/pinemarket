@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import Header from '@/components/Header';
 import ProfileBasicInfo from '@/components/ProfileBasicInfo';
 import TradingViewUsernameField from '@/components/TradingViewUsernameField';
+import Footer from '@/components/Footer';
 
 interface Profile {
   id: string;
