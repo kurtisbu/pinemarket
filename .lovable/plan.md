@@ -1,34 +1,72 @@
 
 
-# Remove Platform Subscription System
+# Deep Clean and Refactor Plan
 
-## What's Being Removed
+## Overview
 
-The `/subscriptions` page is a **platform-level** subscription system (generic "Basic", "Pro" plans) that is separate from the **per-program** recurring pricing already built into each product page. Since per-program subscriptions handle everything needed, the platform subscription pages and components can be removed.
+A comprehensive cleanup removing 20 unused files, fixing dead imports, and deleting stale documentation. This covers orphaned components, dead hook chains, and outdated markdown files.
 
-## Files to Delete (5 files)
+## Files to Delete (20 files)
 
-| File | Purpose |
-|------|---------|
-| `src/pages/Subscriptions.tsx` | The `/subscriptions` page |
-| `src/pages/SubscriptionSuccess.tsx` | Success callback page |
-| `src/pages/SubscriptionCancel.tsx` | Cancel callback page |
-| `src/components/SubscriptionPlans.tsx` | Plans grid component used only by the Subscriptions page |
-| `src/components/SubscriptionPurchaseCard.tsx` | Already identified as unused in previous audit; also links to `/subscriptions` |
+### Unused Components (14 files)
+
+| File | Why it's unused |
+|------|----------------|
+| `src/components/SecureFileUpload.tsx` | Never imported anywhere |
+| `src/components/SecureScriptDownload.tsx` | Never imported anywhere |
+| `src/components/SupabaseDiagnostics.tsx` | Never imported anywhere |
+| `src/components/AdminSecurityDashboard.tsx` | Never imported (SecurityAuditDashboard is used instead) |
+| `src/components/SubscriptionPlanSelector.tsx` | Never imported anywhere |
+| `src/components/PurchaseCard.tsx` | Never imported anywhere |
+| `src/components/AssignmentManager.tsx` | Never imported anywhere |
+| `src/components/AssignmentLogs.tsx` | Never imported anywhere |
+| `src/components/AdminPayoutManagement.tsx` | Imported in AdminDashboard but never rendered (AdminPayoutDashboard is used instead) |
+| `src/components/SecurePaymentCard.tsx` | Only used by PurchaseCard (which is unused) |
+| `src/components/RateLimitStatus.tsx` | Only used by SecurePaymentCard (which is unused) |
+| `src/components/RateLimitGuard.tsx` | Only used by SecurePaymentCard (which is unused) |
+| `src/components/SellerTradingViewIntegration.tsx` | Never imported anywhere |
+| `src/components/PackageCard.tsx` | Never imported anywhere |
+
+### Unused Hooks (4 files)
+
+| File | Why it's unused |
+|------|----------------|
+| `src/hooks/useEnhancedRateLimit.ts` | Never imported anywhere |
+| `src/hooks/usePaymentSecurity.ts` | Only used by SecurePaymentCard (dead chain) |
+| `src/hooks/useRateLimitedAction.ts` | Only used by SecurePaymentCard (dead chain) |
+| `src/hooks/useRateLimit.ts` | All consumers are being deleted (RateLimitGuard, RateLimitStatus, AdminSecurityDashboard, useRateLimitedAction) |
+
+### Stale Documentation (4 files)
+
+| File | Description |
+|------|-------------|
+| `MIGRATION_PLAN.md` | Old migration planning doc, no longer needed |
+| `STRIPE_CONNECT_FLOW.md` | Stripe flow docs, already implemented |
+| `TESTING_GUIDE.md` | Outdated testing guide |
+| `TRADINGVIEW_REDESIGN_PLAN.md` | TradingView redesign plan, already implemented |
+
+**Note:** Some files are part of "dead chains" -- for example, `SecurePaymentCard` is only used by `PurchaseCard` (itself unused), which means `SecurePaymentCard` and everything it exclusively depends on (`usePaymentSecurity`, `useRateLimitedAction`, `RateLimitStatus`, `RateLimitGuard`, `useRateLimit`) are all dead code.
 
 ## Files to Edit (1 file)
 
-**`src/App.tsx`** -- Remove the 3 imports and 3 route definitions for `/subscriptions`, `/subscription/success`, and `/subscription/cancel`.
+### `src/pages/AdminDashboard.tsx`
+
+Remove two dead imports:
+- `import { AdminPayoutManagement } from '@/components/AdminPayoutManagement'` (imported but never rendered)
+- `FileText` from the lucide-react icon import (imported but never used)
 
 ## What's NOT Being Removed
 
-- The `src/components/subscription/` folder (SubscriptionButton, PriceDisplay, PricingOptions, FeaturesList, subscriptionUtils) -- these power the **per-program** recurring pricing on individual product pages and are actively used.
-- The `create-subscription` and `manage-subscription` edge functions -- these are used by the per-program subscription flow.
-- The `subscription_plans` and `user_subscriptions` database tables -- no schema changes in this step; they can be cleaned up later if desired.
+These hooks are used by `useSellScriptForm` (which is actively used by the SellScript page) and will be kept:
+- `src/hooks/useSecurityAudit.ts` -- used by `useSecurityValidation` and `useSecureFileValidation`
+- `src/hooks/useSecurityValidation.ts` -- used by `useSellScriptForm`
+- `src/hooks/useSecureFileValidation.ts` -- used by `useSellScriptForm`
 
-## Technical Details
+The `SecurityAuditDashboard` component (in the admin panel Security tab) is also actively used and will be kept.
 
-The `src/App.tsx` edit removes:
-- 3 import lines (Subscriptions, SubscriptionSuccess, SubscriptionCancel)
-- 3 Route elements for those paths
+## Technical Notes
 
+- No database or edge function changes are needed
+- No route changes needed (none of the deleted components have routes)
+- The `AdminDashboard.tsx` edit is a two-line import cleanup only; no functional changes
+- Total: 20 files deleted, 1 file edited (2 import lines removed)
