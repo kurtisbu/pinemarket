@@ -61,7 +61,7 @@ const ProgramDetail = () => {
       const sessionId = searchParams.get('session_id');
       
       if (success === 'true' && sessionId && user && id) {
-        console.log('Stripe success detected, processing purchase completion...', { sessionId, programId: id });
+        
         
         try {
           const { data, error } = await supabase.functions.invoke('stripe-connect', {
@@ -73,14 +73,14 @@ const ProgramDetail = () => {
           });
 
           if (error) {
-            console.error('Purchase completion error:', error);
+            
             toast({
               title: 'Payment processed, but setup incomplete',
               description: 'Your payment was successful, but there was an issue setting up script access. Please contact support.',
               variant: 'destructive',
             });
           } else {
-            console.log('Purchase completion successful:', data);
+            
             toast({
               title: 'Purchase successful!',
               description: 'Your payment has been processed and script access is being set up.',
@@ -89,7 +89,7 @@ const ProgramDetail = () => {
             refetch();
           }
         } catch (error: any) {
-          console.error('Purchase completion failed:', error);
+          
           toast({
             title: 'Payment processed, but setup incomplete',
             description: 'Your payment was successful, but there was an issue setting up script access. Please contact support.',
@@ -122,7 +122,7 @@ const ProgramDetail = () => {
 
         setHasTradingViewUsername(!!(data?.tradingview_username));
       } catch (error) {
-        console.error('Error checking profile:', error);
+        // Profile check failed silently
       }
     };
 

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import Header from '@/components/Header';
 import ProfileBasicInfo from '@/components/ProfileBasicInfo';
 import TradingViewUsernameField from '@/components/TradingViewUsernameField';
+import Footer from '@/components/Footer';
 
 interface Profile {
   id: string;
@@ -195,9 +196,9 @@ const ProfileSettings = () => {
           />
 
           {!profile?.is_tradingview_connected && (
-            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-              <h3 className="font-semibold text-blue-900 mb-2">Want to sell your Pine Scripts?</h3>
-              <p className="text-blue-700 text-sm mb-4">
+            <div className="bg-muted border border-border p-4 rounded-lg">
+              <h3 className="font-semibold mb-2">Want to sell your Pine Scripts?</h3>
+              <p className="text-muted-foreground text-sm mb-4">
                 Join our seller program to monetize your TradingView Pine Scripts and reach thousands of traders.
               </p>
               <Button onClick={handleBecomeSeller} variant="outline">
@@ -213,6 +214,7 @@ const ProfileSettings = () => {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 };

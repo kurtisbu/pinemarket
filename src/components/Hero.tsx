@@ -1,9 +1,11 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { TrendingUp, Shield, Zap } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const Hero = () => {
+  const navigate = useNavigate();
+
   return (
     <section className="relative bg-gradient-to-br from-background via-background to-muted py-20">
       <div className="container mx-auto px-4">
@@ -16,10 +18,10 @@ const Hero = () => {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <Button size="lg" className="bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600">
+            <Button size="lg" className="bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600" onClick={() => navigate('/browse')}>
               Browse Scripts
             </Button>
-            <Button size="lg" variant="outline">
+            <Button size="lg" variant="outline" onClick={() => navigate('/seller/onboarding')}>
               Start Selling
             </Button>
           </div>

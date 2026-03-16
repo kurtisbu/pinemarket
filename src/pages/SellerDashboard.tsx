@@ -39,9 +39,7 @@ const SellerDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('SellerDashboard - user state:', user);
     if (!user) {
-      console.log('SellerDashboard - No user, redirecting to auth');
       navigate('/auth');
       return;
     }
@@ -63,20 +61,15 @@ const SellerDashboard = () => {
         .eq('id', user.id)
         .maybeSingle();
 
-      if (error) {
-        console.error('Error fetching profile:', error);
-        throw error;
-      }
+      if (error) throw error;
 
       if (!data) {
-        console.log('No profile found, redirecting to settings');
         navigate('/settings/profile');
         return;
       }
       
       // Redirect non-sellers to profile settings
       if (!data.is_tradingview_connected) {
-        console.log('User not connected to TradingView, redirecting to settings');
         navigate('/settings/profile');
         return;
       }
@@ -153,7 +146,7 @@ const SellerDashboard = () => {
                 <Button 
                   variant="link" 
                   className="p-0 h-auto font-normal underline ml-1"
-                  onClick={() => navigate('/seller-dashboard?tab=settings')}
+                  onClick={() => navigate('/dashboard?tab=settings')}
                 >
                   Fix connection
                 </Button>
