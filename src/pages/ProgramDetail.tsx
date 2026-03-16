@@ -80,7 +80,7 @@ const ProgramDetail = () => {
               variant: 'destructive',
             });
           } else {
-            console.log('Purchase completion successful:', data);
+            
             toast({
               title: 'Purchase successful!',
               description: 'Your payment has been processed and script access is being set up.',
