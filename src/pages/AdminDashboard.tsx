@@ -7,13 +7,12 @@ import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import Header from '@/components/Header';
-import { Shield, Users, FileText, BarChart3, AlertTriangle, Clock, Star, DollarSign, FlaskConical } from 'lucide-react';
+import { Shield, Users, BarChart3, AlertTriangle, Clock, Star, DollarSign, FlaskConical } from 'lucide-react';
 import AdminScriptAssignments from '@/components/AdminScriptAssignments';
 import SecurityAuditDashboard from '@/components/SecurityAuditDashboard';
 import AdminTrialManagement from '@/components/AdminTrialManagement';
 import AdminAccessCodes from '@/components/AdminAccessCodes';
 import AdminFeaturedCreators from '@/components/AdminFeaturedCreators';
-import { AdminPayoutManagement } from '@/components/AdminPayoutManagement';
 import AdminPayoutDashboard from '@/components/AdminPayoutDashboard';
 import AdminTestData from '@/components/AdminTestData';
 
