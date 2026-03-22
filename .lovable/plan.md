@@ -1,95 +1,31 @@
 
 
-# Refresh Cookies Button + Proactive Expiry Warnings
+# Fix Trial Script Assignment Flow
 
-## Overview
+## Problem
 
-Two features to improve the seller cookie lifecycle:
+The trial creation code in `stripe-connect/index.ts` has two bugs:
 
-1. **"Update Cookies" button** on the seller dashboard settings -- a streamlined flow to paste new cookies, test, and re-activate without full onboarding
-2. **Proactive expiry warnings** in the health check -- track cookie age and warn sellers before cookies expire and programs get disabled
+1. **Uses wrong field for script lookup** -- It reads `program.tradingview_script_id` (a legacy column that's `null` for your program). The actual scripts are linked via the `program_scripts` junction table.
+2. **Only creates one assignment** -- Programs can have multiple scripts (yours has 5), but the trial flow only creates a single `script_assignments` row.
 
-Additionally, address the TradingView rate limiting concern in the health check.
+The paid purchase flow in `stripe-webhook/index.ts` already handles both correctly by querying `program_scripts` and looping. The trial flow needs the same pattern.
 
----
+## Fix
 
-## Rate Limiting Concern
+### `supabase/functions/stripe-connect/index.ts` -- `createTrialAccess` function
 
-You're right to be concerned. The current health check makes one HTTP request per seller with a 2-second delay between them. At scale:
+Replace the current single-assignment logic with the same multi-script pattern used by the webhook:
 
-- **10 sellers** = ~20 seconds, low risk
-- **100 sellers** = ~3.5 minutes, moderate risk
-- **500+ sellers** = 15+ minutes, high risk of timeouts and rate limits
+1. After creating the trial purchase record, query `program_scripts` joined with `tradingview_scripts` to get all linked scripts and their `pine_id` values
+2. Loop through each script, creating a separate `script_assignments` row for each
+3. For each assignment, trigger `tradingview-service` `assign-script-access` individually
+4. Track success/failure per script and return aggregated results
+5. Keep the legacy `program.tradingview_script_id` fallback for programs not using the junction table
 
-**Mitigation strategy (included in this plan):**
-- Increase delay from 2s to 5s between checks
-- Add exponential backoff on 429 (rate limit) responses
-- Stagger checks: only validate sellers whose cookies haven't been checked in the last 12 hours (up from 6)
-- Add a max batch size (e.g., 50 sellers per run) so the function doesn't time out
-- If a 429 is received, stop processing remaining sellers and mark them for next run
+The current code that creates one assignment + one TV call (~lines 147-230) will be replaced with a loop mirroring the webhook's `createProgramScriptAssignments` pattern.
 
----
+### No other files need changes
 
-## Feature 1: "Update Cookies" Button
-
-### What changes
-
-**`src/components/SellerSettingsView.tsx`**
-
-When the seller's TradingView is already connected (the "Connected Account" card), add an "Update Cookies" button below the disconnect option. Clicking it reveals the cookie input fields (session cookie + signed session cookie) and a "Test & Save" button -- reusing the existing `handleTestConnection` logic. On success, the connection status resets to `active` and programs are re-enabled.
-
-This is a UI-only change -- the existing `tradingview-service` `test-connection` action already handles saving new cookies and updating status.
-
----
-
-## Feature 2: Proactive Expiry Warnings
-
-### Database migration
-
-Add a `tradingview_cookies_set_at` timestamp column to `profiles` to track when cookies were last updated. This lets us calculate cookie age and warn before expiry.
-
-```sql
-ALTER TABLE profiles ADD COLUMN tradingview_cookies_set_at timestamptz;
-```
-
-### Edge function: `tradingview-service/actions/testConnection.ts`
-
-After successfully saving cookies, also set `tradingview_cookies_set_at = now()`.
-
-### Edge function: `tradingview-health-check/index.ts`
-
-Changes:
-- Increase inter-seller delay from 2s to 5s
-- Change skip threshold from 6 hours to 12 hours
-- Add max batch size of 50 sellers per run
-- Add 429 detection: if TradingView returns 429, stop the loop early
-- Add expiry warning logic: if `tradingview_cookies_set_at` is older than 25 days, set `tradingview_connection_status` to `'expiring_soon'` (cookies typically last ~30 days)
-
-### UI: `src/components/TradingViewConnectionStatus.tsx`
-
-Add an `expiring_soon` status with a yellow/warning badge saying "Expiring Soon" and a message like "Your TradingView cookies are nearing expiration. Update them to avoid service interruption."
-
-### UI: `src/components/SellerSettingsView.tsx`
-
-When status is `expiring_soon`, show the cookie update fields automatically with a warning banner.
-
-### Seller Dashboard: `src/pages/SellerDashboard.tsx`
-
-Add `expiring_soon` to the `showConnectionWarning()` check so the top-level alert also triggers.
-
----
-
-## Files to edit
-
-| File | Change |
-|------|--------|
-| `src/components/SellerSettingsView.tsx` | Add "Update Cookies" toggle + fields in connected state; auto-show on `expiring_soon` |
-| `src/components/TradingViewConnectionStatus.tsx` | Add `expiring_soon` status variant |
-| `src/pages/SellerDashboard.tsx` | Add `expiring_soon` to warning check |
-| `supabase/functions/tradingview-health-check/index.ts` | Rate limit mitigations + expiry warning logic |
-| `supabase/functions/tradingview-service/actions/testConnection.ts` | Set `tradingview_cookies_set_at` on success |
-
-### Database migration
-
-Add `tradingview_cookies_set_at` column to `profiles`.
+The `assignScriptAccess` function in `tradingview-service` already works correctly when given a valid `pine_id` -- the only issue was receiving `null`.
 
