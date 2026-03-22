@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,10 +9,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import StripeConnectSettings from '@/components/StripeConnectSettings';
 import TradingViewConnectionStatus from '@/components/TradingViewConnectionStatus';
 import TradingViewDisconnect from '@/components/TradingViewDisconnect';
-import { Upload, User, Loader2, RefreshCw } from 'lucide-react';
+import { Upload, User, Loader2, RefreshCw, AlertTriangle, KeyRound } from 'lucide-react';
 
 interface Profile {
   id: string;
@@ -38,10 +39,15 @@ const SellerSettingsView: React.FC<SellerSettingsViewProps> = ({ profile, onProf
   const { user } = useAuth();
   const { toast } = useToast();
   
+  const needsCookieUpdate = profile?.tradingview_connection_status === 'expiring_soon' || 
+                            profile?.tradingview_connection_status === 'expired' ||
+                            profile?.tradingview_connection_status === 'error';
+
   const [loading, setLoading] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [refreshingHealth, setRefreshingHealth] = useState(false);
+  const [showCookieUpdate, setShowCookieUpdate] = useState(needsCookieUpdate);
   const [formData, setFormData] = useState({
     display_name: profile?.display_name || '',
     bio: profile?.bio || '',
@@ -53,10 +59,7 @@ const SellerSettingsView: React.FC<SellerSettingsViewProps> = ({ profile, onProf
   });
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -78,10 +81,7 @@ const SellerSettingsView: React.FC<SellerSettingsViewProps> = ({ profile, onProf
         .from('avatars')
         .getPublicUrl(fileName);
 
-      setFormData(prev => ({
-        ...prev,
-        avatar_url: publicUrl
-      }));
+      setFormData(prev => ({ ...prev, avatar_url: publicUrl }));
 
       toast({
         title: 'Avatar uploaded',
@@ -111,7 +111,7 @@ const SellerSettingsView: React.FC<SellerSettingsViewProps> = ({ profile, onProf
             tradingview_signed_session_cookie: formData.tradingview_signed_session_cookie,
           },
           user_id: user.id,
-          tradingview_username: formData.tradingview_username,
+          tradingview_username: profile?.tradingview_username || formData.tradingview_username,
         },
       });
 
@@ -129,6 +129,7 @@ const SellerSettingsView: React.FC<SellerSettingsViewProps> = ({ profile, onProf
         tradingview_signed_session_cookie: '',
         is_tradingview_connected: true,
       }));
+      setShowCookieUpdate(false);
 
       onProfileUpdate();
     } catch (error: any) {
@@ -212,6 +213,56 @@ const SellerSettingsView: React.FC<SellerSettingsViewProps> = ({ profile, onProf
     }
   };
 
+  const renderCookieUpdateFields = () => (
+    <div className="space-y-4 border border-border rounded-lg p-4 bg-muted/30">
+      {needsCookieUpdate && (
+        <Alert variant={profile?.tradingview_connection_status === 'expiring_soon' ? 'default' : 'destructive'}>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            {profile?.tradingview_connection_status === 'expiring_soon'
+              ? 'Your cookies are nearing expiration. Paste new cookies below to keep your connection active.'
+              : 'Your connection needs new cookies to resume script assignments.'}
+          </AlertDescription>
+        </Alert>
+      )}
+      <div className="space-y-2">
+        <Label htmlFor="update_session_cookie">Session Cookie (sessionid)</Label>
+        <Input
+          id="update_session_cookie"
+          type="password"
+          value={formData.tradingview_session_cookie}
+          onChange={(e) => handleInputChange('tradingview_session_cookie', e.target.value)}
+          placeholder="Paste new session cookie"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="update_signed_cookie">Signed Session Cookie (sessionid_sign)</Label>
+        <Input
+          id="update_signed_cookie"
+          type="password"
+          value={formData.tradingview_signed_session_cookie}
+          onChange={(e) => handleInputChange('tradingview_signed_session_cookie', e.target.value)}
+          placeholder="Paste new signed session cookie"
+        />
+      </div>
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          onClick={handleTestConnection}
+          disabled={!formData.tradingview_session_cookie || !formData.tradingview_signed_session_cookie || testingConnection}
+        >
+          {testingConnection ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          {testingConnection ? 'Testing...' : 'Test & Save Cookies'}
+        </Button>
+        {!needsCookieUpdate && (
+          <Button type="button" variant="ghost" onClick={() => setShowCookieUpdate(false)}>
+            Cancel
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -225,7 +276,6 @@ const SellerSettingsView: React.FC<SellerSettingsViewProps> = ({ profile, onProf
             <CardTitle>Profile Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            
             <div className="flex flex-col items-center space-y-4">
               <Avatar className="w-24 h-24">
                 <AvatarImage src={formData.avatar_url} alt="Profile picture" />
@@ -321,6 +371,21 @@ const SellerSettingsView: React.FC<SellerSettingsViewProps> = ({ profile, onProf
                     Your TradingView account is connected and scripts are synced.
                   </p>
                 </div>
+
+                {showCookieUpdate ? (
+                  renderCookieUpdateFields()
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowCookieUpdate(true)}
+                    className="flex items-center gap-2"
+                  >
+                    <KeyRound className="w-4 h-4" />
+                    Update Cookies
+                  </Button>
+                )}
+
                 <TradingViewDisconnect
                   userId={user?.id || ''}
                   tradingviewUsername={profile.tradingview_username}
