@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN tradingview_cookies_set_at timestamptz;
