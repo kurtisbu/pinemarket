@@ -72,7 +72,33 @@ const AdminScriptAssignments: React.FC = () => {
   }, []);
 
   const handleRetryAssignment = async (assignment: ScriptAssignment) => {
-    if (!assignment.pine_id || !assignment.tradingview_username) {
+    let pineId = assignment.pine_id;
+    let tvUsername = assignment.tradingview_username;
+
+    // If pine_id is missing, look it up from program_scripts
+    if (!pineId) {
+      const { data: programScripts } = await supabase
+        .from('program_scripts')
+        .select('tradingview_scripts(pine_id, script_id)')
+        .eq('program_id', assignment.program_id);
+
+      if (programScripts && programScripts.length > 0) {
+        const script = (programScripts[0] as any).tradingview_scripts;
+        pineId = script?.pine_id || script?.script_id;
+      }
+    }
+
+    // If tradingview_username is missing, try from purchase
+    if (!tvUsername) {
+      const { data: purchase } = await supabase
+        .from('purchases')
+        .select('tradingview_username')
+        .eq('id', assignment.purchase_id)
+        .single();
+      tvUsername = purchase?.tradingview_username || null;
+    }
+
+    if (!pineId || !tvUsername) {
       toast({ 
         title: 'Cannot retry assignment', 
         description: 'Missing pine_id or TradingView username', 
@@ -86,9 +112,10 @@ const AdminScriptAssignments: React.FC = () => {
     const { data, error } = await supabase.functions.invoke('tradingview-service', {
       body: {
         action: 'assign-script-access',
-        pine_id: assignment.pine_id,
-        tradingview_username: assignment.tradingview_username,
+        pine_id: pineId,
+        tradingview_username: tvUsername,
         assignment_id: assignment.id,
+        access_type: assignment.access_type || (assignment.is_trial ? 'trial' : 'full_purchase'),
       },
     });
 
