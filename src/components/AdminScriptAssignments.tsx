@@ -25,6 +25,8 @@ interface ScriptAssignment {
   error_message: string | null;
   assignment_details: any;
   created_at: string;
+  access_type: string | null;
+  is_trial: boolean | null;
   purchases: {
     amount: number;
     programs: {

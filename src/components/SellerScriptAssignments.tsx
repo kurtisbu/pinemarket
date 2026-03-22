@@ -23,6 +23,8 @@ interface SellerScriptAssignment {
   assigned_at: string | null;
   error_message: string | null;
   created_at: string;
+  access_type: string | null;
+  is_trial: boolean | null;
   purchases: {
     amount: number;
     programs: {
