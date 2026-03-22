@@ -144,31 +144,55 @@ async function createTrialAccess(payload: any, supabaseAdmin: any, req: Request)
   // Calculate expiration date
   const expiresAt = new Date(Date.now() + (trial_period_days * 24 * 60 * 60 * 1000));
 
-  // Create script assignment for trial
-  const { data: assignment, error: assignmentError } = await supabaseAdmin
-    .from('script_assignments')
-    .insert({
-      purchase_id: purchase.id,
-      program_id,
-      buyer_id: user.id,
-      seller_id: program.seller_id,
-      status: 'pending',
-      access_type: 'trial',
-      is_trial: true,
-      expires_at: expiresAt.toISOString(),
-      tradingview_username,
-      pine_id: program.tradingview_script_id,
-      tradingview_script_id: program.tradingview_script_id
-    })
-    .select()
-    .single();
+  // Query program_scripts junction table to get all linked scripts
+  const { data: programScripts, error: scriptsError } = await supabaseAdmin
+    .from('program_scripts')
+    .select(`
+      tradingview_script_id,
+      tradingview_scripts!inner (
+        id,
+        script_id,
+        pine_id,
+        title,
+        publication_url
+      )
+    `)
+    .eq('program_id', program_id)
+    .order('display_order', { ascending: true });
 
-  if (assignmentError) {
-    console.error('[TRIAL] Assignment creation error:', assignmentError);
-    throw new Error('Failed to create trial assignment');
+  if (scriptsError) {
+    console.error('[TRIAL] Error fetching program scripts:', scriptsError);
+    throw new Error('Failed to fetch program scripts');
   }
 
-  console.log('[TRIAL] Trial assignment created:', assignment.id);
+  // Build script list: prefer junction table, fallback to legacy field
+  let scriptsToAssign: Array<{ pine_id: string; script_id: string; title: string }> = [];
+
+  if (programScripts && programScripts.length > 0) {
+    scriptsToAssign = programScripts
+      .map((ps: any) => ({
+        pine_id: ps.tradingview_scripts?.pine_id || ps.tradingview_scripts?.script_id,
+        script_id: ps.tradingview_scripts?.script_id,
+        title: ps.tradingview_scripts?.title || 'Unknown'
+      }))
+      .filter((s: any) => s.pine_id);
+    console.log(`[TRIAL] Found ${scriptsToAssign.length} scripts via program_scripts junction`);
+  } else if (program.tradingview_script_id) {
+    // Legacy fallback
+    scriptsToAssign = [{
+      pine_id: program.tradingview_script_id,
+      script_id: program.tradingview_script_id,
+      title: program.title
+    }];
+    console.log('[TRIAL] Using legacy tradingview_script_id fallback');
+  }
+
+  if (scriptsToAssign.length === 0) {
+    console.error('[TRIAL] No scripts found for program:', program_id);
+    throw new Error('No TradingView scripts linked to this program');
+  }
+
+  console.log('[TRIAL] Scripts to assign:', scriptsToAssign.map(s => ({ pine_id: s.pine_id, title: s.title })));
 
   // Record trial usage immediately to prevent duplicate trials
   try {
@@ -179,123 +203,110 @@ async function createTrialAccess(payload: any, supabaseAdmin: any, req: Request)
     console.log('[TRIAL] Trial usage recorded');
   } catch (error) {
     console.error('[TRIAL] Failed to record trial usage:', error);
-    // Continue with assignment even if usage recording fails
   }
 
-  // Trigger TradingView script assignment with better error handling
-  try {
-    console.log('[TRIAL] Triggering TradingView assignment...');
-    const { data: assignmentResult, error: tvError } = await supabaseAdmin.functions.invoke('tradingview-service', {
-      body: {
-        action: 'assign-script-access',
-        pine_id: program.tradingview_script_id,
-        tradingview_username,
-        assignment_id: assignment.id,
-        access_type: 'trial',
-        trial_duration_days: trial_period_days
-      }
-    });
+  // Loop through each script and create assignment + trigger TV access
+  const assignmentResults: Array<{ script_title: string; assignment_id: string; status: string; error?: string }> = [];
 
-    if (tvError) {
-      console.error('[TRIAL] TradingView assignment error:', tvError);
-      
-      // Update assignment with error details
-      await supabaseAdmin
+  for (const script of scriptsToAssign) {
+    try {
+      // Create script assignment row
+      const { data: assignment, error: assignmentError } = await supabaseAdmin
         .from('script_assignments')
-        .update({
-          status: 'failed',
-          error_message: `TradingView assignment failed: ${tvError.message}`,
-          assignment_details: {
-            error: tvError.message,
-            failed_at: new Date().toISOString(),
-            assignment_attempts: 1
-          }
-        })
-        .eq('id', assignment.id);
-      
-      throw new Error(`Failed to assign TradingView access: ${tvError.message}`);
-    }
-
-    console.log('[TRIAL] TradingView assignment response:', assignmentResult);
-
-    // Check if the assignment was successful
-    if (assignmentResult?.success) {
-      // Update assignment as successful
-      await supabaseAdmin
-        .from('script_assignments')
-        .update({
-          status: 'assigned',
-          assigned_at: new Date().toISOString(),
-          assignment_details: {
-            ...assignmentResult,
-            assigned_at: new Date().toISOString()
-          }
-        })
-        .eq('id', assignment.id);
-
-      console.log('[TRIAL] Assignment marked as successful');
-    } else {
-      // Handle cases where TradingView service doesn't return success flag
-      console.log('[TRIAL] TradingView service response unclear, checking for errors...');
-      
-      if (assignmentResult?.error) {
-        throw new Error(assignmentResult.error);
-      }
-      
-      // If no explicit error, consider it potentially successful but pending verification
-      await supabaseAdmin
-        .from('script_assignments')
-        .update({
+        .insert({
+          purchase_id: purchase.id,
+          program_id,
+          buyer_id: user.id,
+          seller_id: program.seller_id,
           status: 'pending',
-          assignment_details: {
-            ...assignmentResult,
-            note: 'Assignment submitted, awaiting verification',
-            submitted_at: new Date().toISOString()
-          }
+          access_type: 'trial',
+          is_trial: true,
+          expires_at: expiresAt.toISOString(),
+          tradingview_username,
+          pine_id: script.pine_id,
+          tradingview_script_id: script.script_id
         })
-        .eq('id', assignment.id);
-    }
+        .select()
+        .single();
 
-  } catch (error) {
-    console.error('[TRIAL] TradingView assignment failed:', error);
-    
-    // Update assignment with detailed error
-    await supabaseAdmin
-      .from('script_assignments')
-      .update({
-        status: 'failed',
-        error_message: error.message,
-        assignment_details: {
-          error: error.message,
-          stack: error.stack,
-          failed_at: new Date().toISOString(),
-          assignment_attempts: 1
+      if (assignmentError) {
+        console.error(`[TRIAL] Assignment creation error for ${script.title}:`, assignmentError);
+        assignmentResults.push({ script_title: script.title, assignment_id: '', status: 'failed', error: assignmentError.message });
+        continue;
+      }
+
+      console.log(`[TRIAL] Assignment created for "${script.title}":`, assignment.id);
+
+      // Trigger TradingView script assignment
+      const { data: tvResult, error: tvError } = await supabaseAdmin.functions.invoke('tradingview-service', {
+        body: {
+          action: 'assign-script-access',
+          pine_id: script.pine_id,
+          tradingview_username,
+          assignment_id: assignment.id,
+          access_type: 'trial',
+          trial_duration_days: trial_period_days
         }
-      })
-      .eq('id', assignment.id);
-    
-    // Return partial success - trial is created but assignment failed
-    return new Response(JSON.stringify({
-      success: true,
-      trial_id: purchase.id,
-      assignment_id: assignment.id,
-      expires_at: expiresAt.toISOString(),
-      message: `Trial created successfully but script assignment failed: ${error.message}`,
-      warning: 'You may need to manually retry the script assignment from your dashboard.',
-      assignment_status: 'failed'
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
+      });
+
+      if (tvError) {
+        console.error(`[TRIAL] TV assignment error for "${script.title}":`, tvError);
+        await supabaseAdmin
+          .from('script_assignments')
+          .update({
+            status: 'failed',
+            error_message: `TradingView assignment failed: ${tvError.message}`,
+            assignment_details: { error: tvError.message, failed_at: new Date().toISOString() }
+          })
+          .eq('id', assignment.id);
+        assignmentResults.push({ script_title: script.title, assignment_id: assignment.id, status: 'failed', error: tvError.message });
+        continue;
+      }
+
+      if (tvResult?.success) {
+        await supabaseAdmin
+          .from('script_assignments')
+          .update({
+            status: 'assigned',
+            assigned_at: new Date().toISOString(),
+            assignment_details: { ...tvResult, assigned_at: new Date().toISOString() }
+          })
+          .eq('id', assignment.id);
+        assignmentResults.push({ script_title: script.title, assignment_id: assignment.id, status: 'assigned' });
+      } else if (tvResult?.error) {
+        await supabaseAdmin
+          .from('script_assignments')
+          .update({
+            status: 'failed',
+            error_message: tvResult.error,
+            assignment_details: { ...tvResult, failed_at: new Date().toISOString() }
+          })
+          .eq('id', assignment.id);
+        assignmentResults.push({ script_title: script.title, assignment_id: assignment.id, status: 'failed', error: tvResult.error });
+      } else {
+        assignmentResults.push({ script_title: script.title, assignment_id: assignment.id, status: 'pending' });
+      }
+
+    } catch (err: any) {
+      console.error(`[TRIAL] Error processing script "${script.title}":`, err);
+      assignmentResults.push({ script_title: script.title, assignment_id: '', status: 'failed', error: err.message });
+    }
   }
+
+  const successCount = assignmentResults.filter(r => r.status === 'assigned').length;
+  const failedCount = assignmentResults.filter(r => r.status === 'failed').length;
+
+  console.log(`[TRIAL] Assignment results: ${successCount} succeeded, ${failedCount} failed out of ${scriptsToAssign.length} scripts`);
 
   return new Response(JSON.stringify({
     success: true,
     trial_id: purchase.id,
-    assignment_id: assignment.id,
     expires_at: expiresAt.toISOString(),
-    message: `Trial access created successfully - expires in ${trial_period_days} days`,
-    assignment_status: 'assigned'
+    message: failedCount === 0
+      ? `Trial access created successfully for ${successCount} script(s) - expires in ${trial_period_days} days`
+      : `Trial created: ${successCount}/${scriptsToAssign.length} scripts assigned successfully`,
+    assignment_status: failedCount === 0 ? 'assigned' : (successCount > 0 ? 'partial' : 'failed'),
+    assignments: assignmentResults
   }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     status: 200,
