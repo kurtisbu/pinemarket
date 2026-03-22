@@ -25,6 +25,8 @@ const TradingViewConnectionStatus: React.FC<TradingViewConnectionStatusProps> = 
     switch (connectionStatus) {
       case 'active':
         return <CheckCircle className="w-4 h-4" />;
+      case 'expiring_soon':
+        return <AlertTriangle className="w-4 h-4" />;
       case 'expired':
         return <AlertTriangle className="w-4 h-4" />;
       case 'error':
@@ -40,6 +42,8 @@ const TradingViewConnectionStatus: React.FC<TradingViewConnectionStatusProps> = 
     switch (connectionStatus) {
       case 'active':
         return 'default';
+      case 'expiring_soon':
+        return 'secondary';
       case 'expired':
         return 'destructive';
       case 'error':
@@ -55,6 +59,8 @@ const TradingViewConnectionStatus: React.FC<TradingViewConnectionStatusProps> = 
     switch (connectionStatus) {
       case 'active':
         return 'Connected';
+      case 'expiring_soon':
+        return 'Expiring Soon';
       case 'expired':
         return 'Expired';
       case 'error':
@@ -79,7 +85,7 @@ const TradingViewConnectionStatus: React.FC<TradingViewConnectionStatusProps> = 
   };
 
   const shouldShowWarning = () => {
-    return connectionStatus === 'expired' || connectionStatus === 'error' || !isConnected;
+    return connectionStatus === 'expired' || connectionStatus === 'error' || connectionStatus === 'expiring_soon' || !isConnected;
   };
 
   return (
@@ -97,9 +103,15 @@ const TradingViewConnectionStatus: React.FC<TradingViewConnectionStatusProps> = 
       </div>
 
       {shouldShowWarning() && showDetails && (
-        <Alert variant="destructive">
+        <Alert variant={connectionStatus === 'expiring_soon' ? 'default' : 'destructive'}>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
+            {connectionStatus === 'expiring_soon' && (
+              <>
+                Your TradingView cookies are nearing expiration. Update them soon to avoid service interruption.
+                {lastError && <div className="mt-1 text-xs opacity-75">{lastError}</div>}
+              </>
+            )}
             {connectionStatus === 'expired' && (
               <>
                 Your TradingView session has expired. Please update your cookies to re-enable script assignments.

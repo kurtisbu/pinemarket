@@ -218,6 +218,7 @@ export type Database = {
           stripe_onboarding_completed: boolean | null
           stripe_payouts_enabled: boolean | null
           tradingview_connection_status: string | null
+          tradingview_cookies_set_at: string | null
           tradingview_last_error: string | null
           tradingview_last_validated_at: string | null
           tradingview_session_cookie: string | null
@@ -244,6 +245,7 @@ export type Database = {
           stripe_onboarding_completed?: boolean | null
           stripe_payouts_enabled?: boolean | null
           tradingview_connection_status?: string | null
+          tradingview_cookies_set_at?: string | null
           tradingview_last_error?: string | null
           tradingview_last_validated_at?: string | null
           tradingview_session_cookie?: string | null
@@ -270,6 +272,7 @@ export type Database = {
           stripe_onboarding_completed?: boolean | null
           stripe_payouts_enabled?: boolean | null
           tradingview_connection_status?: string | null
+          tradingview_cookies_set_at?: string | null
           tradingview_last_error?: string | null
           tradingview_last_validated_at?: string | null
           tradingview_session_cookie?: string | null

@@ -1,10 +1,13 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { DOMParser } from 'https://deno.land/x/deno_dom/deno-dom-wasm.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 
-// AES-256-GCM decryption function (copied from crypto utils)
+const MAX_BATCH_SIZE = 50;
+const INTER_CHECK_DELAY_MS = 5000;
+const SKIP_IF_VALIDATED_WITHIN_HOURS = 12;
+const COOKIE_EXPIRY_WARNING_DAYS = 25;
+
 async function decrypt(encryptedText: string, key: CryptoKey): Promise<string> {
   const ivAndCiphertext = new Uint8Array(atob(encryptedText).split('').map(c => c.charCodeAt(0)));
   const iv = ivAndCiphertext.slice(0, 12);
@@ -25,7 +28,6 @@ serve(async (req) => {
   }
 
   try {
-    // Verify cron secret
     const cronSecret = req.headers.get('x-cron-secret');
     const expectedSecret = Deno.env.get('CRON_SECRET');
     if (!expectedSecret || cronSecret !== expectedSecret) {
@@ -55,10 +57,9 @@ serve(async (req) => {
 
     console.log('Starting TradingView health check...');
 
-    // Get all sellers with TradingView connections
     const { data: sellers, error: sellersError } = await supabaseAdmin
       .from('profiles')
-      .select('id, tradingview_username, tradingview_session_cookie, tradingview_signed_session_cookie, tradingview_last_validated_at')
+      .select('id, tradingview_username, tradingview_session_cookie, tradingview_signed_session_cookie, tradingview_last_validated_at, tradingview_cookies_set_at')
       .eq('is_tradingview_connected', true)
       .not('tradingview_session_cookie', 'is', null)
       .not('tradingview_signed_session_cookie', 'is', null);
@@ -73,26 +74,58 @@ serve(async (req) => {
     let checkedCount = 0;
     let expiredCount = 0;
     let errorCount = 0;
+    let skippedCount = 0;
+    let expiringWarningCount = 0;
+    let rateLimited = false;
 
     for (const seller of sellers || []) {
+      if (checkedCount >= MAX_BATCH_SIZE) {
+        console.log(`Reached max batch size of ${MAX_BATCH_SIZE}, stopping`);
+        break;
+      }
+
+      if (rateLimited) {
+        console.log('Rate limited by TradingView, stopping batch');
+        break;
+      }
+
       try {
-        // Skip if validated recently (within last 6 hours)
+        // Skip if validated recently
         const lastValidated = seller.tradingview_last_validated_at;
         if (lastValidated) {
-          const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
-          if (new Date(lastValidated) > sixHoursAgo) {
-            console.log(`Skipping ${seller.tradingview_username} - validated recently`);
+          const skipThreshold = new Date(Date.now() - SKIP_IF_VALIDATED_WITHIN_HOURS * 60 * 60 * 1000);
+          if (new Date(lastValidated) > skipThreshold) {
+            skippedCount++;
             continue;
+          }
+        }
+
+        // Check cookie age for proactive expiry warning
+        const cookiesSetAt = seller.tradingview_cookies_set_at;
+        if (cookiesSetAt) {
+          const cookieAgeDays = (Date.now() - new Date(cookiesSetAt).getTime()) / (1000 * 60 * 60 * 24);
+          if (cookieAgeDays >= COOKIE_EXPIRY_WARNING_DAYS) {
+            console.log(`Cookies for ${seller.tradingview_username} are ${Math.floor(cookieAgeDays)} days old - marking as expiring_soon`);
+            const now = new Date().toISOString();
+            await supabaseAdmin
+              .from('profiles')
+              .update({
+                tradingview_connection_status: 'expiring_soon',
+                tradingview_last_validated_at: now,
+                tradingview_last_error: `Cookies are ${Math.floor(cookieAgeDays)} days old and may expire soon`,
+                updated_at: now,
+              })
+              .eq('id', seller.id);
+            expiringWarningCount++;
+            // Still proceed to validate the actual connection
           }
         }
 
         console.log(`Checking connection for seller: ${seller.tradingview_username}`);
 
-        // Decrypt session cookies
         const sessionCookie = await decrypt(seller.tradingview_session_cookie, key);
         const signedSessionCookie = await decrypt(seller.tradingview_signed_session_cookie, key);
 
-        // Test connection
         const testUrl = `https://www.tradingview.com/u/${seller.tradingview_username}/#settings-profile`;
         
         const tvResponse = await fetch(testUrl, {
@@ -101,6 +134,13 @@ serve(async (req) => {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
           },
         });
+
+        // Handle rate limiting
+        if (tvResponse.status === 429) {
+          console.log(`Rate limited by TradingView (429) while checking ${seller.tradingview_username}`);
+          rateLimited = true;
+          continue;
+        }
 
         const now = new Date().toISOString();
         let connectionStatus = 'active';
@@ -122,11 +162,19 @@ serve(async (req) => {
             expiredCount++;
             console.log(`Authentication failed for ${seller.tradingview_username}`);
           } else {
+            // If cookies are old but still valid, keep expiring_soon status
+            const cookiesSetAt = seller.tradingview_cookies_set_at;
+            if (cookiesSetAt) {
+              const cookieAgeDays = (Date.now() - new Date(cookiesSetAt).getTime()) / (1000 * 60 * 60 * 24);
+              if (cookieAgeDays >= COOKIE_EXPIRY_WARNING_DAYS) {
+                connectionStatus = 'expiring_soon';
+                lastError = `Cookies are ${Math.floor(cookieAgeDays)} days old and may expire soon`;
+              }
+            }
             console.log(`Connection healthy for ${seller.tradingview_username}`);
           }
         }
 
-        // Update seller's connection status
         await supabaseAdmin
           .from('profiles')
           .update({
@@ -139,13 +187,12 @@ serve(async (req) => {
 
         checkedCount++;
 
-        // Add delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Delay between checks to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, INTER_CHECK_DELAY_MS));
 
       } catch (error) {
         console.error(`Error checking seller ${seller.tradingview_username}:`, error);
         
-        // Update with error status
         await supabaseAdmin
           .from('profiles')
           .update({
@@ -166,8 +213,11 @@ serve(async (req) => {
     const summary = {
       total_sellers: sellers?.length || 0,
       checked: checkedCount,
+      skipped: skippedCount,
       expired: expiredCount,
+      expiring_warnings: expiringWarningCount,
       errors: errorCount,
+      rate_limited: rateLimited,
       timestamp: new Date().toISOString()
     };
 

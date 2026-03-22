@@ -55,7 +55,6 @@ export async function testConnection(
     console.log(`TradingView connection test - Status: ${tvResponse.status}`);
 
     if (!tvResponse.ok) {
-      // Update connection status to expired/error
       await supabaseAdmin.from('profiles').update({ 
         is_tradingview_connected: false,
         tradingview_connection_status: 'expired',
@@ -75,21 +74,17 @@ export async function testConnection(
     const html = await tvResponse.text();
     const doc = new DOMParser().parseFromString(html, 'text/html');
     
-    // Updated check: Look for 'is-authenticated' class on the <html> tag.
     const isAuthenticated = doc?.querySelector('html')?.classList.contains('is-authenticated');
     
-    // Enhanced username extraction with multiple fallback methods
     let foundUsername = null;
     
-    // Method 1: Extract from title tag - handle multiple formats
     const title = doc?.querySelector('title')?.textContent;
     if (title) {
-      // Try different title patterns
       const titlePatterns = [
-        /^([^—]+)\s*—\s*Trading Ideas and Scripts/,  // "CapitalCodersLLC — Trading Ideas and Scripts"
-        /^([^—]+)\s*—\s*TradingView/,                // "CapitalCodersLLC — TradingView"
-        /Trader\s+([^—\s]+)/,                        // "Trader USERNAME"
-        /^([^—\s]+)/                                 // First word before any separator
+        /^([^—]+)\s*—\s*Trading Ideas and Scripts/,
+        /^([^—]+)\s*—\s*TradingView/,
+        /Trader\s+([^—\s]+)/,
+        /^([^—\s]+)/
       ];
       
       for (const pattern of titlePatterns) {
@@ -101,12 +96,10 @@ export async function testConnection(
       }
     }
     
-    // Method 2: If we have a provided username and title contains it, use it
     if (!foundUsername && tradingview_username && title?.toLowerCase().includes(tradingview_username.toLowerCase())) {
       foundUsername = tradingview_username;
     }
     
-    // Method 3: Look for username in meta tags or data attributes
     if (!foundUsername) {
       const metaDescription = doc?.querySelector('meta[name="description"]')?.getAttribute('content');
       if (metaDescription) {
@@ -120,7 +113,6 @@ export async function testConnection(
     console.log(`Authentication check - isAuthenticated: ${isAuthenticated}, foundUsername: ${foundUsername}, title: ${title}`);
 
     if (!isAuthenticated) {
-      // Update connection status to expired
       await supabaseAdmin.from('profiles').update({ 
         is_tradingview_connected: false,
         tradingview_connection_status: 'expired',
@@ -136,13 +128,11 @@ export async function testConnection(
       });
     }
 
-    // If we couldn't extract username but have authentication, try to use provided username
     if (!foundUsername && tradingview_username) {
       console.log(`Using provided username since extraction failed: ${tradingview_username}`);
       foundUsername = tradingview_username;
     }
 
-    // If we still don't have a username, that's an error
     if (!foundUsername) {
       await supabaseAdmin.from('profiles').update({ 
         is_tradingview_connected: false,
@@ -160,9 +150,7 @@ export async function testConnection(
       });
     }
 
-    // Validate username match if one was provided
     if (tradingview_username && foundUsername.toLowerCase() !== tradingview_username.toLowerCase()) {
-      // Update connection status to error
       await supabaseAdmin.from('profiles').update({ 
         is_tradingview_connected: false,
         tradingview_connection_status: 'error',
@@ -178,7 +166,6 @@ export async function testConnection(
       });
     }
 
-    // Check if this TradingView username is already connected to another user
     const { data: existingConnection } = await supabaseAdmin
       .from('profiles')
       .select('id, display_name, username')
@@ -215,7 +202,6 @@ export async function testConnection(
     const encrypted_session = await encrypt(sessionCookie, key);
     const encrypted_signed_session = await encrypt(signedSessionCookie, key);
 
-    // Update profile with successful connection and health status
     const { error } = await supabaseAdmin
       .from('profiles')
       .update({
@@ -226,13 +212,13 @@ export async function testConnection(
         tradingview_connection_status: 'active',
         tradingview_last_validated_at: new Date().toISOString(),
         tradingview_last_error: null,
+        tradingview_cookies_set_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq('id', user_id);
 
     if (error) throw error;
 
-    // Create notification preferences if they don't exist
     await supabaseAdmin
       .from('seller_notifications')
       .upsert({
@@ -249,7 +235,6 @@ export async function testConnection(
   } catch (error) {
     console.error('Connection test error:', error);
     
-    // Update connection status to error
     await supabaseAdmin.from('profiles').update({ 
       is_tradingview_connected: false,
       tradingview_connection_status: 'error',

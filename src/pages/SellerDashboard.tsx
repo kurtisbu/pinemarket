@@ -68,7 +68,6 @@ const SellerDashboard = () => {
         return;
       }
       
-      // Redirect non-sellers to profile settings
       if (!data.is_tradingview_connected) {
         navigate('/settings/profile');
         return;
@@ -113,6 +112,7 @@ const SellerDashboard = () => {
   const showConnectionWarning = () => {
     return profile?.tradingview_connection_status === 'expired' || 
            profile?.tradingview_connection_status === 'error' ||
+           profile?.tradingview_connection_status === 'expiring_soon' ||
            !profile?.is_tradingview_connected;
   };
 
@@ -139,16 +139,18 @@ const SellerDashboard = () => {
           </div>
 
           {showConnectionWarning() && (
-            <Alert variant="destructive" className="mb-6">
+            <Alert variant={profile?.tradingview_connection_status === 'expiring_soon' ? 'default' : 'destructive'} className="mb-6">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                Your TradingView connection needs attention. Some programs may be disabled until you reconnect.
+                {profile?.tradingview_connection_status === 'expiring_soon' 
+                  ? 'Your TradingView cookies are nearing expiration. Update them in Settings to avoid service interruption.'
+                  : 'Your TradingView connection needs attention. Some programs may be disabled until you reconnect.'}
                 <Button 
                   variant="link" 
                   className="p-0 h-auto font-normal underline ml-1"
                   onClick={() => navigate('/dashboard?tab=settings')}
                 >
-                  Fix connection
+                  Update cookies
                 </Button>
               </AlertDescription>
             </Alert>
