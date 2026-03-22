@@ -1,34 +1,95 @@
 
 
-# Remove Platform Subscription System
+# Refresh Cookies Button + Proactive Expiry Warnings
 
-## What's Being Removed
+## Overview
 
-The `/subscriptions` page is a **platform-level** subscription system (generic "Basic", "Pro" plans) that is separate from the **per-program** recurring pricing already built into each product page. Since per-program subscriptions handle everything needed, the platform subscription pages and components can be removed.
+Two features to improve the seller cookie lifecycle:
 
-## Files to Delete (5 files)
+1. **"Update Cookies" button** on the seller dashboard settings -- a streamlined flow to paste new cookies, test, and re-activate without full onboarding
+2. **Proactive expiry warnings** in the health check -- track cookie age and warn sellers before cookies expire and programs get disabled
 
-| File | Purpose |
-|------|---------|
-| `src/pages/Subscriptions.tsx` | The `/subscriptions` page |
-| `src/pages/SubscriptionSuccess.tsx` | Success callback page |
-| `src/pages/SubscriptionCancel.tsx` | Cancel callback page |
-| `src/components/SubscriptionPlans.tsx` | Plans grid component used only by the Subscriptions page |
-| `src/components/SubscriptionPurchaseCard.tsx` | Already identified as unused in previous audit; also links to `/subscriptions` |
+Additionally, address the TradingView rate limiting concern in the health check.
 
-## Files to Edit (1 file)
+---
 
-**`src/App.tsx`** -- Remove the 3 imports and 3 route definitions for `/subscriptions`, `/subscription/success`, and `/subscription/cancel`.
+## Rate Limiting Concern
 
-## What's NOT Being Removed
+You're right to be concerned. The current health check makes one HTTP request per seller with a 2-second delay between them. At scale:
 
-- The `src/components/subscription/` folder (SubscriptionButton, PriceDisplay, PricingOptions, FeaturesList, subscriptionUtils) -- these power the **per-program** recurring pricing on individual product pages and are actively used.
-- The `create-subscription` and `manage-subscription` edge functions -- these are used by the per-program subscription flow.
-- The `subscription_plans` and `user_subscriptions` database tables -- no schema changes in this step; they can be cleaned up later if desired.
+- **10 sellers** = ~20 seconds, low risk
+- **100 sellers** = ~3.5 minutes, moderate risk
+- **500+ sellers** = 15+ minutes, high risk of timeouts and rate limits
 
-## Technical Details
+**Mitigation strategy (included in this plan):**
+- Increase delay from 2s to 5s between checks
+- Add exponential backoff on 429 (rate limit) responses
+- Stagger checks: only validate sellers whose cookies haven't been checked in the last 12 hours (up from 6)
+- Add a max batch size (e.g., 50 sellers per run) so the function doesn't time out
+- If a 429 is received, stop processing remaining sellers and mark them for next run
 
-The `src/App.tsx` edit removes:
-- 3 import lines (Subscriptions, SubscriptionSuccess, SubscriptionCancel)
-- 3 Route elements for those paths
+---
+
+## Feature 1: "Update Cookies" Button
+
+### What changes
+
+**`src/components/SellerSettingsView.tsx`**
+
+When the seller's TradingView is already connected (the "Connected Account" card), add an "Update Cookies" button below the disconnect option. Clicking it reveals the cookie input fields (session cookie + signed session cookie) and a "Test & Save" button -- reusing the existing `handleTestConnection` logic. On success, the connection status resets to `active` and programs are re-enabled.
+
+This is a UI-only change -- the existing `tradingview-service` `test-connection` action already handles saving new cookies and updating status.
+
+---
+
+## Feature 2: Proactive Expiry Warnings
+
+### Database migration
+
+Add a `tradingview_cookies_set_at` timestamp column to `profiles` to track when cookies were last updated. This lets us calculate cookie age and warn before expiry.
+
+```sql
+ALTER TABLE profiles ADD COLUMN tradingview_cookies_set_at timestamptz;
+```
+
+### Edge function: `tradingview-service/actions/testConnection.ts`
+
+After successfully saving cookies, also set `tradingview_cookies_set_at = now()`.
+
+### Edge function: `tradingview-health-check/index.ts`
+
+Changes:
+- Increase inter-seller delay from 2s to 5s
+- Change skip threshold from 6 hours to 12 hours
+- Add max batch size of 50 sellers per run
+- Add 429 detection: if TradingView returns 429, stop the loop early
+- Add expiry warning logic: if `tradingview_cookies_set_at` is older than 25 days, set `tradingview_connection_status` to `'expiring_soon'` (cookies typically last ~30 days)
+
+### UI: `src/components/TradingViewConnectionStatus.tsx`
+
+Add an `expiring_soon` status with a yellow/warning badge saying "Expiring Soon" and a message like "Your TradingView cookies are nearing expiration. Update them to avoid service interruption."
+
+### UI: `src/components/SellerSettingsView.tsx`
+
+When status is `expiring_soon`, show the cookie update fields automatically with a warning banner.
+
+### Seller Dashboard: `src/pages/SellerDashboard.tsx`
+
+Add `expiring_soon` to the `showConnectionWarning()` check so the top-level alert also triggers.
+
+---
+
+## Files to edit
+
+| File | Change |
+|------|--------|
+| `src/components/SellerSettingsView.tsx` | Add "Update Cookies" toggle + fields in connected state; auto-show on `expiring_soon` |
+| `src/components/TradingViewConnectionStatus.tsx` | Add `expiring_soon` status variant |
+| `src/pages/SellerDashboard.tsx` | Add `expiring_soon` to warning check |
+| `supabase/functions/tradingview-health-check/index.ts` | Rate limit mitigations + expiry warning logic |
+| `supabase/functions/tradingview-service/actions/testConnection.ts` | Set `tradingview_cookies_set_at` on success |
+
+### Database migration
+
+Add `tradingview_cookies_set_at` column to `profiles`.
 
