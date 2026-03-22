@@ -1,31 +1,19 @@
 
 
-# Fix Trial Script Assignment Flow
+# Skip Trial Period in Checkout for Users Who Already Trialed
 
 ## Problem
 
-The trial creation code in `stripe-connect/index.ts` has two bugs:
-
-1. **Uses wrong field for script lookup** -- It reads `program.tradingview_script_id` (a legacy column that's `null` for your program). The actual scripts are linked via the `program_scripts` junction table.
-2. **Only creates one assignment** -- Programs can have multiple scripts (yours has 5), but the trial flow only creates a single `script_assignments` row.
-
-The paid purchase flow in `stripe-webhook/index.ts` already handles both correctly by querying `program_scripts` and looping. The trial flow needs the same pattern.
+Line 273 of `create-checkout/index.ts` unconditionally adds `trial_period_days` to the Stripe subscription checkout whenever the program has a trial configured. This means even users who already completed their free trial see "3 days free then $49.95" instead of just "$49.95 every 3 months".
 
 ## Fix
 
-### `supabase/functions/stripe-connect/index.ts` -- `createTrialAccess` function
+**`supabase/functions/create-checkout/index.ts`** -- Before adding `trial_period_days` to the subscription data, check the `trial_usage` table to see if the buyer has already used their trial for this program. If they have, skip the trial period.
 
-Replace the current single-assignment logic with the same multi-script pattern used by the webhook:
+Change the trial block (~lines 272-275) to:
 
-1. After creating the trial purchase record, query `program_scripts` joined with `tradingview_scripts` to get all linked scripts and their `pine_id` values
-2. Loop through each script, creating a separate `script_assignments` row for each
-3. For each assignment, trigger `tradingview-service` `assign-script-access` individually
-4. Track success/failure per script and return aggregated results
-5. Keep the legacy `program.tradingview_script_id` fallback for programs not using the junction table
+1. Query `trial_usage` for the current `user.id` + `program_id`
+2. Only add `trial_period_days` if no record exists (user hasn't trialed)
 
-The current code that creates one assignment + one TV call (~lines 147-230) will be replaced with a loop mirroring the webhook's `createProgramScriptAssignments` pattern.
-
-### No other files need changes
-
-The `assignScriptAccess` function in `tradingview-service` already works correctly when given a valid `pine_id` -- the only issue was receiving `null`.
+This is a ~5 line change in one file. No frontend changes needed -- the "3 days free" messaging comes from Stripe's checkout page based on the session config.
 
