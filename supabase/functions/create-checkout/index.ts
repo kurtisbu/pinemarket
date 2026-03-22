@@ -269,9 +269,20 @@ serve(async (req) => {
         },
       };
       
-      // Add trial period if configured (only for single programs)
+      // Add trial period if configured and user hasn't already used their trial
       if (!isPackage && price.programs.trial_period_days && price.programs.trial_period_days > 0) {
-        sessionData.subscription_data.trial_period_days = price.programs.trial_period_days;
+        const { data: trialUsage } = await supabaseAdmin
+          .from('trial_usage')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('program_id', price.programs.id)
+          .maybeSingle();
+
+        if (!trialUsage) {
+          sessionData.subscription_data.trial_period_days = price.programs.trial_period_days;
+        } else {
+          console.log(`[CHECKOUT] User ${user.id} already used trial for program ${price.programs.id}, skipping trial period`);
+        }
       }
     }
 
