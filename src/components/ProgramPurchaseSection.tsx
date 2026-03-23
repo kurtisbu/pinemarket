@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ProgramPriceSelector } from '@/components/ProgramPriceSelector';
-import TrialPurchaseCard from '@/components/TrialPurchaseCard';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Clock } from 'lucide-react';
 
 interface Program {
   id: string;
@@ -28,9 +28,11 @@ const ProgramPurchaseSection: React.FC<ProgramPurchaseSectionProps> = ({ program
   const [isTrialEligible, setIsTrialEligible] = useState(false);
   const [checkingEligibility, setCheckingEligibility] = useState(true);
 
+  const hasTrialOption = program.trial_period_days && program.trial_period_days > 0;
+
   useEffect(() => {
     const checkTrialEligibility = async () => {
-      if (!user || !program.trial_period_days || program.trial_period_days <= 0) {
+      if (!user || !hasTrialOption) {
         setCheckingEligibility(false);
         return;
       }
@@ -41,59 +43,36 @@ const ProgramPurchaseSection: React.FC<ProgramPurchaseSectionProps> = ({ program
           p_program_id: program.id
         });
 
-        if (error) {
-          console.error('Error checking trial eligibility:', error);
-          setIsTrialEligible(false);
-        } else {
+        if (!error) {
           setIsTrialEligible(data);
         }
-      } catch (error) {
-        console.error('Error checking trial eligibility:', error);
-        setIsTrialEligible(false);
+      } catch {
+        // ignore
       } finally {
         setCheckingEligibility(false);
       }
     };
 
     checkTrialEligibility();
-  }, [user, program.id, program.trial_period_days]);
+  }, [user, program.id, hasTrialOption]);
 
+  const showTrialBanner = hasTrialOption && user && isTrialEligible && !checkingEligibility;
 
-  const hasTrialOption = program.trial_period_days && program.trial_period_days > 0;
-  const showTrialTab = hasTrialOption && user && isTrialEligible && !checkingEligibility;
-
-  // If no trial or user not eligible, show regular purchase card
-  if (!showTrialTab) {
-    return (
-      <ProgramPriceSelector 
-        programId={program.id}
-      />
-    );
-  }
-
-  // Show both trial and purchase options in tabs
   return (
-    <Tabs defaultValue="trial" className="w-full">
-      <TabsList className="grid w-full grid-cols-2">
-        <TabsTrigger value="trial">Free Trial</TabsTrigger>
-        <TabsTrigger value="purchase">Buy Now</TabsTrigger>
-      </TabsList>
-      
-      <TabsContent value="trial" className="mt-4">
-        <TrialPurchaseCard
-          programId={program.id}
-          sellerId={program.seller_id}
-          trialPeriodDays={program.trial_period_days || 7}
-          isTrialEligible={isTrialEligible}
-        />
-      </TabsContent>
-      
-      <TabsContent value="purchase" className="mt-4">
-        <ProgramPriceSelector 
-          programId={program.id}
-        />
-      </TabsContent>
-    </Tabs>
+    <div className="space-y-4">
+      {showTrialBanner && (
+        <Alert className="border-blue-200 bg-blue-50/30">
+          <Clock className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800">
+            This program includes a <strong>{program.trial_period_days}-day free trial</strong>. You won't be charged until the trial ends. You can cancel anytime.
+          </AlertDescription>
+        </Alert>
+      )}
+      <ProgramPriceSelector
+        programId={program.id}
+        trialPeriodDays={showTrialBanner ? program.trial_period_days! : undefined}
+      />
+    </div>
   );
 };
 

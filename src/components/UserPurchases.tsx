@@ -48,6 +48,7 @@ const UserPurchases: React.FC<UserPurchasesProps> = ({ userId }) => {
           status,
           purchased_at,
           tradingview_username,
+          stripe_subscription_id,
           programs (
             id,
             title,

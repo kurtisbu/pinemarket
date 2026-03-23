@@ -20,9 +20,10 @@ interface PriceOption {
 interface ProgramPriceSelectorProps {
   programId: string;
   onPurchase?: () => void;
+  trialPeriodDays?: number;
 }
 
-export const ProgramPriceSelector = ({ programId, onPurchase }: ProgramPriceSelectorProps) => {
+export const ProgramPriceSelector = ({ programId, onPurchase, trialPeriodDays }: ProgramPriceSelectorProps) => {
   const [prices, setPrices] = useState<PriceOption[]>([]);
   const [selectedPriceId, setSelectedPriceId] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -71,10 +72,7 @@ export const ProgramPriceSelector = ({ programId, onPurchase }: ProgramPriceSele
 
   const handlePurchase = async () => {
     if (!selectedPriceId) {
-      toast({
-        title: 'Please select a pricing option',
-        variant: 'destructive',
-      });
+      toast({ title: 'Please select a pricing option', variant: 'destructive' });
       return;
     }
 
@@ -85,19 +83,11 @@ export const ProgramPriceSelector = ({ programId, onPurchase }: ProgramPriceSele
       const cancelUrl = `${window.location.origin}/program/${programId}`;
 
       const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: {
-          priceId: selectedPriceId,
-          successUrl,
-          cancelUrl,
-        },
+        body: { priceId: selectedPriceId, successUrl, cancelUrl },
       });
 
       if (error) throw error;
-
-      // Check for error in the response data (edge function returns { error: message })
-      if (data?.error) {
-        throw new Error(data.error);
-      }
+      if (data?.error) throw new Error(data.error);
 
       if (data?.url) {
         window.location.href = data.url;
@@ -106,14 +96,12 @@ export const ProgramPriceSelector = ({ programId, onPurchase }: ProgramPriceSele
       }
     } catch (error: any) {
       console.error('Checkout error:', error);
-      
-      // Check if this is a TradingView username error and provide actionable guidance
       const errorMessage = error.message || 'An unexpected error occurred';
       const isTradingViewError = errorMessage.toLowerCase().includes('tradingview username');
-      
+
       toast({
         title: isTradingViewError ? 'Profile Setup Required' : 'Checkout failed',
-        description: isTradingViewError 
+        description: isTradingViewError
           ? 'Please add your TradingView username to your profile before purchasing. Go to Profile Settings to update it.'
           : errorMessage,
         variant: 'destructive',
@@ -131,6 +119,9 @@ export const ProgramPriceSelector = ({ programId, onPurchase }: ProgramPriceSele
     }
   };
 
+  const selectedPrice = prices.find(p => p.id === selectedPriceId);
+  const showTrialOnButton = trialPeriodDays && selectedPrice?.price_type === 'recurring';
+
   if (loading) {
     return (
       <Card className="p-6">
@@ -144,9 +135,7 @@ export const ProgramPriceSelector = ({ programId, onPurchase }: ProgramPriceSele
   if (prices.length === 0) {
     return (
       <Card className="p-6">
-        <p className="text-center text-muted-foreground">
-          No pricing options available
-        </p>
+        <p className="text-center text-muted-foreground">No pricing options available</p>
       </Card>
     );
   }
@@ -155,7 +144,7 @@ export const ProgramPriceSelector = ({ programId, onPurchase }: ProgramPriceSele
     <Card className="p-6">
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">Select Your Plan</h3>
-        
+
         <RadioGroup value={selectedPriceId} onValueChange={setSelectedPriceId}>
           {prices.map((price) => (
             <div
@@ -181,9 +170,16 @@ export const ProgramPriceSelector = ({ programId, onPurchase }: ProgramPriceSele
                         </span>
                       )}
                     </p>
-                    <Badge variant={price.price_type === 'recurring' ? 'default' : 'secondary'}>
-                      {price.price_type === 'recurring' ? 'Subscription' : 'One-time'}
-                    </Badge>
+                    <div className="flex items-center gap-1 justify-end mt-1">
+                      <Badge variant={price.price_type === 'recurring' ? 'default' : 'secondary'}>
+                        {price.price_type === 'recurring' ? 'Subscription' : 'One-time'}
+                      </Badge>
+                      {trialPeriodDays && price.price_type === 'recurring' && (
+                        <Badge variant="outline" className="border-blue-300 text-blue-700 bg-blue-50">
+                          {trialPeriodDays}-day free trial
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
               </Label>
@@ -202,6 +198,8 @@ export const ProgramPriceSelector = ({ programId, onPurchase }: ProgramPriceSele
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               Processing...
             </>
+          ) : showTrialOnButton ? (
+            `Start ${trialPeriodDays}-Day Free Trial`
           ) : (
             'Continue to Checkout'
           )}

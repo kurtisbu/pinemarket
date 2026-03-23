@@ -1,10 +1,12 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, ExternalLink } from 'lucide-react';
+import { Calendar, ExternalLink, Settings, Loader2 } from 'lucide-react';
 import PurchaseStatusBadge from './PurchaseStatusBadge';
 import AssignmentStatusBadge from './AssignmentStatusBadge';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
 
 interface Purchase {
   id: string;
@@ -12,6 +14,7 @@ interface Purchase {
   status: string;
   purchased_at: string;
   tradingview_username: string;
+  stripe_subscription_id?: string | null;
   programs: {
     id: string;
     title: string;
@@ -31,6 +34,33 @@ interface PurchaseItemProps {
 }
 
 const PurchaseItem: React.FC<PurchaseItemProps> = ({ purchase }) => {
+  const [managingSubscription, setManagingSubscription] = useState(false);
+  const { toast } = useToast();
+
+  const handleManageSubscription = async () => {
+    setManagingSubscription(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-subscription', {
+        body: { returnUrl: window.location.href },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to open subscription management',
+        variant: 'destructive',
+      });
+    } finally {
+      setManagingSubscription(false);
+    }
+  };
+
   return (
     <div className="border rounded-lg p-4 space-y-3">
       <div className="flex items-start justify-between">
@@ -75,12 +105,31 @@ const PurchaseItem: React.FC<PurchaseItemProps> = ({ purchase }) => {
             </div>
           )}
         </div>
-        <Button variant="outline" size="sm" asChild>
-          <a href={`/program/${purchase.programs.id}`}>
-            <ExternalLink className="w-4 h-4 mr-1" />
-            View Program
-          </a>
-        </Button>
+        <div className="flex items-center gap-2">
+          {purchase.stripe_subscription_id && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleManageSubscription}
+              disabled={managingSubscription}
+            >
+              {managingSubscription ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <Settings className="w-4 h-4 mr-1" />
+                  Manage Subscription
+                </>
+              )}
+            </Button>
+          )}
+          <Button variant="outline" size="sm" asChild>
+            <a href={`/program/${purchase.programs.id}`}>
+              <ExternalLink className="w-4 h-4 mr-1" />
+              View Program
+            </a>
+          </Button>
+        </div>
       </div>
 
       {purchase.script_assignments?.some(a => a.error_message) && (
