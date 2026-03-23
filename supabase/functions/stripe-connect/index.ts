@@ -18,8 +18,6 @@ serve(async (req) => {
     console.log(`[STRIPE-CONNECT] Action: ${action}`, payload);
 
     switch (action) {
-      case 'create-trial-access':
-        return await createTrialAccess(payload, supabaseAdmin, req);
       case 'create-payment-intent':
         return await createPaymentIntent(payload, supabaseAdmin);
       case 'confirm-purchase':
