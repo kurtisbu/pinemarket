@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import AdminRoute from "@/components/AdminRoute";
 import Index from "./pages/Index";
 import Browse from "./pages/Browse";
 import ProgramDetail from "./pages/ProgramDetail";
@@ -20,6 +21,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import Creators from "./pages/Creators";
 import CreatePackage from "./pages/CreatePackage";
 import ResetPassword from "./pages/ResetPassword";
+import Interest from "./pages/Interest";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,24 +33,29 @@ const App = () => (
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/browse" element={<Browse />} />
-          <Route path="/program/:id" element={<ProgramDetail />} />
-          <Route path="/create-package" element={<CreatePackage />} />
+          {/* Public routes */}
+          <Route path="/interest" element={<Interest />} />
           <Route path="/auth" element={<Auth />} />
-          <Route path="/profile/:username" element={<Profile />} />
-          <Route path="/settings/profile" element={<ProfileSettings />} />
-          <Route path="/dashboard" element={<SellerDashboard />} />
-          <Route path="/seller/onboarding" element={<SellerOnboardingPage />} />
-          <Route path="/sell-script" element={<SellScript />} />
-          <Route path="/my-programs" element={<MyPrograms />} />
-          <Route path="/my-purchases" element={<MyPurchases />} />
-          <Route path="/edit-program/:id" element={<EditProgram />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/creators" element={<Creators />} />
           <Route path="/reset-password" element={<ResetPassword />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
+
+          {/* Admin-only routes */}
+          <Route path="/" element={<AdminRoute><Index /></AdminRoute>} />
+          <Route path="/browse" element={<AdminRoute><Browse /></AdminRoute>} />
+          <Route path="/program/:id" element={<AdminRoute><ProgramDetail /></AdminRoute>} />
+          <Route path="/create-package" element={<AdminRoute><CreatePackage /></AdminRoute>} />
+          <Route path="/profile/:username" element={<AdminRoute><Profile /></AdminRoute>} />
+          <Route path="/settings/profile" element={<AdminRoute><ProfileSettings /></AdminRoute>} />
+          <Route path="/dashboard" element={<AdminRoute><SellerDashboard /></AdminRoute>} />
+          <Route path="/seller/onboarding" element={<AdminRoute><SellerOnboardingPage /></AdminRoute>} />
+          <Route path="/sell-script" element={<AdminRoute><SellScript /></AdminRoute>} />
+          <Route path="/my-programs" element={<AdminRoute><MyPrograms /></AdminRoute>} />
+          <Route path="/my-purchases" element={<AdminRoute><MyPurchases /></AdminRoute>} />
+          <Route path="/edit-program/:id" element={<AdminRoute><EditProgram /></AdminRoute>} />
+          <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+          <Route path="/creators" element={<AdminRoute><Creators /></AdminRoute>} />
+
+          {/* Catch-all redirects to interest page */}
+          <Route path="*" element={<Interest />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
