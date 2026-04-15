@@ -59,6 +59,27 @@ export type Database = {
           },
         ]
       }
+      interest_signups: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          tradingview_username: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          tradingview_username: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          tradingview_username?: string
+        }
+        Relationships: []
+      }
       package_prices: {
         Row: {
           amount: number
