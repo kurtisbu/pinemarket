@@ -102,8 +102,8 @@ const Interest = () => {
             </form>
           ) : (
             <div className="max-w-md mx-auto p-8 rounded-xl border border-border bg-card">
-              <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-                <Check className="h-6 w-6 text-green-600" />
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                <Check className="h-6 w-6 text-primary" />
               </div>
               <h3 className="text-xl font-semibold text-foreground mb-2">You're on the list!</h3>
               <p className="text-muted-foreground">We'll reach out when PineMarket is ready for sellers.</p>
