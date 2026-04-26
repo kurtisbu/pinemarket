@@ -14,6 +14,7 @@ import {
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import logo from '@/assets/logo.png';
 
 interface HeaderProps {
   onSearch?: (query: string) => void;
@@ -122,9 +123,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-8">
             <div className="flex items-center space-x-2 cursor-pointer" onClick={() => navigate('/')}>
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-green-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">PS</span>
-              </div>
+              <img src={logo} alt="PineMarket logo" className="w-8 h-8 object-contain" />
               <h1 className="text-xl font-bold">PineMarket</h1>
             </div>
             
