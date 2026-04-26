@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { TrendingUp, Shield, Zap, DollarSign, BarChart3, Users, ChevronRight, Check } from 'lucide-react';
+import logo from '@/assets/logo.png';
 
 const Interest = () => {
   const [email, setEmail] = useState('');
@@ -57,6 +58,7 @@ const Interest = () => {
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10" />
         <div className="relative max-w-5xl mx-auto px-6 pt-20 pb-16 text-center">
+          <img src={logo} alt="PineMarket logo" className="w-20 h-20 object-contain mx-auto mb-6" />
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-border bg-muted/50 text-sm text-muted-foreground mb-8">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/60 opacity-75" />
