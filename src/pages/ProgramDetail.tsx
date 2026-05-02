@@ -15,7 +15,7 @@ import UserRatingSection from '@/components/UserRatingSection';
 import RatingsList from '@/components/RatingsList';
 import ProfileCompletionBanner from '@/components/ProfileCompletionBanner';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ExternalLink } from 'lucide-react';
 
 const ProgramDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -187,6 +187,22 @@ const ProgramDetail = () => {
           <div className="lg:col-span-2 space-y-6">
             <ImageGallery images={program.image_urls || []} />
             <ProgramHeader program={program} />
+            {program.tradingview_publication_url && (
+              <Button
+                asChild
+                variant="outline"
+                className="w-full sm:w-auto"
+              >
+                <a
+                  href={program.tradingview_publication_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  View on TradingView
+                </a>
+              </Button>
+            )}
             <ProgramDescription description={program.description} tags={program.tags} programId={program.id} />
             
             <UserRatingSection 

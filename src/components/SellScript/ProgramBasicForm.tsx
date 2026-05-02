@@ -12,6 +12,7 @@ interface ProgramBasicFormProps {
     category: string;
     trial_period_days: number;
     offer_trial: boolean;
+    tradingview_publication_url: string;
   };
   onInputChange: (field: string, value: string | number | boolean) => void;
   categories: string[];
@@ -95,6 +96,20 @@ const ProgramBasicForm: React.FC<ProgramBasicFormProps> = ({
           rows={6}
           required
         />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="tradingview_publication_url">TradingView Publication Link (Optional)</Label>
+        <Input
+          id="tradingview_publication_url"
+          type="url"
+          value={formData.tradingview_publication_url}
+          onChange={(e) => onInputChange('tradingview_publication_url', e.target.value)}
+          placeholder="https://www.tradingview.com/script/..."
+        />
+        <p className="text-sm text-muted-foreground">
+          Link to your official TradingView script publication so users can view the interactive chart.
+        </p>
       </div>
     </>
   );
