@@ -32,7 +32,8 @@ const EditProgram = () => {
     price: '',
     category: '',
     tags: [] as string[],
-    status: 'draft'
+    status: 'draft',
+    tradingview_publication_url: '',
   });
 
   const categories = [
@@ -71,7 +72,8 @@ const EditProgram = () => {
         price: data.price.toString(),
         category: data.category,
         tags: data.tags || [],
-        status: data.status
+        status: data.status,
+        tradingview_publication_url: data.tradingview_publication_url || '',
       });
       setExistingImageUrls(data.image_urls || []);
       
@@ -180,7 +182,8 @@ const EditProgram = () => {
         price: parseFloat(formData.price),
         category: formData.category,
         tags: formData.tags,
-        image_urls: [...existingImageUrls, ...newImageUrls]
+        image_urls: [...existingImageUrls, ...newImageUrls],
+        tradingview_publication_url: formData.tradingview_publication_url?.trim() || null,
       };
 
       const { error } = await supabase
@@ -301,6 +304,20 @@ const EditProgram = () => {
                     rows={6}
                     required
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="tradingview_publication_url">TradingView Publication Link (Optional)</Label>
+                  <Input
+                    id="tradingview_publication_url"
+                    type="url"
+                    value={formData.tradingview_publication_url}
+                    onChange={(e) => handleInputChange('tradingview_publication_url', e.target.value)}
+                    placeholder="https://www.tradingview.com/script/..."
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Direct link to your TradingView script publication so buyers can view the interactive chart.
+                  </p>
                 </div>
 
                 <div className="space-y-2">
