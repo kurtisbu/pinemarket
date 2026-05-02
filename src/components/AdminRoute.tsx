@@ -1,7 +1,5 @@
 import React, { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { Navigate, useSearchParams } from 'react-router-dom';
 
 interface AdminRouteProps {
@@ -53,23 +51,22 @@ const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
     }
   }, [searchParams]);
 
-  const bypass = isPreviewHost() || hasPreviewAccess() || searchParams.get('preview') === PREVIEW_TOKEN;
-
-  const { data: isAdmin, isLoading } = useQuery({
-    queryKey: ['is-admin', user?.id],
-    queryFn: async () => {
-      if (!user) return false;
-      const { data } = await supabase.rpc('is_current_user_admin');
-      return data === true;
-    },
-    enabled: !!user && !bypass,
-  });
+  // Bypass the interest-page gate for:
+  // - preview hosts (localhost, *.lovable.app, *.lovableproject.com)
+  // - anyone with a valid preview token saved in localStorage
+  // - any authenticated user (they already have an account, so the
+  //   marketing/interest page should not block them)
+  const bypass =
+    isPreviewHost() ||
+    hasPreviewAccess() ||
+    searchParams.get('preview') === PREVIEW_TOKEN ||
+    !!user;
 
   if (bypass) {
     return <>{children}</>;
   }
 
-  if (authLoading || isLoading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -77,11 +74,7 @@ const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
     );
   }
 
-  if (!user || !isAdmin) {
-    return <Navigate to="/interest" replace />;
-  }
-
-  return <>{children}</>;
+  return <Navigate to="/interest" replace />;
 };
 
 export default AdminRoute;
