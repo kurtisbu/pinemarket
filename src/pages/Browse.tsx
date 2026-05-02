@@ -40,14 +40,14 @@ const Browse = () => {
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState(searchParams.get('category') || 'All');
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
-  const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'newest');
+  const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'trending');
 
   // Update URL params when filters change
   useEffect(() => {
     const params = new URLSearchParams();
     if (activeCategory !== 'All') params.set('category', activeCategory);
     if (searchQuery) params.set('search', searchQuery);
-    if (sortBy !== 'newest') params.set('sort', sortBy);
+    if (sortBy !== 'trending') params.set('sort', sortBy);
     setSearchParams(params);
   }, [activeCategory, searchQuery, sortBy, setSearchParams]);
 
@@ -83,6 +83,9 @@ const Browse = () => {
 
       // Apply sorting
       switch (sortBy) {
+        case 'trending':
+          query = query.order('trending_score', { ascending: false });
+          break;
         case 'popular':
           query = query.order('view_count', { ascending: false });
           break;
@@ -90,8 +93,10 @@ const Browse = () => {
           query = query.order('average_rating', { ascending: false });
           break;
         case 'newest':
-        default:
           query = query.order('created_at', { ascending: false });
+          break;
+        default:
+          query = query.order('trending_score', { ascending: false });
           break;
       }
 
