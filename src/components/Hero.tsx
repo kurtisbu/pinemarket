@@ -10,7 +10,7 @@ const Hero = () => {
     <section className="relative bg-gradient-to-br from-background via-background to-muted py-20">
       <div className="container mx-auto px-4">
         <div className="text-center max-w-4xl mx-auto">
-          <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-blue-500 to-green-500 bg-clip-text text-transparent">
+          <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-primary to-accent-foreground bg-clip-text text-transparent">
             Premium Pine Script Marketplace
           </h1>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
@@ -18,7 +18,7 @@ const Hero = () => {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <Button size="lg" className="bg-gradient-to-r from-blue-500 to-green-500 hover:from-blue-600 hover:to-green-600" onClick={() => navigate('/browse')}>
+            <Button size="lg" className="bg-gradient-to-r from-primary to-accent-foreground text-primary-foreground hover:opacity-90" onClick={() => navigate('/browse')}>
               Browse Scripts
             </Button>
             <Button size="lg" variant="outline" onClick={() => navigate('/seller/onboarding')}>
@@ -28,24 +28,24 @@ const Hero = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16">
             <div className="text-center">
-              <div className="bg-blue-500/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <TrendingUp className="w-8 h-8 text-blue-500" />
+              <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <TrendingUp className="w-8 h-8 text-primary" />
               </div>
               <h3 className="text-lg font-semibold mb-2">Proven Strategies</h3>
               <p className="text-muted-foreground">Access battle-tested trading strategies with verified performance metrics</p>
             </div>
             
             <div className="text-center">
-              <div className="bg-green-500/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Shield className="w-8 h-8 text-green-500" />
+              <div className="bg-accent w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Shield className="w-8 h-8 text-accent-foreground" />
               </div>
               <h3 className="text-lg font-semibold mb-2">Secure Platform</h3>
               <p className="text-muted-foreground">Built with security best practices and automated safety checks to protect your investments</p>
             </div>
             
             <div className="text-center">
-              <div className="bg-purple-500/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Zap className="w-8 h-8 text-purple-500" />
+              <div className="bg-secondary w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Zap className="w-8 h-8 text-secondary-foreground" />
               </div>
               <h3 className="text-lg font-semibold mb-2">Instant Access</h3>
               <p className="text-muted-foreground">Purchase and deploy scripts to TradingView instantly</p>

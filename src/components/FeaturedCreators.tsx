@@ -170,7 +170,7 @@ const FeaturedCreators: React.FC<FeaturedCreatorsProps> = ({
               <div className="grid grid-cols-2 gap-4 py-3 border-t border-border">
                 <div className="text-center space-y-1">
                   <div className="flex items-center justify-center space-x-1">
-                    <TrendingUp className="w-4 h-4 text-blue-500" />
+                    <TrendingUp className="w-4 h-4 text-primary" />
                     <span className="text-lg font-semibold">{creator.total_programs}</span>
                   </div>
                   <p className="text-xs text-muted-foreground">Programs</p>
@@ -178,7 +178,7 @@ const FeaturedCreators: React.FC<FeaturedCreatorsProps> = ({
                 
                 <div className="text-center space-y-1">
                   <div className="flex items-center justify-center space-x-1">
-                    <Users className="w-4 h-4 text-green-500" />
+                    <Users className="w-4 h-4 text-accent-foreground" />
                     <span className="text-lg font-semibold">{creator.total_sales}</span>
                   </div>
                   <p className="text-xs text-muted-foreground">Sales</p>
