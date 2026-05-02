@@ -23,6 +23,12 @@ const SellerPublishedPrograms: React.FC<SellerPublishedProgramsProps> = ({ selle
           profiles!seller_id (
             display_name,
             username
+          ),
+          program_prices (
+            amount,
+            price_type,
+            interval,
+            is_active
           )
         `)
         .eq('seller_id', sellerId)
@@ -30,7 +36,14 @@ const SellerPublishedPrograms: React.FC<SellerPublishedProgramsProps> = ({ selle
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data;
+      return (data || []).map((program: any) => {
+        const activePrices = (program.program_prices || []).filter((p: any) => p.is_active);
+        const lowestPrice = activePrices.length > 0
+          ? Math.min(...activePrices.map((p: any) => Number(p.amount)))
+          : program.price;
+        const hasMultiplePrices = activePrices.length > 1;
+        return { ...program, lowestPrice, hasMultiplePrices };
+      });
     },
     enabled: !!sellerId,
   });
