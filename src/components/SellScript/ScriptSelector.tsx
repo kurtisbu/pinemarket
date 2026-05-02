@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, AlertCircle, Check, ExternalLink } from 'lucide-react';
+import { RefreshCw, AlertCircle, Check, ExternalLink, Pencil, Save, X } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
 
 interface TradingViewScript {
   id: string;
@@ -32,6 +33,9 @@ const ScriptSelector: React.FC<ScriptSelectorProps> = ({
   const [scripts, setScripts] = useState<TradingViewScript[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState<string>('');
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   const fetchScripts = async () => {
     if (!user) return;
@@ -94,6 +98,58 @@ const ScriptSelector: React.FC<ScriptSelectorProps> = ({
       onSelectionChange(selectedScripts.filter(id => id !== scriptId));
     } else {
       onSelectionChange([...selectedScripts, scriptId]);
+    }
+  };
+
+  const isGenericProfileUrl = (url: string | null | undefined) => {
+    if (!url) return true;
+    return url.includes('#published-scripts') || /\/u\/[^/]+\/?$/.test(url);
+  };
+
+  const startEditing = (script: TradingViewScript) => {
+    setEditingId(script.id);
+    setEditingValue(isGenericProfileUrl(script.publication_url) ? '' : script.publication_url);
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditingValue('');
+  };
+
+  const savePublicationUrl = async (scriptId: string) => {
+    const trimmed = editingValue.trim();
+    if (trimmed && !/^https?:\/\/(www\.)?tradingview\.com\/script\//i.test(trimmed)) {
+      toast({
+        title: 'Invalid URL',
+        description: 'Please enter a TradingView script URL (https://www.tradingview.com/script/...)',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSavingId(scriptId);
+    try {
+      const { error } = await supabase
+        .from('tradingview_scripts')
+        .update({ publication_url: trimmed })
+        .eq('id', scriptId);
+
+      if (error) throw error;
+
+      setScripts(prev =>
+        prev.map(s => (s.id === scriptId ? { ...s, publication_url: trimmed } : s))
+      );
+      setEditingId(null);
+      setEditingValue('');
+      toast({ title: 'Publication link updated' });
+    } catch (error: any) {
+      toast({
+        title: 'Failed to save',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingId(null);
     }
   };
 
@@ -236,6 +292,85 @@ const ScriptSelector: React.FC<ScriptSelectorProps> = ({
                     {isSelected && (
                       <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1">
                         <Check className="w-3 h-3" />
+                      </div>
+                    )}
+
+                    {isSelected && (
+                      <div
+                        className="mt-3 pt-3 border-t space-y-2"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Label className="text-xs text-muted-foreground">
+                          Publication link
+                        </Label>
+                        {editingId === script.id ? (
+                          <div className="flex gap-1">
+                            <Input
+                              type="url"
+                              value={editingValue}
+                              onChange={(e) => setEditingValue(e.target.value)}
+                              placeholder="https://www.tradingview.com/script/..."
+                              className="h-8 text-xs"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 shrink-0"
+                              disabled={savingId === script.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                savePublicationUrl(script.id);
+                              }}
+                            >
+                              <Save className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 shrink-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                cancelEditing();
+                              }}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            {isGenericProfileUrl(script.publication_url) ? (
+                              <span className="text-xs text-destructive flex-1 truncate">
+                                Not set — using profile fallback
+                              </span>
+                            ) : (
+                              <a
+                                href={script.publication_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-primary hover:underline flex-1 truncate flex items-center gap-1"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <ExternalLink className="w-3 h-3 shrink-0" />
+                                <span className="truncate">{script.publication_url}</span>
+                              </a>
+                            )}
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 shrink-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startEditing(script);
+                              }}
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
