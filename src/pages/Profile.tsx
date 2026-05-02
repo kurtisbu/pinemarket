@@ -3,10 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import Header from '@/components/Header';
-import { User, Calendar } from 'lucide-react';
+import { Calendar, Share2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import UserTradingViewScripts from '@/components/UserTradingViewScripts';
 import UserPurchases from '@/components/UserPurchases';
@@ -89,53 +90,70 @@ const Profile = () => {
 
   const isOwner = authUser?.id === profile.id;
 
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast.success('Profile link copied to clipboard');
+    } catch {
+      toast.error('Failed to copy link');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <Card>
-            <CardHeader className="pb-4">
-              <div className="flex items-start gap-6">
-                <Avatar className="w-24 h-24">
-                  <AvatarImage src={profile.avatar_url} alt={profile.display_name || profile.username} />
-                  <AvatarFallback className="text-2xl">
-                    {(profile.display_name || profile.username)?.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h1 className="text-3xl font-bold">
-                      {profile.display_name || profile.username}
-                    </h1>
-                    {profile.role && profile.role !== 'user' && (
-                      <Badge variant="secondary" className="capitalize">
-                        {profile.role}
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-muted-foreground mb-2">@{profile.username}</p>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="w-4 h-4" />
-                    <span>Member since {joinDate}</span>
-                  </div>
+
+      {/* Hero banner */}
+      <div className="relative">
+        <div className="h-48 sm:h-56 w-full bg-gradient-to-br from-primary/30 via-primary/10 to-background" />
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto -mt-16 sm:-mt-20">
+            <div className="flex flex-col sm:flex-row items-start sm:items-end gap-6">
+              <Avatar className="w-32 h-32 sm:w-36 sm:h-36 ring-4 ring-background shadow-xl">
+                <AvatarImage src={profile.avatar_url} alt={profile.display_name || profile.username} />
+                <AvatarFallback className="text-4xl">
+                  {(profile.display_name || profile.username)?.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 sm:pb-2">
+                <div className="flex flex-wrap items-center gap-3 mb-1">
+                  <h1 className="text-4xl font-bold tracking-tight">
+                    {profile.display_name || profile.username}
+                  </h1>
+                  {profile.role && profile.role !== 'user' && (
+                    <Badge variant="secondary" className="capitalize">
+                      {profile.role}
+                    </Badge>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleShare}
+                    className="ml-auto sm:ml-2"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    Share Profile
+                  </Button>
+                </div>
+                <p className="text-muted-foreground text-lg">@{profile.username}</p>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+                  <Calendar className="w-4 h-4" />
+                  <span>Member since {joinDate}</span>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              {profile.bio ? (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold mb-2">About</h3>
-                  <p className="text-muted-foreground whitespace-pre-wrap">{profile.bio}</p>
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <User className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>This user hasn't added a bio yet.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+            </div>
+
+            {profile.bio && (
+              <p className="mt-8 text-lg leading-relaxed text-foreground/80 whitespace-pre-wrap max-w-3xl">
+                {profile.bio}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto space-y-6">
 
           {/* Show purchases only to the profile owner */}
           {isOwner && (
