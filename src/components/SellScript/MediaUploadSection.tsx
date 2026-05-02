@@ -17,7 +17,8 @@ const MediaUploadSection: React.FC<MediaUploadSectionProps> = ({
 }) => {
   const RECOMMENDED_WIDTH = 800;
   const RECOMMENDED_HEIGHT = 600;
-  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+  const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+  const MAX_IMAGES = 3;
 
   const resizeImage = (file: File): Promise<File> => {
     return new Promise((resolve) => {
@@ -64,12 +65,19 @@ const MediaUploadSection: React.FC<MediaUploadSectionProps> = ({
 
   const handleMediaFilesChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
+
+    if (mediaFiles.length + files.length > MAX_IMAGES) {
+      alert(`Max ${MAX_IMAGES} images allowed`);
+      event.target.value = '';
+      return;
+    }
+
     const processedFiles: File[] = [];
     
     for (const file of files) {
       // Check file size
       if (file.size > MAX_FILE_SIZE) {
-        alert(`${file.name} is too large. Maximum file size is 5MB.`);
+        alert(`${file.name} is too large. Maximum file size is 2MB.`);
         continue;
       }
       
@@ -103,7 +111,7 @@ const MediaUploadSection: React.FC<MediaUploadSectionProps> = ({
           <AlertDescription>
             <strong>Recommended image size:</strong> {RECOMMENDED_WIDTH}x{RECOMMENDED_HEIGHT} pixels. 
             Images will be automatically resized to optimize loading while maintaining quality.
-            Maximum file size: 5MB per image.
+            Maximum file size: 2MB per image. Max {MAX_IMAGES} images. GIFs and videos are not allowed.
           </AlertDescription>
         </Alert>
       </div>
@@ -117,13 +125,13 @@ const MediaUploadSection: React.FC<MediaUploadSectionProps> = ({
                 Upload images and GIFs to showcase your program
               </span>
               <span className="mt-1 block text-xs text-gray-500">
-                PNG, JPG, WebP, GIF up to 5MB each
+                PNG, JPG, WebP up to 2MB each (Max {MAX_IMAGES} images)
               </span>
             </Label>
             <Input
               id="media"
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               multiple
               onChange={handleMediaFilesChange}
               className="hidden"
