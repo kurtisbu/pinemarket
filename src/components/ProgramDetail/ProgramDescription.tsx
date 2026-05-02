@@ -6,6 +6,16 @@ import { Card } from '@/components/ui/card';
 import { Package, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
+const isValidPublicationUrl = (url: string | null | undefined): boolean => {
+  if (!url) return false;
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+  if (trimmed.includes('#published-scripts')) return false;
+  // Generic profile URL like /u/username/ — not a specific script publication
+  if (/\/u\/[^/]+\/?$/.test(trimmed)) return false;
+  return true;
+};
+
 interface IncludedScript {
   id: string;
   title: string;
@@ -95,7 +105,7 @@ const ProgramDescription: React.FC<ProgramDescriptionProps> = ({ description, ta
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm truncate">{script.title}</p>
                 </div>
-                {script.publication_url && (
+                {isValidPublicationUrl(script.publication_url) && (
                   <a
                     href={script.publication_url}
                     target="_blank"
