@@ -226,7 +226,7 @@ export const useSellScriptForm = () => {
         image_urls: imageUrls,
         status: 'draft',
         script_file_path: scriptPath,
-        tradingview_publication_url: null, // No longer a single URL
+        tradingview_publication_url: formData.tradingview_publication_url?.trim() || null,
         tradingview_script_id: null, // Now using program_scripts junction table
         pricing_model: 'flexible',
         price: 0,
