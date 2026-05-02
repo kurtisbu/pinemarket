@@ -35,13 +35,28 @@ const Profile = () => {
     const fetchProfile = async () => {
       if (!username) return;
 
-      const { data, error } = await supabase
+      // Try username lookup first
+      let { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('username', username)
-        .single();
+        .maybeSingle();
 
-      if (error || !data) {
+      // Fallback: if the URL segment looks like a UUID, try matching by id
+      if (!data) {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(username)) {
+          const byId = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', username)
+            .maybeSingle();
+          data = byId.data;
+          error = byId.error;
+        }
+      }
+
+      if (!data) {
         setNotFound(true);
       } else {
         setProfile(data);
