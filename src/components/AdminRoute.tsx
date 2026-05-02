@@ -53,7 +53,16 @@ const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
     }
   }, [searchParams]);
 
-  const bypass = isPreviewHost() || hasPreviewAccess() || searchParams.get('preview') === PREVIEW_TOKEN;
+  // Bypass the interest-page gate for:
+  // - preview hosts (localhost, *.lovable.app, *.lovableproject.com)
+  // - anyone with a valid preview token saved in localStorage
+  // - any authenticated user (they already have an account, so the
+  //   marketing/interest page should not block them)
+  const bypass =
+    isPreviewHost() ||
+    hasPreviewAccess() ||
+    searchParams.get('preview') === PREVIEW_TOKEN ||
+    !!user;
 
   const { data: isAdmin, isLoading } = useQuery({
     queryKey: ['is-admin', user?.id],
@@ -77,11 +86,7 @@ const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
     );
   }
 
-  if (!user || !isAdmin) {
-    return <Navigate to="/interest" replace />;
-  }
-
-  return <>{children}</>;
+  return <Navigate to="/interest" replace />;
 };
 
 export default AdminRoute;
