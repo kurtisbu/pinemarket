@@ -1,7 +1,5 @@
 import React, { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { Navigate, useSearchParams } from 'react-router-dom';
 
 interface AdminRouteProps {
@@ -64,21 +62,11 @@ const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
     searchParams.get('preview') === PREVIEW_TOKEN ||
     !!user;
 
-  const { data: isAdmin, isLoading } = useQuery({
-    queryKey: ['is-admin', user?.id],
-    queryFn: async () => {
-      if (!user) return false;
-      const { data } = await supabase.rpc('is_current_user_admin');
-      return data === true;
-    },
-    enabled: !!user && !bypass,
-  });
-
   if (bypass) {
     return <>{children}</>;
   }
 
-  if (authLoading || isLoading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
