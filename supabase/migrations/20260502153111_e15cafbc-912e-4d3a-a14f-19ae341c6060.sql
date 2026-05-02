@@ -1,0 +1,1 @@
+UPDATE public.profiles SET username = 'capitalcodersllc', display_name = COALESCE(display_name, 'Capital Coders') WHERE id = 'f0cfedeb-ab66-457c-8431-96bee451ce52' AND username IS NULL;
