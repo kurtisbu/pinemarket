@@ -466,6 +466,7 @@ export type Database = {
           title: string
           tradingview_publication_url: string | null
           tradingview_script_id: string | null
+          trending_score: number
           trial_period_days: number | null
           updated_at: string
           view_count: number
@@ -495,6 +496,7 @@ export type Database = {
           title: string
           tradingview_publication_url?: string | null
           tradingview_script_id?: string | null
+          trending_score?: number
           trial_period_days?: number | null
           updated_at?: string
           view_count?: number
@@ -524,6 +526,7 @@ export type Database = {
           title?: string
           tradingview_publication_url?: string | null
           tradingview_script_id?: string | null
+          trending_score?: number
           trial_period_days?: number | null
           updated_at?: string
           view_count?: number
@@ -1308,6 +1311,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_trending_scores: {
+        Args: { p_program_id?: string }
+        Returns: undefined
+      }
       check_rate_limit: {
         Args: {
           p_endpoint?: string

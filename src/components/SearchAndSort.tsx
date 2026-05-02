@@ -34,6 +34,7 @@ const SearchAndSort: React.FC<SearchAndSortProps> = ({
           <SelectValue placeholder="Sort by" />
         </SelectTrigger>
         <SelectContent>
+          <SelectItem value="trending">Trending</SelectItem>
           <SelectItem value="newest">Newest</SelectItem>
           <SelectItem value="popular">Most Popular</SelectItem>
           <SelectItem value="rated">Top Rated</SelectItem>
