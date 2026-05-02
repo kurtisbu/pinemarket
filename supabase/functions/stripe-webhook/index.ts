@@ -622,6 +622,12 @@ async function handleSubscriptionDeleted(subscription: any, supabaseAdmin: any) 
   console.log(`[WEBHOOK] Revoking access for ${purchases.length} purchase(s)`);
 
   for (const purchase of purchases) {
+    // Fetch assignments BEFORE updating to capture pine_id/username
+    const { data: assignments } = await supabaseAdmin
+      .from('script_assignments')
+      .select('id, pine_id, tradingview_username')
+      .eq('purchase_id', purchase.id);
+
     // Update assignment status to expired and set expires_at to now
     const { error: updateError } = await supabaseAdmin
       .from('script_assignments')
@@ -636,9 +642,86 @@ async function handleSubscriptionDeleted(subscription: any, supabaseAdmin: any) 
     } else {
       console.log(`[WEBHOOK] Revoked assignments for purchase ${purchase.id}`);
     }
-    
-    // TODO: Optionally trigger TradingView access revocation here
+
+    // Trigger TradingView access revocation for each assignment
+    for (const a of assignments || []) {
+      await triggerScriptRevocation(a.id, a.pine_id, a.tradingview_username, 'subscription_cancelled');
+    }
   }
   
   console.log("[WEBHOOK] Subscription cancellation processed successfully");
+}
+
+async function handleRevocation(
+  paymentIntentId: string | undefined,
+  reason: 'refunded' | 'disputed',
+  supabaseAdmin: any
+) {
+  console.log(`[WEBHOOK] Processing revocation (${reason}) for payment_intent: ${paymentIntentId}`);
+
+  if (!paymentIntentId) {
+    console.warn("[WEBHOOK] No payment_intent_id provided for revocation");
+    return;
+  }
+
+  // Find purchases by payment_intent_id
+  const { data: purchases, error: purchasesError } = await supabaseAdmin
+    .from('purchases')
+    .select('id')
+    .eq('payment_intent_id', paymentIntentId);
+
+  if (purchasesError) {
+    console.error(`[WEBHOOK] Error fetching purchases for ${reason}:`, purchasesError);
+    return;
+  }
+
+  if (!purchases || purchases.length === 0) {
+    console.log(`[WEBHOOK] No purchases found for payment_intent: ${paymentIntentId}`);
+    return;
+  }
+
+  console.log(`[WEBHOOK] Revoking ${purchases.length} purchase(s) due to ${reason}`);
+
+  for (const purchase of purchases) {
+    // Mark purchase status
+    const { error: purchaseUpdateError } = await supabaseAdmin
+      .from('purchases')
+      .update({ status: reason })
+      .eq('id', purchase.id);
+
+    if (purchaseUpdateError) {
+      console.error(`[WEBHOOK] Error updating purchase ${purchase.id} to ${reason}:`, purchaseUpdateError);
+    } else {
+      console.log(`[WEBHOOK] Purchase ${purchase.id} marked as ${reason}`);
+    }
+
+    // Fetch assignments before update to capture pine_id/username
+    const { data: assignments } = await supabaseAdmin
+      .from('script_assignments')
+      .select('id, pine_id, tradingview_username')
+      .eq('purchase_id', purchase.id);
+
+    // Mark assignments expired
+    const { error: assignmentUpdateError } = await supabaseAdmin
+      .from('script_assignments')
+      .update({
+        status: 'expired',
+        expires_at: new Date().toISOString(),
+        error_message: `Access revoked: ${reason}`,
+      })
+      .eq('purchase_id', purchase.id);
+
+    if (assignmentUpdateError) {
+      console.error(`[WEBHOOK] Error expiring assignments for purchase ${purchase.id}:`, assignmentUpdateError);
+    } else {
+      console.log(`[WEBHOOK] Expired ${assignments?.length || 0} assignment(s) for purchase ${purchase.id}`);
+    }
+
+    // Actively revoke TradingView access for each assignment
+    for (const a of assignments || []) {
+      await triggerScriptRevocation(a.id, a.pine_id, a.tradingview_username, reason);
+    }
+  }
+
+  console.log(`[WEBHOOK] Revocation (${reason}) processing complete`);
 }
