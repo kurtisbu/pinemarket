@@ -54,6 +54,56 @@ async function triggerScriptAssignment(
   }
 }
 
+// Helper function to trigger TradingView script access revocation
+async function triggerScriptRevocation(
+  assignmentId: string,
+  pineId: string,
+  tradingviewUsername: string,
+  reason: string
+): Promise<void> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.error("[WEBHOOK] Missing Supabase credentials for TradingView revocation call");
+    return;
+  }
+
+  if (!pineId || !tradingviewUsername) {
+    console.warn(`[WEBHOOK] Skipping TradingView revocation for ${assignmentId} - missing pine_id or username`);
+    return;
+  }
+
+  try {
+    console.log(`[WEBHOOK] Triggering TradingView revocation for ${assignmentId} (reason: ${reason})`);
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/tradingview-service`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({
+        action: 'revoke-script-access',
+        pine_id: pineId,
+        tradingview_username: tradingviewUsername,
+        assignment_id: assignmentId,
+        reason,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      console.log(`[WEBHOOK] TradingView revocation successful for ${assignmentId}:`, result);
+    } else {
+      console.error(`[WEBHOOK] TradingView revocation failed for ${assignmentId}:`, result);
+    }
+  } catch (error) {
+    console.error(`[WEBHOOK] Error calling TradingView revocation for ${assignmentId}:`, error);
+  }
+}
+
 // Get stripe instance
 function getStripe(): Stripe {
   return new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
@@ -106,6 +156,22 @@ serve(async (req) => {
 
       case "customer.subscription.deleted":
         await handleSubscriptionDeleted(event.data.object, supabaseAdmin);
+        break;
+
+      case "charge.refunded":
+        await handleRevocation(
+          event.data.object?.payment_intent,
+          'refunded',
+          supabaseAdmin
+        );
+        break;
+
+      case "charge.dispute.created":
+        await handleRevocation(
+          event.data.object?.payment_intent,
+          'disputed',
+          supabaseAdmin
+        );
         break;
 
       default:
