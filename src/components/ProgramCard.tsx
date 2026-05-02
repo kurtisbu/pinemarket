@@ -32,13 +32,15 @@ interface ProgramCardProps {
 const ProgramCard: React.FC<ProgramCardProps> = ({ program, onClick }) => {
   return (
     <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={onClick}>
-      <CardHeader className="p-0">
+      <CardHeader className="p-0 bg-muted/50 rounded-t-lg">
         {program.image_urls && program.image_urls[0] && (
-          <img
-            src={program.image_urls[0]}
-            alt={program.title}
-            className="w-full h-48 object-cover rounded-t-lg"
-          />
+          <div className="aspect-video w-full flex items-center justify-center p-4">
+            <img
+              src={program.image_urls[0]}
+              alt={program.title}
+              className="w-full h-full object-contain rounded-md shadow-sm"
+            />
+          </div>
         )}
       </CardHeader>
       
