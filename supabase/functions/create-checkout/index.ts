@@ -199,12 +199,51 @@ serve(async (req) => {
     const { data: feeRateResult, error: feeRateError } = await supabaseAdmin
       .rpc('get_seller_fee_rate', { seller_id: sellerId });
 
-    const feePercent = feeRateError ? 10.0 : (feeRateResult ?? 10.0);
-    console.log(`[CHECKOUT] Using fee rate: ${feePercent}% for seller: ${sellerId}`);
+    const sellerFeePercent = feeRateError ? 5.0 : (feeRateResult ?? 5.0);
+    const buyerFeePercent = BUYER_FEE_PERCENT;
+    console.log(`[CHECKOUT] Fee rates - seller: ${sellerFeePercent}%, buyer: ${buyerFeePercent}%`);
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2023-10-16",
     });
+
+    // Resolve the buyer-inclusive Stripe price (list price + buyer fee)
+    let buyerInclusivePriceId: string;
+    if (isPackage) {
+      buyerInclusivePriceId = await ensureBuyerInclusivePriceForPackagePrice(stripe, supabaseAdmin, {
+        id: price.id,
+        price_type: price.price_type,
+        amount: price.amount,
+        currency: price.currency,
+        interval: price.interval,
+        display_name: price.display_name,
+        stripe_price_id: price.stripe_price_id,
+        stripe_buyer_inclusive_price_id: price.stripe_buyer_inclusive_price_id ?? null,
+        program_packages: {
+          id: price.program_packages.id,
+          title: price.program_packages.title,
+          description: price.program_packages.description ?? null,
+          seller_id: price.program_packages.seller_id,
+        },
+      });
+    } else {
+      buyerInclusivePriceId = await ensureBuyerInclusivePriceForProgramPrice(stripe, supabaseAdmin, {
+        id: price.id,
+        price_type: price.price_type,
+        amount: price.amount,
+        currency: price.currency,
+        interval: price.interval,
+        display_name: price.display_name,
+        stripe_buyer_inclusive_price_id: price.stripe_buyer_inclusive_price_id ?? null,
+        programs: {
+          id: price.programs.id,
+          title: price.programs.title,
+          description: (price.programs as any).description ?? null,
+          seller_id: price.programs.seller_id,
+          stripe_product_id: (price.programs as any).stripe_product_id ?? null,
+        },
+      });
+    }
 
     // Find or create customer
     let customerId: string;
@@ -228,9 +267,22 @@ serve(async (req) => {
     // Determine checkout mode based on price type
     const mode = price.price_type === 'recurring' ? 'subscription' : 'payment';
 
-    // Calculate platform fee using dynamic rate
-    const platformFeeAmount = Math.round(price.amount * (feePercent / 100) * 100); // Convert to cents
-    
+    // Fee math (Fiverr-style split):
+    //   listAmount  = price.amount                           ($100)
+    //   buyerFee    = listAmount * buyerFeePercent / 100     ($5)
+    //   totalCharged= listAmount + buyerFee                  ($105)
+    //   sellerFee   = listAmount * sellerFeePercent / 100    ($5)
+    //   platformTake= buyerFee + sellerFee                   ($10) -> application_fee
+    //   sellerNet   = listAmount - sellerFee                 ($95)
+    const listAmount = price.amount;
+    const buyerFeeAmount = Math.round(listAmount * (buyerFeePercent / 100) * 100) / 100;
+    const totalCharged = Math.round((listAmount + buyerFeeAmount) * 100) / 100;
+    const sellerFeeAmount = Math.round(listAmount * (sellerFeePercent / 100) * 100) / 100;
+    const applicationFeeAmountCents = Math.round((buyerFeeAmount + sellerFeeAmount) * 100);
+    const applicationFeePercent = totalCharged > 0
+      ? Math.round(((buyerFeeAmount + sellerFeeAmount) / totalCharged) * 10000) / 100
+      : 0;
+
     const resourceId = isPackage ? packageId : price.programs.id;
     const resourceType = isPackage ? 'package' : 'program';
 
@@ -240,7 +292,7 @@ serve(async (req) => {
       payment_method_types: ['card'],
       line_items: [
         {
-          price: price.stripe_price_id,
+          price: buyerInclusivePriceId,
           quantity: 1,
         },
       ],
@@ -255,14 +307,18 @@ serve(async (req) => {
         price_type: price.price_type,
         tradingview_username: profile.tradingview_username,
         is_package: isPackage.toString(),
-        fee_percent: feePercent.toString(),
+        fee_percent: sellerFeePercent.toString(),
+        seller_fee_percent: sellerFeePercent.toString(),
+        buyer_fee_percent: buyerFeePercent.toString(),
+        list_amount: listAmount.toString(),
+        total_charged: totalCharged.toString(),
       },
     };
 
     // Add destination charges for Stripe Connect (platform takes dynamic fee)
     if (mode === 'payment') {
       sessionData.payment_intent_data = {
-        application_fee_amount: platformFeeAmount,
+        application_fee_amount: applicationFeeAmountCents,
         transfer_data: {
           destination: sellerProfile.stripe_account_id,
         },
@@ -270,7 +326,7 @@ serve(async (req) => {
     } else {
       // For subscriptions, use application_fee_percent
       sessionData.subscription_data = {
-        application_fee_percent: feePercent,
+        application_fee_percent: applicationFeePercent,
         transfer_data: {
           destination: sellerProfile.stripe_account_id,
         },
