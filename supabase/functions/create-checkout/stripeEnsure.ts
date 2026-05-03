@@ -3,6 +3,14 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0
 
 type PriceType = "one_time" | "recurring";
 
+// Default buyer-side platform fee percentage (added on top of the listed price)
+export const BUYER_FEE_PERCENT = 5.0;
+
+export function calculateBuyerInclusiveAmount(listAmount: number): number {
+  // Round to nearest cent
+  return Math.round(listAmount * (1 + BUYER_FEE_PERCENT / 100) * 100) / 100;
+}
+
 function mapRecurring(interval: string | null): { interval: "month" | "year"; interval_count: number } | null {
   if (!interval) return null;
   if (interval === "month") return { interval: "month", interval_count: 1 };

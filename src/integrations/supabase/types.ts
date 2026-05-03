@@ -93,6 +93,7 @@ export type Database = {
           package_id: string
           price_type: string
           sort_order: number
+          stripe_buyer_inclusive_price_id: string | null
           stripe_price_id: string | null
           updated_at: string
         }
@@ -108,6 +109,7 @@ export type Database = {
           package_id: string
           price_type: string
           sort_order?: number
+          stripe_buyer_inclusive_price_id?: string | null
           stripe_price_id?: string | null
           updated_at?: string
         }
@@ -123,6 +125,7 @@ export type Database = {
           package_id?: string
           price_type?: string
           sort_order?: number
+          stripe_buyer_inclusive_price_id?: string | null
           stripe_price_id?: string | null
           updated_at?: string
         }
@@ -359,6 +362,7 @@ export type Database = {
           price_type: string
           program_id: string
           sort_order: number
+          stripe_buyer_inclusive_price_id: string | null
           stripe_price_id: string | null
           updated_at: string
         }
@@ -374,6 +378,7 @@ export type Database = {
           price_type: string
           program_id: string
           sort_order?: number
+          stripe_buyer_inclusive_price_id?: string | null
           stripe_price_id?: string | null
           updated_at?: string
         }
@@ -389,6 +394,7 @@ export type Database = {
           price_type?: string
           program_id?: string
           sort_order?: number
+          stripe_buyer_inclusive_price_id?: string | null
           stripe_price_id?: string | null
           updated_at?: string
         }
@@ -552,6 +558,7 @@ export type Database = {
       purchases: {
         Row: {
           amount: number
+          buyer_fee: number
           buyer_id: string
           created_at: string
           id: string
@@ -565,11 +572,13 @@ export type Database = {
           status: Database["public"]["Enums"]["purchase_status"]
           stripe_subscription_id: string | null
           stripe_transfer_id: string | null
+          total_charged: number | null
           tradingview_username: string | null
           updated_at: string
         }
         Insert: {
           amount: number
+          buyer_fee?: number
           buyer_id: string
           created_at?: string
           id?: string
@@ -583,11 +592,13 @@ export type Database = {
           status?: Database["public"]["Enums"]["purchase_status"]
           stripe_subscription_id?: string | null
           stripe_transfer_id?: string | null
+          total_charged?: number | null
           tradingview_username?: string | null
           updated_at?: string
         }
         Update: {
           amount?: number
+          buyer_fee?: number
           buyer_id?: string
           created_at?: string
           id?: string
@@ -601,6 +612,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["purchase_status"]
           stripe_subscription_id?: string | null
           stripe_transfer_id?: string | null
+          total_charged?: number | null
           tradingview_username?: string | null
           updated_at?: string
         }
