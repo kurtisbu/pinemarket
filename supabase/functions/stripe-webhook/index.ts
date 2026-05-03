@@ -206,6 +206,8 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any, stripe:
   const isPackage = session.metadata.is_package === 'true';
   const tradingviewUsername = session.metadata.tradingview_username;
   const feePercentFromMetadata = session.metadata.fee_percent ? parseFloat(session.metadata.fee_percent) : null;
+  const sellerFeePercentMeta = session.metadata.seller_fee_percent ? parseFloat(session.metadata.seller_fee_percent) : null;
+  const buyerFeePercentMeta = session.metadata.buyer_fee_percent ? parseFloat(session.metadata.buyer_fee_percent) : 0;
 
   if ((!programId && !packageId) || !priceId || !userId) {
     console.error("[WEBHOOK] Missing required metadata");
@@ -292,19 +294,23 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any, stripe:
     amount = programPrice?.amount || 0;
   }
 
-  // Get seller's fee rate - use metadata if available, otherwise fetch from DB
-  let feePercent = feePercentFromMetadata;
-  if (feePercent === null) {
+  // Resolve fee rates - prefer metadata, fall back to DB / defaults
+  let sellerFeePercent = sellerFeePercentMeta ?? feePercentFromMetadata;
+  if (sellerFeePercent === null) {
     const { data: feeRateResult } = await supabaseAdmin
       .rpc('get_seller_fee_rate', { seller_id: sellerId });
-    feePercent = feeRateResult ?? 10.0;
+    sellerFeePercent = feeRateResult ?? 5.0;
   }
-  
-  console.log(`[WEBHOOK] Using fee rate: ${feePercent}% for seller: ${sellerId}`);
+  const buyerFeePercent = buyerFeePercentMeta;
 
-  // Calculate platform fee using dynamic rate
-  const platformFee = amount * (feePercent / 100);
-  const sellerOwed = amount - platformFee;
+  console.log(`[WEBHOOK] Fee rates - seller: ${sellerFeePercent}%, buyer: ${buyerFeePercent}%`);
+
+  // Fee math (split between buyer and seller, like Fiverr)
+  const buyerFee = Math.round(amount * (buyerFeePercent / 100) * 100) / 100;
+  const sellerCut = Math.round(amount * (sellerFeePercent / 100) * 100) / 100;
+  const platformFee = Math.round((buyerFee + sellerCut) * 100) / 100; // total platform take
+  const sellerOwed = Math.round((amount - sellerCut) * 100) / 100;
+  const totalCharged = Math.round((amount + buyerFee) * 100) / 100;
 
   // Create purchase record with stripe_subscription_id for tracking
   const { data: purchase, error: purchaseError } = await supabaseAdmin
@@ -317,6 +323,8 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any, stripe:
       amount: amount,
       platform_fee: platformFee,
       seller_owed: sellerOwed,
+      buyer_fee: buyerFee,
+      total_charged: totalCharged,
       status: 'completed',
       payment_intent_id: session.payment_intent || session.id,
       tradingview_username: tradingviewUsername,

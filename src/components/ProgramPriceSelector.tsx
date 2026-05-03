@@ -8,6 +8,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 
+const BUYER_FEE_PERCENT = 5; // Must mirror BUYER_FEE_PERCENT in supabase/functions/create-checkout/stripeEnsure.ts
+
 interface PriceOption {
   id: string;
   price_type: 'one_time' | 'recurring';
@@ -122,6 +124,9 @@ export const ProgramPriceSelector = ({ programId, onPurchase, trialPeriodDays }:
   const selectedPrice = prices.find(p => p.id === selectedPriceId);
   const showTrialOnButton = trialPeriodDays && selectedPrice?.price_type === 'recurring';
 
+  const buyerFee = selectedPrice ? Math.round(selectedPrice.amount * BUYER_FEE_PERCENT) / 100 : 0;
+  const totalDue = selectedPrice ? Math.round((selectedPrice.amount + buyerFee) * 100) / 100 : 0;
+
   if (loading) {
     return (
       <Card className="p-6">
@@ -186,6 +191,30 @@ export const ProgramPriceSelector = ({ programId, onPurchase, trialPeriodDays }:
             </div>
           ))}
         </RadioGroup>
+
+        {selectedPrice && (
+          <div className="rounded-lg border bg-muted/30 p-3 text-sm space-y-1">
+            <div className="flex justify-between text-muted-foreground">
+              <span>Subtotal</span>
+              <span>${selectedPrice.amount.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-muted-foreground">
+              <span>Platform fee ({BUYER_FEE_PERCENT}%)</span>
+              <span>${buyerFee.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-semibold pt-1 border-t">
+              <span>Total due today{showTrialOnButton ? ' after trial' : ''}</span>
+              <span>
+                ${totalDue.toFixed(2)}
+                {selectedPrice.price_type === 'recurring' && (
+                  <span className="text-xs font-normal text-muted-foreground ml-1">
+                    {getIntervalLabel(selectedPrice.interval)}
+                  </span>
+                )}
+              </span>
+            </div>
+          </div>
+        )}
 
         <Button
           onClick={handlePurchase}
