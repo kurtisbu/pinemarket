@@ -80,40 +80,45 @@ async function completeStripePurchase(payload: any, supabaseAdmin: any) {
 async function getAccountStatus(payload: any, supabaseAdmin: any, req: Request) {
   const { account_id } = payload;
   
-  // If account_id is provided, verify the user owns this account
-  if (account_id) {
-    const authHeader = req.headers.get('Authorization');
-    if (authHeader) {
-      const supabaseAuth = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-      );
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user } } = await supabaseAuth.auth.getUser(token);
-      
-      if (user) {
-        // Verify user owns this Stripe account
-        const { data: profile } = await supabaseAdmin
-          .from('profiles')
-          .select('stripe_account_id')
-          .eq('id', user.id)
-          .single();
-        
-        if (profile?.stripe_account_id !== account_id) {
-          return new Response(JSON.stringify({ error: 'Unauthorized - account mismatch' }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 403,
-          });
-        }
-      }
-    }
-  }
-
   if (!account_id) {
     return new Response(JSON.stringify({ error: 'Missing account_id' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
     });
+  }
+
+  // Require auth and verify ownership of the Stripe account
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 401,
+    });
+  }
+  {
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    );
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user } } = await supabaseAuth.auth.getUser(token);
+    if (!user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      });
+    }
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('stripe_account_id')
+      .eq('id', user.id)
+      .single();
+    if (profile?.stripe_account_id !== account_id) {
+      return new Response(JSON.stringify({ error: 'Unauthorized - account mismatch' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 403,
+      });
+    }
   }
 
   console.log('[STRIPE-ACCOUNT] Fetching account status for:', account_id);
@@ -411,27 +416,35 @@ async function createAccountLink(payload: any, supabaseAdmin: any, req: Request)
 
   // Verify user owns this account
   const authHeader = req.headers.get('Authorization');
-  if (authHeader) {
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 401,
+    });
+  }
+  {
     const supabaseAuth = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
     const token = authHeader.replace('Bearer ', '');
     const { data: { user } } = await supabaseAuth.auth.getUser(token);
-    
-    if (user) {
-      const { data: profile } = await supabaseAdmin
-        .from('profiles')
-        .select('stripe_account_id')
-        .eq('id', user.id)
-        .single();
-      
-      if (profile?.stripe_account_id !== account_id) {
-        return new Response(JSON.stringify({ error: 'Unauthorized - account mismatch' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 403,
-        });
-      }
+    if (!user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      });
+    }
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('stripe_account_id')
+      .eq('id', user.id)
+      .single();
+    if (profile?.stripe_account_id !== account_id) {
+      return new Response(JSON.stringify({ error: 'Unauthorized - account mismatch' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 403,
+      });
     }
   }
 
@@ -499,27 +512,35 @@ async function createDashboardLink(payload: any, supabaseAdmin: any, req: Reques
 
   // Verify user owns this account
   const authHeader = req.headers.get('Authorization');
-  if (authHeader) {
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 401,
+    });
+  }
+  {
     const supabaseAuth = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
     const token = authHeader.replace('Bearer ', '');
     const { data: { user } } = await supabaseAuth.auth.getUser(token);
-    
-    if (user) {
-      const { data: profile } = await supabaseAdmin
-        .from('profiles')
-        .select('stripe_account_id')
-        .eq('id', user.id)
-        .single();
-      
-      if (profile?.stripe_account_id !== account_id) {
-        return new Response(JSON.stringify({ error: 'Unauthorized - account mismatch' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 403,
-        });
-      }
+    if (!user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      });
+    }
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('stripe_account_id')
+      .eq('id', user.id)
+      .single();
+    if (profile?.stripe_account_id !== account_id) {
+      return new Response(JSON.stringify({ error: 'Unauthorized - account mismatch' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 403,
+      });
     }
   }
 
