@@ -578,20 +578,48 @@ async function handleInvoicePaid(invoice: any, supabaseAdmin: any, stripe: Strip
     
     console.log(`[WEBHOOK] Extending access for ${purchases.length} purchase(s)`);
     
-    // Extend all related script assignments
+    // Extend all related script assignments (DB + TradingView)
     for (const purchase of purchases) {
+      // Fetch assignments first so we have pine_id/username to push to TV
+      const { data: assignments, error: fetchError } = await supabaseAdmin
+        .from('script_assignments')
+        .select('id, pine_id, tradingview_username')
+        .eq('purchase_id', purchase.id);
+
+      if (fetchError) {
+        console.error(`[WEBHOOK] Error fetching assignments for purchase ${purchase.id}:`, fetchError);
+        continue;
+      }
+
+      // Update DB: extend expires_at and ensure status is 'assigned'
       const { error: updateError } = await supabaseAdmin
         .from('script_assignments')
         .update({ 
           expires_at: newExpiresAt,
-          status: 'assigned' // Ensure status is assigned (not expired)
+          status: 'assigned'
         })
         .eq('purchase_id', purchase.id);
       
       if (updateError) {
         console.error(`[WEBHOOK] Error extending assignment for purchase ${purchase.id}:`, updateError);
       } else {
-        console.log(`[WEBHOOK] Extended assignments for purchase ${purchase.id} to ${newExpiresAt}`);
+        console.log(`[WEBHOOK] Extended DB assignments for purchase ${purchase.id} to ${newExpiresAt}`);
+      }
+
+      // Push the new expiration to TradingView for each assignment.
+      // pine_perm/add/ with a new expiration acts as an extension.
+      for (const a of assignments || []) {
+        if (!a.pine_id || !a.tradingview_username) {
+          console.warn(`[WEBHOOK] Skipping TradingView extension for assignment ${a.id} - missing pine_id or username`);
+          continue;
+        }
+        await triggerScriptAssignment(
+          a.id,
+          a.pine_id,
+          a.tradingview_username,
+          'subscription',
+          newExpiresAt
+        );
       }
     }
     
