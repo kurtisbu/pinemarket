@@ -117,7 +117,7 @@ const AdminFeaturedCreators = () => {
     const [priority, setPriority] = useState(creator.featured_priority || 1);
     const [description, setDescription] = useState(creator.featured_description || '');
     const [isFeatured, setIsFeatured] = useState(creator.is_featured);
-    const [customFee, setCustomFee] = useState<number>(creator.custom_platform_fee_percent ?? 10);
+    const [customFee, setCustomFee] = useState<number>(creator.custom_platform_fee_percent ?? 5);
     const [useCustomFee, setUseCustomFee] = useState(creator.custom_platform_fee_percent !== null);
 
     const handleSubmit = () => {
@@ -178,33 +178,33 @@ const AdminFeaturedCreators = () => {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Fee Rate</span>
-                    <span className="text-lg font-semibold">
-                      {customFee}%
-                      {customFee < 10 && (
-                        <span className="text-sm text-green-600 ml-2">
-                          (saves {10 - customFee}%)
-                        </span>
-                      )}
-                    </span>
+                     <span className="text-lg font-semibold">
+                       {customFee}%
+                       {customFee < 5 && (
+                         <span className="text-sm text-green-600 ml-2">
+                           (saves {5 - customFee}%)
+                         </span>
+                       )}
+                     </span>
                   </div>
                   <Slider
                     value={[customFee]}
                     onValueChange={(value) => setCustomFee(value[0])}
                     min={0}
-                    max={10}
+                    max={5}
                     step={0.5}
                     className="w-full"
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>0% (No fee)</span>
-                    <span>10% (Standard)</span>
+                    <span>5% (Standard)</span>
                   </div>
                 </div>
               )}
 
               {!useCustomFee && (
                 <p className="text-sm text-muted-foreground">
-                  Using standard 10% platform fee
+                  Using standard 5% platform fee
                 </p>
               )}
             </div>
