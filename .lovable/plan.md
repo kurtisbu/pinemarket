@@ -1,26 +1,28 @@
-## Fix: Subscription renewals don't extend TradingView access
+## Problem
 
-### Problem
-On `invoice.paid` (renewal), `handleInvoicePaid` in `supabase/functions/stripe-webhook/index.ts` only updates `script_assignments.expires_at` in the DB. It never re-calls TradingView, so TV expires the user at the original period end even though they paid for the next period.
+`AdminFeaturedCreators.tsx` filters profiles by `role = 'seller'`, but no profile in the DB has that role (only `'user'` and `'admin'`). So the "All Creators" section is always empty.
 
-### Fix
-Update `handleInvoicePaid` (around lines 539–602) so that, for each renewed assignment, it also re-pushes the new expiration to TradingView.
+In this project a "creator" isn't a profile role — it's anyone who actually sells: has programs, a Stripe Connect account, or is already featured.
 
-Specifically, in the loop over purchases:
+## Changes
 
-1. Select assignments with `id, pine_id, tradingview_username` (not just update blindly).
-2. Update `expires_at` + `status: 'assigned'` in DB (existing behavior).
-3. For each assignment with a valid `pine_id` and `tradingview_username`, call `triggerScriptAssignment(assignment.id, pine_id, tradingview_username, 'subscription', newExpiresAt)`.
-   - This re-invokes `tradingview-service` → `assignScriptAccess` → `pine_perm/add/` with the new `expiration` timestamp, which TradingView treats as an extension.
-   - The existing `assignScriptAccess` already handles `access_type: 'subscription'` + `subscription_expires_at` and writes verification details back to the assignment.
-4. Skip (with a warn log) any assignment missing `pine_id`/`tradingview_username` to avoid a failed TV call — the DB row is still extended.
-5. Wrap each TV call in try/catch (already done inside `triggerScriptAssignment`) so one failure doesn't block other assignments.
+### 1. New DB function (migration)
 
-### Notes / non-goals
-- No DB schema changes.
-- `customer.subscription.deleted` revocation flow is already correct — not touched.
-- `handleSubscriptionUpdate` (past_due / pause handling) is still a no-op; out of scope for this fix unless you want it included.
-- No new secrets needed.
+`get_all_creators_with_stats()` — admin-only, SECURITY DEFINER, `SET search_path = public`.
 
-### Files changed
-- `supabase/functions/stripe-webhook/index.ts` — modify `handleInvoicePaid` only.
+Returns the same columns as `get_featured_creators_with_stats` but for any profile matching:
+- has at least one row in `programs` (any status), OR
+- has `stripe_account_id IS NOT NULL`, OR
+- `is_featured = true`
+
+Ordered by `is_featured DESC, featured_priority DESC, created_at DESC`.
+
+Raises if caller is not admin (`has_role(auth.uid(), 'admin')`).
+
+### 2. `src/components/AdminFeaturedCreators.tsx`
+
+- Replace the `from('profiles').eq('role', 'seller')` query in `fetchAllCreators` with `supabase.rpc('get_all_creators_with_stats')`.
+- Drop the manual stats defaulting (RPC already returns real stats).
+- Show a friendly empty state if no creators exist yet.
+
+No other files affected. No Stripe or RLS changes needed.
