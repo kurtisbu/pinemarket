@@ -1355,6 +1355,28 @@ export type Database = {
         Args: never
         Returns: undefined
       }
+      get_all_creators_with_stats: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          avg_rating: number
+          bio: string
+          created_at: string
+          custom_platform_fee_percent: number
+          display_name: string
+          featured_at: string
+          featured_description: string
+          featured_priority: number
+          id: string
+          is_featured: boolean
+          is_tradingview_connected: boolean
+          role: string
+          total_programs: number
+          total_revenue: number
+          total_sales: number
+          username: string
+        }[]
+      }
       get_featured_creators_with_stats: {
         Args: never
         Returns: {

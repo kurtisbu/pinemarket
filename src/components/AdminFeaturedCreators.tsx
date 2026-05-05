@@ -62,24 +62,9 @@ const AdminFeaturedCreators = () => {
 
   const fetchAllCreators = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, username, display_name, avatar_url, bio, role, is_featured, featured_at, featured_priority, featured_description, custom_platform_fee_percent')
-        .eq('role', 'seller')
-        .order('created_at', { ascending: false });
-
+      const { data, error } = await supabase.rpc('get_all_creators_with_stats');
       if (error) throw error;
-      
-      // Transform data to match Creator interface with default stats
-      const transformedData: Creator[] = (data || []).map(profile => ({
-        ...profile,
-        total_programs: 0,
-        avg_rating: 0,
-        total_sales: 0,
-        total_revenue: 0,
-      }));
-      
-      setAllCreators(transformedData);
+      setAllCreators((data as Creator[]) || []);
     } catch (error) {
       console.error('Error fetching all creators:', error);
     } finally {
@@ -358,9 +343,15 @@ const AdminFeaturedCreators = () => {
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
-          {allCreators.map((creator) => (
-            <CreatorStatsCard key={creator.id} creator={creator} />
-          ))}
+          {allCreators.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              No creators yet. Profiles appear here once they publish a program, connect Stripe, or get featured.
+            </p>
+          ) : (
+            allCreators.map((creator) => (
+              <CreatorStatsCard key={creator.id} creator={creator} />
+            ))
+          )}
         </CardContent>
       </Card>
     </div>
