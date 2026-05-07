@@ -14,6 +14,7 @@ interface SellScriptFormProps {
     category: string;
     tags: string[];
     tradingview_publication_url: string;
+    demo_video_url: string;
     offer_trial: boolean;
     trial_period_days: number;
   };
