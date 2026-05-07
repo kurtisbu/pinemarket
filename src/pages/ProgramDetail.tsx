@@ -11,6 +11,7 @@ import ImageGallery from '@/components/ImageGallery';
 import ProgramHeader from '@/components/ProgramDetail/ProgramHeader';
 import ProgramDescription from '@/components/ProgramDetail/ProgramDescription';
 import ProgramSidebar from '@/components/ProgramDetail/ProgramSidebar';
+import DemoVideo from '@/components/ProgramDetail/DemoVideo';
 import UserRatingSection from '@/components/UserRatingSection';
 import RatingsList from '@/components/RatingsList';
 import ProfileCompletionBanner from '@/components/ProfileCompletionBanner';
@@ -187,6 +188,7 @@ const ProgramDetail = () => {
           <div className="lg:col-span-2 space-y-6">
             <ImageGallery images={program.image_urls || []} />
             <ProgramHeader program={program} />
+            <DemoVideo url={(program as any).demo_video_url} />
             {program.tradingview_publication_url && (
               <Button
                 asChild

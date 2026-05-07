@@ -36,6 +36,7 @@ const EditProgram = () => {
     tags: [] as string[],
     status: 'draft',
     tradingview_publication_url: '',
+    demo_video_url: '',
   });
 
   const categories = ['Indicator', 'Strategy', 'Utility', 'Screener', 'Library', 'Educational'];
@@ -65,6 +66,7 @@ const EditProgram = () => {
         tags: data.tags || [],
         status: data.status,
         tradingview_publication_url: data.tradingview_publication_url || '',
+        demo_video_url: (data as any).demo_video_url || '',
       });
       setExistingImageUrls(data.image_urls || []);
 
@@ -169,6 +171,7 @@ const EditProgram = () => {
         tags: formData.tags,
         image_urls: [...existingImageUrls, ...newImageUrls],
         tradingview_publication_url: formData.tradingview_publication_url?.trim() || null,
+        demo_video_url: formData.demo_video_url?.trim() || null,
       };
 
       const { error } = await supabase.from('programs').update(updateData).eq('id', id);
@@ -261,6 +264,12 @@ const EditProgram = () => {
                 <div className="space-y-2">
                   <Label htmlFor="tradingview_publication_url">TradingView Publication Link (Optional)</Label>
                   <Input id="tradingview_publication_url" type="url" value={formData.tradingview_publication_url} onChange={(e) => handleInputChange('tradingview_publication_url', e.target.value)} placeholder="https://www.tradingview.com/script/..." />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="demo_video_url">Demo Video URL (Optional)</Label>
+                  <Input id="demo_video_url" type="url" value={formData.demo_video_url} onChange={(e) => handleInputChange('demo_video_url', e.target.value)} placeholder="https://youtube.com/watch?v=... or vimeo.com/... or loom.com/share/..." />
+                  <p className="text-sm text-muted-foreground">Embed a YouTube, Vimeo, or Loom video to showcase a live demo.</p>
                 </div>
 
                 <div className="space-y-2">
