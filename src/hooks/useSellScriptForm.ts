@@ -29,6 +29,7 @@ export const useSellScriptForm = () => {
     category: '',
     tags: [] as string[],
     tradingview_publication_url: '',
+    demo_video_url: '',
     offer_trial: false,
     trial_period_days: 7,
   });
@@ -228,6 +229,7 @@ export const useSellScriptForm = () => {
         script_file_path: scriptPath,
         tradingview_publication_url: formData.tradingview_publication_url?.trim() || null,
         tradingview_script_id: null, // Now using program_scripts junction table
+        demo_video_url: formData.demo_video_url?.trim() || null,
         pricing_model: 'flexible',
         price: 0,
         trial_period_days: formData.offer_trial ? formData.trial_period_days : 0

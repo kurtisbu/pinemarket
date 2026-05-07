@@ -453,6 +453,7 @@ export type Database = {
           billing_interval: string | null
           category: string
           created_at: string
+          demo_video_url: string | null
           description: string
           download_count: number
           id: string
@@ -483,6 +484,7 @@ export type Database = {
           billing_interval?: string | null
           category: string
           created_at?: string
+          demo_video_url?: string | null
           description: string
           download_count?: number
           id?: string
@@ -513,6 +515,7 @@ export type Database = {
           billing_interval?: string | null
           category?: string
           created_at?: string
+          demo_video_url?: string | null
           description?: string
           download_count?: number
           id?: string

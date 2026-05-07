@@ -13,6 +13,7 @@ interface ProgramBasicFormProps {
     trial_period_days: number;
     offer_trial: boolean;
     tradingview_publication_url: string;
+    demo_video_url: string;
   };
   onInputChange: (field: string, value: string | number | boolean) => void;
   categories: string[];
@@ -109,6 +110,20 @@ const ProgramBasicForm: React.FC<ProgramBasicFormProps> = ({
         />
         <p className="text-sm text-muted-foreground">
           Link to your official TradingView script publication so users can view the interactive chart.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="demo_video_url">Demo Video URL (Optional)</Label>
+        <Input
+          id="demo_video_url"
+          type="url"
+          value={formData.demo_video_url}
+          onChange={(e) => onInputChange('demo_video_url', e.target.value)}
+          placeholder="https://youtube.com/watch?v=... or vimeo.com/... or loom.com/share/..."
+        />
+        <p className="text-sm text-muted-foreground">
+          Embed a YouTube, Vimeo, or Loom video on your product page to showcase a live demo.
         </p>
       </div>
     </>
