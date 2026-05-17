@@ -50,6 +50,7 @@ const Footer = () => {
               <li><button onClick={() => navigate('/auth')} className="hover:text-foreground transition-colors">Sign In</button></li>
               <li><button onClick={() => navigate('/my-purchases')} className="hover:text-foreground transition-colors">My Purchases</button></li>
               <li><button onClick={() => navigate('/settings/profile')} className="hover:text-foreground transition-colors">Profile Settings</button></li>
+              <li><button onClick={() => navigate('/support')} className="hover:text-foreground transition-colors">Contact Support</button></li>
             </ul>
           </div>
         </div>

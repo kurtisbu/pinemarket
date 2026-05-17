@@ -23,6 +23,9 @@ import CreatePackage from "./pages/CreatePackage";
 import ResetPassword from "./pages/ResetPassword";
 import Interest from "./pages/Interest";
 import NotFound from "./pages/NotFound";
+import SupportList from "./pages/support/SupportList";
+import SupportNew from "./pages/support/SupportNew";
+import SupportThread from "./pages/support/SupportThread";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +40,11 @@ const App = () => (
           <Route path="/interest" element={<Interest />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+
+          {/* Support — public new-ticket form, auth-gated thread views */}
+          <Route path="/support/new" element={<SupportNew />} />
+          <Route path="/support" element={<AdminRoute><SupportList /></AdminRoute>} />
+          <Route path="/support/:id" element={<AdminRoute><SupportThread /></AdminRoute>} />
 
           {/* Admin-only routes */}
           <Route path="/" element={<AdminRoute><Index /></AdminRoute>} />

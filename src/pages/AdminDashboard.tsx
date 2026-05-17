@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import Header from '@/components/Header';
-import { Shield, Users, BarChart3, AlertTriangle, Clock, Star, DollarSign, FlaskConical } from 'lucide-react';
+import { Shield, Users, BarChart3, AlertTriangle, Clock, Star, DollarSign, FlaskConical, LifeBuoy } from 'lucide-react';
 import AdminScriptAssignments from '@/components/AdminScriptAssignments';
 import SecurityAuditDashboard from '@/components/SecurityAuditDashboard';
 import AdminTrialManagement from '@/components/AdminTrialManagement';
@@ -15,6 +15,7 @@ import AdminAccessCodes from '@/components/AdminAccessCodes';
 import AdminFeaturedCreators from '@/components/AdminFeaturedCreators';
 import AdminPayoutDashboard from '@/components/AdminPayoutDashboard';
 import AdminTestData from '@/components/AdminTestData';
+import AdminSupportTickets from '@/components/support/AdminSupportTickets';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -124,8 +125,12 @@ const AdminDashboard = () => {
             </p>
           </div>
 
-          <Tabs defaultValue="assignments" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-7">
+          <Tabs defaultValue="support" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-8">
+              <TabsTrigger value="support" className="flex items-center gap-2">
+                <LifeBuoy className="w-4 h-4" />
+                Support
+              </TabsTrigger>
               <TabsTrigger value="assignments" className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4" />
                 Assignments
@@ -155,6 +160,10 @@ const AdminDashboard = () => {
                 Test Data
               </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="support" className="space-y-6">
+              <AdminSupportTickets />
+            </TabsContent>
 
             <TabsContent value="assignments" className="space-y-6">
               <AdminScriptAssignments />
