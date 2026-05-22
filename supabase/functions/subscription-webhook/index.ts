@@ -18,10 +18,12 @@ serve(async (req) => {
 
   let event;
   try {
-    event = stripe.webhooks.constructEvent(
+    event = await stripe.webhooks.constructEventAsync(
       body,
       signature!,
-      Deno.env.get("STRIPE_WEBHOOK_SECRET") || ""
+      Deno.env.get("STRIPE_WEBHOOK_SECRET") || "",
+      undefined,
+      Stripe.createSubtleCryptoProvider()
     );
   } catch (err) {
     console.error("Webhook signature verification failed:", err.message);
