@@ -18,9 +18,6 @@ verify_jwt = true
 [functions.trial-cleanup]
 verify_jwt = false
 
-[functions.subscription-webhook]
-verify_jwt = false
-
 [functions.create-program-prices]
 verify_jwt = true
 
