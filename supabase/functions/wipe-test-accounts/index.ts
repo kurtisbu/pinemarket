@@ -11,17 +11,26 @@ const BUCKETS = ['avatars', 'program-media', 'pine-scripts', 'scripts']
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const secret = req.headers.get('x-cron-secret')
-  if (!secret || secret !== Deno.env.get('CRON_SECRET')) {
-    return new Response(JSON.stringify({ error: 'unauthorized' }), {
-      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
-
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   )
+
+  // Authorize: either CRON_SECRET header OR a JWT belonging to the admin user
+  const secret = req.headers.get('x-cron-secret')
+  let authorized = !!secret && secret === Deno.env.get('CRON_SECRET')
+  if (!authorized) {
+    const auth = req.headers.get('Authorization')?.replace('Bearer ', '')
+    if (auth) {
+      const { data: userData } = await supabase.auth.getUser(auth)
+      if (userData?.user?.id === ADMIN_ID) authorized = true
+    }
+  }
+  if (!authorized) {
+    return new Response(JSON.stringify({ error: 'unauthorized' }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
 
   const result: Record<string, unknown> = { deleted_users: [], storage_deleted: {}, errors: [] }
 
