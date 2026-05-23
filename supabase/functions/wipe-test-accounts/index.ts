@@ -16,17 +16,9 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   )
 
-  // Authorize: either CRON_SECRET header OR a JWT belonging to the admin user
+  // Authorize via CRON_SECRET header only (admin must call from server/curl with the secret)
   const secret = req.headers.get('x-cron-secret')
-  let authorized = !!secret && secret === Deno.env.get('CRON_SECRET')
-  if (!authorized) {
-    const auth = req.headers.get('Authorization')?.replace('Bearer ', '')
-    if (auth) {
-      const { data: userData } = await supabase.auth.getUser(auth)
-      if (userData?.user?.id === ADMIN_ID) authorized = true
-    }
-  }
-  if (!authorized) {
+  if (!secret || secret !== Deno.env.get('CRON_SECRET')) {
     return new Response(JSON.stringify({ error: 'unauthorized' }), {
       status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
