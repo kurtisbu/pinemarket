@@ -21,9 +21,22 @@ Deno.serve(async (req) => {
   let authorized = !!secret && secret === Deno.env.get('CRON_SECRET')
   if (!authorized) {
     const auth = req.headers.get('Authorization')?.replace('Bearer ', '')
+    console.log('auth header present:', !!auth, 'len:', auth?.length)
     if (auth) {
       const { data: userData } = await supabase.auth.getUser(auth)
-      if (userData?.user?.id === ADMIN_ID) authorized = true
+      console.log('resolved user:', userData?.user?.id, userData?.user?.email)
+      if (userData?.user?.id === ADMIN_ID) {
+        authorized = true
+      } else if (userData?.user?.id) {
+        // fallback: check admin role in DB
+        const { data: roleRow } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userData.user.id)
+          .eq('role', 'admin')
+          .maybeSingle()
+        if (roleRow) authorized = true
+      }
     }
   }
   if (!authorized) {
