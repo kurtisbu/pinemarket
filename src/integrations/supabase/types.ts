@@ -1536,6 +1536,23 @@ export type Database = {
           username: string
         }[]
       }
+      get_safe_profile_by_username: {
+        Args: { _username: string }
+        Returns: {
+          avatar_url: string
+          bio: string
+          created_at: string
+          display_name: string
+          featured_at: string
+          featured_description: string
+          featured_priority: number
+          id: string
+          is_featured: boolean
+          is_tradingview_connected: boolean
+          role: string
+          username: string
+        }[]
+      }
       get_script_download_url: {
         Args: { program_id_param: string }
         Returns: string
