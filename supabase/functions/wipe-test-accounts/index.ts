@@ -16,8 +16,13 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   )
 
-  // ONE-OFF: auth disabled for initial wipe. Re-enable after run.
-  console.log('WIPE: starting unauthenticated one-off run')
+  // Authorize via CRON_SECRET header only (admin must call from server/curl with the secret)
+  const secret = req.headers.get('x-cron-secret')
+  if (!secret || secret !== Deno.env.get('CRON_SECRET')) {
+    return new Response(JSON.stringify({ error: 'unauthorized' }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
 
   const result: Record<string, unknown> = { deleted_users: [], storage_deleted: {}, errors: [] }
 
