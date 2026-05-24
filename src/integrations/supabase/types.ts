@@ -1447,6 +1447,7 @@ export type Database = {
         Args: never
         Returns: undefined
       }
+      generate_unique_username: { Args: { _seed: string }; Returns: string }
       get_all_creators_with_stats: {
         Args: never
         Returns: {

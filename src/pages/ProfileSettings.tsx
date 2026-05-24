@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import Header from '@/components/Header';
 import ProfileBasicInfo from '@/components/ProfileBasicInfo';
 import TradingViewUsernameField from '@/components/TradingViewUsernameField';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import Footer from '@/components/Footer';
 
 interface Profile {
@@ -30,6 +32,7 @@ const ProfileSettings = () => {
   const [uploading, setUploading] = useState(false);
 
   const [formData, setFormData] = useState({
+    username: '',
     display_name: '',
     bio: '',
     avatar_url: '',
@@ -58,6 +61,7 @@ const ProfileSettings = () => {
       
       setProfile(data);
       setFormData({
+        username: data.username || '',
         display_name: data.display_name || '',
         bio: data.bio || '',
         avatar_url: data.avatar_url || '',
@@ -120,9 +124,25 @@ const ProfileSettings = () => {
 
     setSaving(true);
     try {
+      const cleanedUsername = formData.username
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, '');
+
+      if (cleanedUsername.length < 3) {
+        toast({
+          title: 'Invalid username',
+          description: 'Username must be at least 3 characters (letters, numbers, underscore).',
+          variant: 'destructive',
+        });
+        setSaving(false);
+        return;
+      }
+
       const { error } = await supabase
         .from('profiles')
         .update({
+          username: cleanedUsername,
           display_name: formData.display_name,
           bio: formData.bio,
           avatar_url: formData.avatar_url,
@@ -130,7 +150,12 @@ const ProfileSettings = () => {
         })
         .eq('id', user.id);
 
-      if (error) throw error;
+      if (error) {
+        if ((error as any).code === '23505') {
+          throw new Error('That username is already taken.');
+        }
+        throw error;
+      }
 
       toast({
         title: 'Success',
@@ -189,6 +214,19 @@ const ProfileSettings = () => {
             onAvatarUpload={handleAvatarUpload}
             uploading={uploading}
           />
+
+          <div className="space-y-2">
+            <Label htmlFor="username">Username</Label>
+            <Input
+              id="username"
+              value={formData.username}
+              onChange={(e) => handleInputChange('username', e.target.value)}
+              placeholder="your-username"
+            />
+            <p className="text-xs text-muted-foreground">
+              Used in your public profile URL: /profile/{formData.username || 'your-username'}
+            </p>
+          </div>
 
           <TradingViewUsernameField
             value={formData.tradingview_username}
