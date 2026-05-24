@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Card } from '@/components/ui/card';
-import { Package, ExternalLink } from 'lucide-react';
+import { Package, ExternalLink, LineChart } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 const isValidPublicationUrl = (url: string | null | undefined): boolean => {
@@ -88,36 +88,48 @@ const ProgramDescription: React.FC<ProgramDescriptionProps> = ({ description, ta
 
       {includedScripts.length > 0 && (
         <div className="mt-6">
-          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <Package className="w-5 h-5" />
-            Included Scripts ({includedScripts.length})
-          </h3>
-          <div className="grid gap-3">
-            {includedScripts.map(script => (
-              <Card key={script.id} className="p-3 flex items-center gap-3">
-                {script.image_url && (
-                  <img
-                    src={script.image_url}
-                    alt={script.title}
-                    className="w-16 h-10 object-cover rounded"
-                  />
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">{script.title}</p>
-                </div>
-                {isValidPublicationUrl(script.publication_url) && (
-                  <a
-                    href={script.publication_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline text-sm flex items-center gap-1"
-                  >
-                    View
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                )}
-              </Card>
-            ))}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Package className="w-5 h-5 text-primary" />
+              Included Scripts
+            </h3>
+            <Badge variant="secondary" className="text-xs">
+              {includedScripts.length} {includedScripts.length === 1 ? 'script' : 'scripts'}
+            </Badge>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {includedScripts.map(script => {
+              const hasLink = isValidPublicationUrl(script.publication_url);
+              const Wrapper: any = hasLink ? 'a' : 'div';
+              const wrapperProps = hasLink
+                ? {
+                    href: script.publication_url,
+                    target: '_blank',
+                    rel: 'noopener noreferrer',
+                  }
+                : {};
+              return (
+                <Wrapper
+                  key={script.id}
+                  {...wrapperProps}
+                  className={`group flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5 transition-all ${
+                    hasLink
+                      ? 'hover:border-primary/40 hover:bg-primary/5 cursor-pointer'
+                      : ''
+                  }`}
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <LineChart className="w-4 h-4" />
+                  </div>
+                  <p className="flex-1 min-w-0 truncate text-sm font-medium">
+                    {script.title}
+                  </p>
+                  {hasLink && (
+                    <ExternalLink className="w-3.5 h-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                  )}
+                </Wrapper>
+              );
+            })}
           </div>
         </div>
       )}
