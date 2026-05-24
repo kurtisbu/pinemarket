@@ -29,6 +29,7 @@ interface Program {
   pricing_model: string;
   monthly_price?: number;
   yearly_price?: number;
+  program_prices?: Array<{ amount: number; is_active: boolean; price_type: string; interval: string | null }>;
 }
 
 const SellerProgramsView: React.FC = () => {
@@ -52,7 +53,7 @@ const SellerProgramsView: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('programs')
-        .select('*')
+        .select('*, program_prices(amount, is_active, price_type, interval)')
         .eq('seller_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -97,6 +98,18 @@ const SellerProgramsView: React.FC = () => {
         variant: 'destructive',
       });
     }
+  };
+
+  const getDisplayPrice = (program: Program): string => {
+    const active = (program.program_prices || []).filter(p => p.is_active && Number(p.amount) > 0);
+    if (active.length > 0) {
+      const lowest = Math.min(...active.map(p => Number(p.amount)));
+      return `From $${lowest}`;
+    }
+    if (program.monthly_price && program.monthly_price > 0) return `From $${program.monthly_price}/mo`;
+    if (program.yearly_price && program.yearly_price > 0) return `From $${program.yearly_price}/yr`;
+    if (program.price && program.price > 0) return `$${program.price}`;
+    return 'No price set';
   };
 
   const filteredPrograms = programs.filter(program => 
@@ -170,7 +183,7 @@ const SellerProgramsView: React.FC = () => {
                   <div className="flex-1">
                     <CardTitle className="text-lg">{program.title}</CardTitle>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {program.category} • ${program.price}
+                      {program.category} • {getDisplayPrice(program)}
                     </p>
                   </div>
                   <DropdownMenu>
