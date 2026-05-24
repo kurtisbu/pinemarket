@@ -1448,6 +1448,19 @@ export type Database = {
         Returns: undefined
       }
       generate_unique_username: { Args: { _seed: string }; Returns: string }
+      get_admin_activity_feed: {
+        Args: { p_limit?: number }
+        Returns: {
+          display_name: string
+          event_at: string
+          event_type: string
+          metadata: Json
+          resource_id: string
+          resource_title: string
+          user_id: string
+          username: string
+        }[]
+      }
       get_all_creators_with_stats: {
         Args: never
         Returns: {
