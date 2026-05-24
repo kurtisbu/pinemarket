@@ -10,6 +10,7 @@ import { Upload, User } from 'lucide-react';
 
 interface ProfileBasicInfoProps {
   formData: {
+    username: string;
     display_name: string;
     bio: string;
     avatar_url: string;
@@ -64,6 +65,19 @@ const ProfileBasicInfo: React.FC<ProfileBasicInfoProps> = ({
             onChange={(e) => onInputChange('display_name', e.target.value)}
             placeholder="Your display name"
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="username">Username (profile URL slug)</Label>
+          <Input
+            id="username"
+            value={formData.username}
+            onChange={(e) => onInputChange('username', e.target.value)}
+            placeholder="your-username"
+          />
+          <p className="text-xs text-muted-foreground">
+            Your public profile: /profile/{formData.username || 'your-username'}
+          </p>
         </div>
 
         <div className="space-y-2">
