@@ -1,54 +1,41 @@
-# Support Ticket System
+# Seller Onboarding via Invite Link
 
-Build an in-app ticketing system so users can submit support requests from a footer link, with email notifications to `capitalcodersllc@gmail.com` and a full admin reply interface.
+## Goal
+You send each new seller two things:
+1. A link to `https://pinemarket.io/auth`
+2. Their founder access code
 
-## What we'll build
+They sign up, verify email, get auto-routed into the seller onboarding flow, paste the access code, and are off to the races. No other gating changes, site stays closed to the public via `/interest`.
 
-### 1. Database
-New tables:
-- **`support_tickets`** — subject, message, category (Billing / TradingView Access / Bug Report / Account / Other), status (open / in_progress / waiting_user / resolved / closed), priority, user_id (nullable so guests can submit), email, related_purchase_id, created_at, updated_at, last_message_at.
-- **`support_ticket_messages`** — ticket_id, author_id, author_type (user / admin), body, is_internal_note, created_at, attachments[].
+## What works today
+- `/auth` is already a public route — no gate change needed.
+- `/auth` signup form already has a "I want to sell Pine Scripts" checkbox that sets `localStorage.pendingSellerOnboarding = 'true'`.
+- `AuthContext` already watches for `SIGNED_IN` and redirects to `/seller/onboarding` when that flag is set.
+- `SellerOnboarding` already validates the access code via `AccessCodeStep`.
 
-RLS:
-- Users can view/create their own tickets and messages.
-- Admins (`has_role(... 'admin')`) can view and reply to all.
-- Guests can insert a ticket if they provide an email.
+## What's missing / what to change
 
-### 2. Email infrastructure (Lovable Emails)
-- Set up a sender domain (notify.pinemarket.io) via the email setup dialog.
-- Two transactional emails:
-  - **New ticket → admin** (`capitalcodersllc@gmail.com`) with ticket details + deep link.
-  - **Reply notification → user** when an admin responds.
-- Uses the queued `send-transactional-email` function.
+### 1. Make the "I want to sell" checkbox more prominent on signup
+Right now it's a small checkbox at the bottom of the signup form. Sellers coming from your invite email may miss it, and if unchecked they land on `/` (the buyer home) after verifying.
 
-### 3. User-facing pages
-- **`/support`** — list of the current user's tickets + "New ticket" button. Guests see only the new-ticket form.
-- **`/support/new`** — form: subject, category, message, (optional) related purchase dropdown. If logged out, also email + name fields.
-- **`/support/:ticketId`** — thread view: messages chronologically, reply box, status badge, "Mark resolved" button.
+Change: On `/auth`, if the URL has `?sell=1`, pre-check the "I want to sell" box and show a small banner at the top ("You've been invited to sell on PineMarket — finish signup to continue setup"). You then send invitees `https://pinemarket.io/auth?sell=1` instead of plain `/auth`.
 
-### 4. Admin dashboard
-- New tab in `/admin` → **Support Tickets**: filterable list (status, category, priority), open ticket → same thread view with admin reply box, status changer, internal-notes toggle, assign-priority control.
+### 2. Also set the pendingSellerOnboarding flag for already-signed-up sellers who land on /auth?sell=1
+Edge case: if someone already has an account and visits `/auth?sell=1`, signing in should also route them to `/seller/onboarding` (not `/`). Add the same `pendingSellerOnboarding` flag-set on the sign-in path when `?sell=1` is present.
 
-### 5. Entry points
-- Add **Contact Support** link to `Footer.tsx` under a new "Support" column (or in the Account column).
-- Auto-link from purchase rows in `/my-purchases` ("Need help with this order?") that pre-fills the related purchase.
+### 3. (Optional polish) Show the access code on the onboarding page if passed via URL
+If you want to skip even the copy/paste step, support `/auth?sell=1&code=ABC123` — stash the code in localStorage at signup, and `AccessCodeStep` reads + pre-fills it. This is nice-to-have, not required.
 
-### 6. Polish
-- Validation with zod (subject 1–200, message 1–5000, email format).
-- Empty state: "No tickets yet — questions are welcome."
-- Toast confirmations on submit/reply.
-- SEO: `<title>Support – PineMarket</title>`, single H1.
+## Files touched
+- `src/pages/Auth.tsx` — read `?sell=1` query param, pre-check `wantsToSell`, show invite banner, set `pendingSellerOnboarding` on sign-in too when flag present.
+- `src/components/SellerOnboarding/AccessCodeStep.tsx` — (only if doing #3) pre-fill code from localStorage.
 
-## Technical notes
+No database changes. No new routes. No changes to `/interest` gating.
 
-- All ticket/message writes go through RLS; admin replies use the existing `has_role` pattern.
-- Email send is non-blocking: insert ticket → call `send-transactional-email` edge function → return success even if email queueing is slow (queue handles retries).
-- Reuse existing shadcn components (Card, Badge, Textarea, Select, Tabs) and design tokens — no new colors.
-- No third-party chat widget; entirely self-hosted to keep data in your DB.
+## Your onboarding workflow after this ships
+1. Create an access code in Admin → Access Codes for the new seller.
+2. Email them: "Sign up here: `https://pinemarket.io/auth?sell=1` — use access code `XXXX` when prompted."
+3. They sign up → verify email → land on seller onboarding → paste code → connect Stripe + TradingView → start uploading.
 
-## Out of scope (can add later)
-
-- File attachments on tickets (would need a `support-attachments` storage bucket).
-- SLA timers / auto-close after N days.
-- Canned responses / macros.
-- Public knowledge-base / FAQ pages.
+## When you're ready to open the site publicly
+Remove the `AdminRoute` wrappers in `App.tsx` (or repurpose the component). The `/interest` route can stay as a marketing fallback or be deleted.

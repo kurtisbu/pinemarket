@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
@@ -10,12 +10,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { Mail, Chrome } from 'lucide-react';
 
 const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const [searchParams] = useSearchParams();
+  const isSellInvite = searchParams.get('sell') === '1';
+  const [isLogin, setIsLogin] = useState(!isSellInvite);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [tradingviewUsername, setTradingviewUsername] = useState('');
   const [loading, setLoading] = useState(false);
-  const [wantsToSell, setWantsToSell] = useState(false);
+  const [wantsToSell, setWantsToSell] = useState(isSellInvite);
   const [forgotPassword, setForgotPassword] = useState(false);
   
   const { signIn, signUp, signInWithProvider, user } = useAuth();
@@ -75,6 +77,9 @@ const Auth = () => {
 
     try {
       if (isLogin) {
+        if (isSellInvite) {
+          localStorage.setItem('pendingSellerOnboarding', 'true');
+        }
         const { error } = await signIn(email, password);
         if (error) {
           toast({
