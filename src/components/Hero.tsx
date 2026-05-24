@@ -1,10 +1,32 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { TrendingUp, Shield, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 const Hero = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [isTvConnected, setIsTvConnected] = useState(false);
+
+  useEffect(() => {
+    if (!user) {
+      setIsTvConnected(false);
+      return;
+    }
+    supabase
+      .from('profiles')
+      .select('is_tradingview_connected')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => setIsTvConnected(!!data?.is_tradingview_connected));
+  }, [user]);
+
+  const handleStartSelling = () => {
+    if (!user) return navigate('/auth');
+    navigate(isTvConnected ? '/sell-script' : '/seller/onboarding');
+  };
 
   return (
     <section className="relative bg-gradient-to-br from-background via-background to-muted py-20">
@@ -21,8 +43,8 @@ const Hero = () => {
             <Button size="lg" className="bg-gradient-to-r from-primary to-accent-foreground text-primary-foreground hover:opacity-90" onClick={() => navigate('/browse')}>
               Browse Scripts
             </Button>
-            <Button size="lg" variant="outline" onClick={() => navigate('/seller/onboarding')}>
-              Start Selling
+            <Button size="lg" variant="outline" onClick={handleStartSelling}>
+              {isTvConnected ? 'Sell Your Script' : 'Start Selling'}
             </Button>
           </div>
           
