@@ -7,7 +7,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import Header from '@/components/Header';
-import { Shield, Users, BarChart3, AlertTriangle, Clock, Star, DollarSign, FlaskConical, LifeBuoy } from 'lucide-react';
+import { Shield, Users, BarChart3, AlertTriangle, Clock, Star, DollarSign, FlaskConical, LifeBuoy, Activity } from 'lucide-react';
+import AdminActivityFeed from '@/components/AdminActivityFeed';
 import AdminScriptAssignments from '@/components/AdminScriptAssignments';
 import SecurityAuditDashboard from '@/components/SecurityAuditDashboard';
 import AdminTrialManagement from '@/components/AdminTrialManagement';
@@ -125,8 +126,12 @@ const AdminDashboard = () => {
             </p>
           </div>
 
-          <Tabs defaultValue="support" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-8">
+          <Tabs defaultValue="activity" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-9">
+              <TabsTrigger value="activity" className="flex items-center gap-2">
+                <Activity className="w-4 h-4" />
+                Activity
+              </TabsTrigger>
               <TabsTrigger value="support" className="flex items-center gap-2">
                 <LifeBuoy className="w-4 h-4" />
                 Support
@@ -160,6 +165,10 @@ const AdminDashboard = () => {
                 Test Data
               </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="activity" className="space-y-6">
+              <AdminActivityFeed />
+            </TabsContent>
 
             <TabsContent value="support" className="space-y-6">
               <AdminSupportTickets />
