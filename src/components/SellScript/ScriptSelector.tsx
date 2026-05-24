@@ -243,21 +243,15 @@ const ScriptSelector: React.FC<ScriptSelectorProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {scripts.map(script => {
               const isSelected = selectedScripts.includes(script.id);
+              const checkboxId = `script-${script.id}`;
               return (
                 <Card
                   key={script.id}
-                  className={`relative cursor-pointer transition-all hover:shadow-md ${
+                  className={`relative transition-all ${
                     isSelected
                       ? 'ring-2 ring-primary bg-primary/5'
                       : 'hover:bg-muted/50'
                   }`}
-                  onClick={(e) => {
-                    // Prevent double-toggle when clicking checkbox directly
-                    if ((e.target as HTMLElement).closest('button[role="checkbox"]')) {
-                      return;
-                    }
-                    toggleScript(script.id);
-                  }}
                 >
                   <div className="p-4">
                     {script.image_url && (
@@ -272,12 +266,15 @@ const ScriptSelector: React.FC<ScriptSelectorProps> = ({
                     
                     <div className="flex items-start gap-3">
                       <Checkbox
+                        id={checkboxId}
                         checked={isSelected}
                         onCheckedChange={() => toggleScript(script.id)}
                         className="mt-1"
-                        onClick={(e) => e.stopPropagation()}
                       />
-                      <div className="flex-1 min-w-0">
+                      <label
+                        htmlFor={checkboxId}
+                        className="flex-1 min-w-0 cursor-pointer"
+                      >
                         <h4 className="font-medium text-sm line-clamp-2">
                           {script.title}
                         </h4>
@@ -286,7 +283,7 @@ const ScriptSelector: React.FC<ScriptSelectorProps> = ({
                             {script.pine_id.replace('PUB;', '').slice(0, 12)}...
                           </p>
                         )}
-                      </div>
+                      </label>
                     </div>
 
                     {isSelected && (
@@ -298,7 +295,6 @@ const ScriptSelector: React.FC<ScriptSelectorProps> = ({
                     {isSelected && (
                       <div
                         className="mt-3 pt-3 border-t space-y-2"
-                        onClick={(e) => e.stopPropagation()}
                       >
                         <Label className="text-xs text-muted-foreground">
                           Publication link
@@ -311,7 +307,6 @@ const ScriptSelector: React.FC<ScriptSelectorProps> = ({
                               onChange={(e) => setEditingValue(e.target.value)}
                               placeholder="https://www.tradingview.com/script/..."
                               className="h-8 text-xs"
-                              onClick={(e) => e.stopPropagation()}
                             />
                             <Button
                               type="button"
@@ -319,10 +314,7 @@ const ScriptSelector: React.FC<ScriptSelectorProps> = ({
                               variant="ghost"
                               className="h-8 w-8 shrink-0"
                               disabled={savingId === script.id}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                savePublicationUrl(script.id);
-                              }}
+                              onClick={() => savePublicationUrl(script.id)}
                             >
                               <Save className="w-3 h-3" />
                             </Button>
@@ -331,10 +323,7 @@ const ScriptSelector: React.FC<ScriptSelectorProps> = ({
                               size="icon"
                               variant="ghost"
                               className="h-8 w-8 shrink-0"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                cancelEditing();
-                              }}
+                              onClick={cancelEditing}
                             >
                               <X className="w-3 h-3" />
                             </Button>
@@ -351,7 +340,6 @@ const ScriptSelector: React.FC<ScriptSelectorProps> = ({
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-xs text-primary hover:underline flex-1 truncate flex items-center gap-1"
-                                onClick={(e) => e.stopPropagation()}
                               >
                                 <ExternalLink className="w-3 h-3 shrink-0" />
                                 <span className="truncate">{script.publication_url}</span>
@@ -362,10 +350,7 @@ const ScriptSelector: React.FC<ScriptSelectorProps> = ({
                               size="icon"
                               variant="ghost"
                               className="h-7 w-7 shrink-0"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                startEditing(script);
-                              }}
+                              onClick={() => startEditing(script)}
                             >
                               <Pencil className="w-3 h-3" />
                             </Button>
