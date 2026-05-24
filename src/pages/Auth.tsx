@@ -216,6 +216,15 @@ const Auth = () => {
           </p>
         </div>
 
+        {isSellInvite && (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-sm">
+            <p className="font-semibold mb-1">You've been invited to sell on PineMarket</p>
+            <p className="text-muted-foreground">
+              Finish signing up to continue to seller setup. You'll need the access code we sent you.
+            </p>
+          </div>
+        )}
+
         <Button
           variant="outline"
           className="w-full"
