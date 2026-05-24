@@ -33,10 +33,10 @@ const SellerOnboarding: React.FC<SellerOnboardingProps> = ({ onComplete }) => {
     { id: 0, title: 'Vendor Rules', description: 'TradingView requirements' },
     { id: 1, title: 'Access Code', description: 'Validate seller access' },
     { id: 2, title: 'Welcome', description: 'Get started as a seller' },
-    { id: 3, title: 'Payments', description: 'Connect Stripe to get paid' },
-    { id: 4, title: 'TradingView Setup', description: 'Connect your TradingView account' },
-    { id: 5, title: 'Get Cookies', description: 'Extract session cookies' },
-    { id: 6, title: 'Test Connection', description: 'Verify and sync scripts' },
+    { id: 3, title: 'TradingView Setup', description: 'Connect your TradingView account' },
+    { id: 4, title: 'Get Cookies', description: 'Extract session cookies' },
+    { id: 5, title: 'Test Connection', description: 'Verify and sync scripts' },
+    { id: 6, title: 'Payments', description: 'Connect Stripe to get paid' },
     { id: 7, title: 'Complete', description: 'Ready to sell!' },
   ];
 
@@ -96,7 +96,7 @@ const SellerOnboarding: React.FC<SellerOnboardingProps> = ({ onComplete }) => {
       });
 
       await handleSyncScripts();
-      setCurrentStep(7);
+      setCurrentStep(6);
     } catch (error: any) {
       toast({
         title: 'Connection Test Failed',
@@ -151,7 +151,9 @@ const SellerOnboarding: React.FC<SellerOnboardingProps> = ({ onComplete }) => {
 
       case 3:
         return (
-          <StripeSetupStep
+          <TradingViewSetupStep
+            username={formData.tradingview_username}
+            onUsernameChange={(value) => handleInputChange('tradingview_username', value)}
             onNext={() => setCurrentStep(4)}
             onBack={() => setCurrentStep(2)}
           />
@@ -159,9 +161,11 @@ const SellerOnboarding: React.FC<SellerOnboardingProps> = ({ onComplete }) => {
 
       case 4:
         return (
-          <TradingViewSetupStep
-            username={formData.tradingview_username}
-            onUsernameChange={(value) => handleInputChange('tradingview_username', value)}
+          <CookiesStep
+            sessionCookie={formData.tradingview_session_cookie}
+            signedSessionCookie={formData.tradingview_signed_session_cookie}
+            onSessionCookieChange={(value) => handleInputChange('tradingview_session_cookie', value)}
+            onSignedSessionCookieChange={(value) => handleInputChange('tradingview_signed_session_cookie', value)}
             onNext={() => setCurrentStep(5)}
             onBack={() => setCurrentStep(3)}
           />
@@ -169,22 +173,18 @@ const SellerOnboarding: React.FC<SellerOnboardingProps> = ({ onComplete }) => {
 
       case 5:
         return (
-          <CookiesStep
-            sessionCookie={formData.tradingview_session_cookie}
-            signedSessionCookie={formData.tradingview_signed_session_cookie}
-            onSessionCookieChange={(value) => handleInputChange('tradingview_session_cookie', value)}
-            onSignedSessionCookieChange={(value) => handleInputChange('tradingview_signed_session_cookie', value)}
-            onNext={() => setCurrentStep(6)}
+          <TestConnectionStep
+            username={formData.tradingview_username}
+            loading={loading}
+            onTestConnection={handleTestConnection}
             onBack={() => setCurrentStep(4)}
           />
         );
 
       case 6:
         return (
-          <TestConnectionStep
-            username={formData.tradingview_username}
-            loading={loading}
-            onTestConnection={handleTestConnection}
+          <StripeSetupStep
+            onNext={() => setCurrentStep(7)}
             onBack={() => setCurrentStep(5)}
           />
         );
