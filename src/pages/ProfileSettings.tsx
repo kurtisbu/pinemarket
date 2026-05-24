@@ -8,8 +8,6 @@ import { Button } from '@/components/ui/button';
 import Header from '@/components/Header';
 import ProfileBasicInfo from '@/components/ProfileBasicInfo';
 import TradingViewUsernameField from '@/components/TradingViewUsernameField';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import Footer from '@/components/Footer';
 
 interface Profile {
@@ -214,19 +212,6 @@ const ProfileSettings = () => {
             onAvatarUpload={handleAvatarUpload}
             uploading={uploading}
           />
-
-          <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
-            <Input
-              id="username"
-              value={formData.username}
-              onChange={(e) => handleInputChange('username', e.target.value)}
-              placeholder="your-username"
-            />
-            <p className="text-xs text-muted-foreground">
-              Used in your public profile URL: /profile/{formData.username || 'your-username'}
-            </p>
-          </div>
 
           <TradingViewUsernameField
             value={formData.tradingview_username}
