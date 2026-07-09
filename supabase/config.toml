@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.wipe-test-accounts]
 verify_jwt = false
+
+[functions.send-founding-seller-invite]
+verify_jwt = true
