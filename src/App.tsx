@@ -47,11 +47,14 @@ const App = () => (
           <Route path="/support/:id" element={<AdminRoute><SupportThread /></AdminRoute>} />
 
           {/* Admin-only routes */}
+          {/* Public seller stores + product pages so sellers can share links */}
+          <Route path="/profile/:username" element={<Profile />} />
+          <Route path="/program/:id" element={<ProgramDetail />} />
+
+          {/* Main marketplace still gated behind the interest form */}
           <Route path="/" element={<AdminRoute><Index /></AdminRoute>} />
           <Route path="/browse" element={<AdminRoute><Browse /></AdminRoute>} />
-          <Route path="/program/:id" element={<AdminRoute><ProgramDetail /></AdminRoute>} />
           <Route path="/create-package" element={<AdminRoute><CreatePackage /></AdminRoute>} />
-          <Route path="/profile/:username" element={<AdminRoute><Profile /></AdminRoute>} />
           <Route path="/settings/profile" element={<AdminRoute><ProfileSettings /></AdminRoute>} />
           <Route path="/dashboard" element={<AdminRoute><SellerDashboard /></AdminRoute>} />
           <Route path="/seller/onboarding" element={<AdminRoute><SellerOnboardingPage /></AdminRoute>} />
