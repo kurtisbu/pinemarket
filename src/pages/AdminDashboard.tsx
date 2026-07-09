@@ -13,6 +13,7 @@ import AdminScriptAssignments from '@/components/AdminScriptAssignments';
 import SecurityAuditDashboard from '@/components/SecurityAuditDashboard';
 import AdminTrialManagement from '@/components/AdminTrialManagement';
 import AdminAccessCodes from '@/components/AdminAccessCodes';
+import AdminFoundingSellerInvite from '@/components/AdminFoundingSellerInvite';
 import AdminFeaturedCreators from '@/components/AdminFeaturedCreators';
 import AdminPayoutDashboard from '@/components/AdminPayoutDashboard';
 import AdminTestData from '@/components/AdminTestData';
@@ -188,6 +189,7 @@ const AdminDashboard = () => {
 
             <TabsContent value="users" className="space-y-6">
               <AdminAccessCodes />
+              <AdminFoundingSellerInvite />
             </TabsContent>
 
             <TabsContent value="featured-creators" className="space-y-6">
