@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 const DISCORD_WEBHOOK_URL = Deno.env.get('DISCORD_SUPPORT_WEBHOOK_URL') || '';
-const ALERT_SECRET = Deno.env.get('CRON_SECRET') || '';
+const ALERT_SECRET = Deno.env.get('DISCORD_ALERT_SECRET') || '';
 const APP_URL = Deno.env.get('APP_URL') || 'https://pinemarket.io';
 
 type EventKind = 'signup' | 'seller_onboarded' | 'program_published';
