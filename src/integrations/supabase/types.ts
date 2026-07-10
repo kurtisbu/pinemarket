@@ -1615,6 +1615,34 @@ export type Database = {
           username: string
         }[]
       }
+      get_public_seller_info: {
+        Args: { _seller_id: string }
+        Returns: {
+          avatar_url: string
+          bio: string
+          default_discord_description: string
+          default_discord_invite_url: string
+          display_name: string
+          id: string
+          is_tradingview_connected: boolean
+          tradingview_username: string
+          username: string
+        }[]
+      }
+      get_public_sellers_info: {
+        Args: { _seller_ids: string[] }
+        Returns: {
+          avatar_url: string
+          bio: string
+          default_discord_description: string
+          default_discord_invite_url: string
+          display_name: string
+          id: string
+          is_tradingview_connected: boolean
+          tradingview_username: string
+          username: string
+        }[]
+      }
       get_safe_profile: {
         Args: { profile_id: string }
         Returns: {

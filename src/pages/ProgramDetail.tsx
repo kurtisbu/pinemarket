@@ -36,24 +36,22 @@ const ProgramDetail = () => {
       const { data, error } = await supabase
         .from('programs')
         .select(`
-          *,
-          profiles!seller_id (
-            display_name,
-            username,
-            avatar_url,
-            bio,
-            is_tradingview_connected,
-            tradingview_username,
-            default_discord_invite_url,
-            default_discord_description
-          )
+          *
         `)
         .eq('id', id)
         .eq('status', 'published')
         .single();
 
       if (error) throw error;
-      return data;
+
+      let profiles: any = null;
+      if (data?.seller_id) {
+        const { data: sellerRows } = await supabase.rpc('get_public_seller_info', {
+          _seller_id: data.seller_id,
+        });
+        profiles = Array.isArray(sellerRows) ? sellerRows[0] ?? null : sellerRows ?? null;
+      }
+      return { ...data, profiles };
     },
     enabled: !!id,
   });

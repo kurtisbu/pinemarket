@@ -66,13 +66,7 @@ const UserPurchases: React.FC<UserPurchasesProps> = ({ userId }) => {
             image_urls,
             discord_invite_url,
             discord_description,
-            seller_id,
-            profiles!seller_id (
-              display_name,
-              username,
-              default_discord_invite_url,
-              default_discord_description
-            )
+            seller_id
           ),
           script_assignments (
             status,
@@ -84,7 +78,33 @@ const UserPurchases: React.FC<UserPurchasesProps> = ({ userId }) => {
         .order('purchased_at', { ascending: false });
 
       if (error) throw error;
-      setPurchases(data || []);
+
+      const rows = data || [];
+      const sellerIds = Array.from(
+        new Set(
+          rows
+            .map((r: any) => r.programs?.seller_id)
+            .filter((v: string | null | undefined): v is string => !!v)
+        )
+      );
+
+      let sellerMap: Record<string, any> = {};
+      if (sellerIds.length > 0) {
+        const { data: sellers } = await supabase.rpc('get_public_sellers_info', {
+          _seller_ids: sellerIds,
+        });
+        (sellers || []).forEach((s: any) => {
+          sellerMap[s.id] = s;
+        });
+      }
+
+      const merged = rows.map((r: any) => ({
+        ...r,
+        programs: r.programs
+          ? { ...r.programs, profiles: sellerMap[r.programs.seller_id] ?? null }
+          : r.programs,
+      }));
+      setPurchases(merged);
     } catch (error: any) {
       toast({
         title: 'Error',
