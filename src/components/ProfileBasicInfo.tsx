@@ -14,6 +14,8 @@ interface ProfileBasicInfoProps {
     display_name: string;
     bio: string;
     avatar_url: string;
+    default_discord_invite_url?: string;
+    default_discord_description?: string;
   };
   onInputChange: (field: string, value: string) => void;
   onAvatarUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -88,6 +90,32 @@ const ProfileBasicInfo: React.FC<ProfileBasicInfoProps> = ({
             onChange={(e) => onInputChange('bio', e.target.value)}
             placeholder="Tell us about yourself..."
             rows={4}
+          />
+        </div>
+
+        <div className="space-y-2 pt-4 border-t">
+          <Label htmlFor="default_discord_invite_url">Default Discord Invite (Optional)</Label>
+          <Input
+            id="default_discord_invite_url"
+            value={formData.default_discord_invite_url || ''}
+            onChange={(e) => onInputChange('default_discord_invite_url', e.target.value)}
+            placeholder="https://discord.gg/your-invite"
+            maxLength={200}
+          />
+          <p className="text-xs text-muted-foreground">
+            Shown to buyers of your programs after purchase. Individual products can override this.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="default_discord_description">Discord Description (Optional)</Label>
+          <Textarea
+            id="default_discord_description"
+            value={formData.default_discord_description || ''}
+            onChange={(e) => onInputChange('default_discord_description', e.target.value)}
+            placeholder="e.g. Community support, strategy discussion, and product updates."
+            rows={2}
+            maxLength={500}
           />
         </div>
       </CardContent>
