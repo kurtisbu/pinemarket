@@ -131,6 +131,7 @@ const SupportNew: React.FC = () => {
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8 max-w-2xl">
+        <h1 className="text-3xl font-bold mb-4">Contact PineMarket Support</h1>
         {user && (
           <Button asChild variant="ghost" size="sm" className="mb-4">
             <Link to="/support"><ArrowLeft className="w-4 h-4 mr-1" /> All tickets</Link>

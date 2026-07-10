@@ -12,17 +12,17 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
             <div className="flex items-center space-x-2 mb-4">
-              <img src={logo} alt="PineMarket logo" className="w-8 h-8 object-contain" />
+              <img src={logo} alt="PineMarket trading script marketplace logo" className="w-8 h-8 object-contain" />
               <h3 className="text-lg font-bold">PineMarket</h3>
             </div>
             <p className="text-muted-foreground mb-4">
               The premier marketplace for TradingView Pine Script programs, connecting traders with professional indicators and strategies.
             </p>
             <div className="flex space-x-4">
-              <Twitter className="w-5 h-5 text-muted-foreground hover:text-foreground cursor-pointer transition-colors" />
-              <Github className="w-5 h-5 text-muted-foreground hover:text-foreground cursor-pointer transition-colors" />
-              <Linkedin className="w-5 h-5 text-muted-foreground hover:text-foreground cursor-pointer transition-colors" />
-              <Mail className="w-5 h-5 text-muted-foreground hover:text-foreground cursor-pointer transition-colors" />
+              <Twitter aria-label="PineMarket on Twitter" role="img" className="w-5 h-5 text-muted-foreground hover:text-foreground cursor-pointer transition-colors" />
+              <Github aria-label="PineMarket on GitHub" role="img" className="w-5 h-5 text-muted-foreground hover:text-foreground cursor-pointer transition-colors" />
+              <Linkedin aria-label="PineMarket on LinkedIn" role="img" className="w-5 h-5 text-muted-foreground hover:text-foreground cursor-pointer transition-colors" />
+              <Mail aria-label="Email PineMarket support" role="img" className="w-5 h-5 text-muted-foreground hover:text-foreground cursor-pointer transition-colors" />
             </div>
           </div>
           

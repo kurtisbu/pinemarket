@@ -123,7 +123,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-8">
             <div className="flex items-center space-x-2 cursor-pointer" onClick={() => navigate('/')}>
-              <img src={logo} alt="PineMarket logo" className="w-8 h-8 object-contain" />
+              <img src={logo} alt="PineMarket trading script marketplace logo" className="w-8 h-8 object-contain" />
               <h1 className="text-xl font-bold">PineMarket</h1>
             </div>
             
@@ -154,7 +154,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
             {/* Mobile menu */}
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="md:hidden">
+                <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open mobile navigation menu">
                   <Menu className="w-5 h-5" />
                 </Button>
               </SheetTrigger>
@@ -196,7 +196,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="relative">
+                  <Button variant="ghost" size="icon" className="relative" aria-label="Open user account menu">
                     <Avatar className="w-8 h-8">
                       <AvatarImage src={profile?.avatar_url} alt={profile?.display_name || 'User'} />
                       <AvatarFallback>
@@ -239,7 +239,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, searchQuery = '' }) => {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button variant="ghost" size="icon" onClick={() => navigate('/auth')}>
+              <Button variant="ghost" size="icon" onClick={() => navigate('/auth')} aria-label="Sign in to PineMarket">
                 <User className="w-5 h-5" />
               </Button>
             )}

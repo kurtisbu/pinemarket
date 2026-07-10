@@ -204,11 +204,11 @@ const Auth = () => {
             <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-green-500 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">PS</span>
             </div>
-            <h1 className="text-2xl font-bold">PineMarket</h1>
+            <span className="text-2xl font-bold">PineMarket</span>
           </div>
-          <h2 className="text-3xl font-bold">
-            {isLogin ? 'Sign in to your account' : 'Create your account'}
-          </h2>
+          <h1 className="text-3xl font-bold">
+            {isLogin ? 'Sign in to PineMarket — Pine Script Marketplace' : 'Create your PineMarket account'}
+          </h1>
           <p className="mt-2 text-muted-foreground">
             {isLogin 
               ? 'Welcome back to the Pine Script marketplace' 

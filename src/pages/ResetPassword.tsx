@@ -101,9 +101,9 @@ const ResetPassword = () => {
             <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-green-500 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">PS</span>
             </div>
-            <h1 className="text-2xl font-bold">PineMarket</h1>
+            <span className="text-2xl font-bold">PineMarket</span>
           </div>
-          <h2 className="text-3xl font-bold">Set New Password</h2>
+          <h1 className="text-3xl font-bold">Reset your PineMarket password</h1>
           <p className="mt-2 text-muted-foreground">
             Enter your new password below.
           </p>
