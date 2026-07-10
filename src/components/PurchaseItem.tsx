@@ -7,6 +7,7 @@ import PurchaseStatusBadge from './PurchaseStatusBadge';
 import AssignmentStatusBadge from './AssignmentStatusBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
+import DiscordAccessCard from './DiscordAccessCard';
 
 interface Purchase {
   id: string;
@@ -21,6 +22,14 @@ interface Purchase {
     description: string;
     category: string;
     image_urls: string[];
+    discord_invite_url?: string | null;
+    discord_description?: string | null;
+    profiles?: {
+      display_name?: string | null;
+      username?: string | null;
+      default_discord_invite_url?: string | null;
+      default_discord_description?: string | null;
+    } | null;
   };
   script_assignments?: Array<{
     status: string;
@@ -140,6 +149,18 @@ const PurchaseItem: React.FC<PurchaseItemProps> = ({ purchase }) => {
             </p>
           ))}
         </div>
+      )}
+
+      {purchase.status === 'completed' && (
+        <DiscordAccessCard
+          ownershipConfirmed
+          programId={purchase.programs.id}
+          sellerDisplayName={purchase.programs.profiles?.display_name || purchase.programs.profiles?.username}
+          productInvite={purchase.programs.discord_invite_url}
+          productDescription={purchase.programs.discord_description}
+          sellerDefaultInvite={purchase.programs.profiles?.default_discord_invite_url}
+          sellerDefaultDescription={purchase.programs.profiles?.default_discord_description}
+        />
       )}
     </div>
   );
