@@ -1603,6 +1603,7 @@ export type Database = {
         }
         Returns: string
       }
+      notify_discord_alert: { Args: { _payload: Json }; Returns: undefined }
       record_trial_usage: {
         Args: { p_program_id: string; p_user_id: string }
         Returns: undefined
