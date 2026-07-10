@@ -1,41 +1,54 @@
-# Seller Onboarding via Invite Link
+## Seller Discord Access for Buyers
 
-## Goal
-You send each new seller two things:
-1. A link to `https://pinemarket.io/auth`
-2. Their founder access code
+Ship a simple invite-link system now, structured so we can layer an auto-role bot on top later without schema rework.
 
-They sign up, verify email, get auto-routed into the seller onboarding flow, paste the access code, and are off to the races. No other gating changes, site stays closed to the public via `/interest`.
+### What sellers get
+- **Profile setting** — one "Default Discord invite URL" field on their seller profile (in Settings). Used for every product unless overridden.
+- **Per-product override** — optional "Discord invite URL" field on program and package forms (Sell Script + Edit Program + Create/Edit Package). Blank = fall back to seller default.
+- Optional short description ("What's inside our Discord") shown next to the invite.
 
-## What works today
-- `/auth` is already a public route — no gate change needed.
-- `/auth` signup form already has a "I want to sell Pine Scripts" checkbox that sets `localStorage.pendingSellerOnboarding = 'true'`.
-- `AuthContext` already watches for `SIGNED_IN` and redirects to `/seller/onboarding` when that flag is set.
-- `SellerOnboarding` already validates the access code via `AccessCodeStep`.
+### What buyers get
+- After a successful purchase, a **"Join the Seller's Discord"** card appears:
+  - On the product page (only when the buyer owns it)
+  - On the `/my-purchases` page for that item
+  - In the Stripe-success confirmation flow
+- The purchase confirmation UI shows the invite alongside the existing "Instant Access" TradingView delivery info.
+- Card shows seller's display name, Discord icon, description, and a "Join Discord" button opening the invite in a new tab.
 
-## What's missing / what to change
+### Data model (designed for future bot upgrade)
+- `profiles.default_discord_invite_url` (text, nullable)
+- `profiles.default_discord_description` (text, nullable)
+- `programs.discord_invite_url` (text, nullable) — overrides default
+- `programs.discord_description` (text, nullable)
+- `program_packages.discord_invite_url` (text, nullable)
+- `program_packages.discord_description` (text, nullable)
+- New table `discord_deliveries` (purchase_id, buyer_id, seller_id, invite_url, delivered_at, revoked_at) — records every invite handed out. Not user-visible yet, but enables:
+  - Auto-revoke when a subscription ends (once the bot ships)
+  - Analytics on Discord conversion
+  - Migration path to bot-managed roles (swap `invite_url` for `discord_role_id`)
 
-### 1. Make the "I want to sell" checkbox more prominent on signup
-Right now it's a small checkbox at the bottom of the signup form. Sellers coming from your invite email may miss it, and if unchecked they land on `/` (the buyer home) after verifying.
+### Validation
+- Client + server-side check that the URL matches `https://discord.gg/...` or `https://discord.com/invite/...`. Reject anything else to avoid phishing links.
+- Trim whitespace, cap length at 200 chars.
 
-Change: On `/auth`, if the URL has `?sell=1`, pre-check the "I want to sell" box and show a small banner at the top ("You've been invited to sell on PineMarket — finish signup to continue setup"). You then send invitees `https://pinemarket.io/auth?sell=1` instead of plain `/auth`.
+### Access rules
+- Anyone can read the seller's default and product-level Discord URL (needed for the buyer-facing card) — but the "Join" button only renders for owners of that purchase.
+- Only the seller (or admin) can update their own defaults and product-level fields via existing RLS on `profiles` / `programs` / `program_packages`.
 
-### 2. Also set the pendingSellerOnboarding flag for already-signed-up sellers who land on /auth?sell=1
-Edge case: if someone already has an account and visits `/auth?sell=1`, signing in should also route them to `/seller/onboarding` (not `/`). Add the same `pendingSellerOnboarding` flag-set on the sign-in path when `?sell=1` is present.
+### Files touched
+- Migration: add columns above + create `discord_deliveries` with GRANTs and RLS.
+- `src/components/SellerSettingsView.tsx` (or `ProfileBasicInfo.tsx`) — default Discord fields.
+- `src/components/SellScript/ProgramBasicForm.tsx` + `useSellScriptForm.ts` — per-program field.
+- `src/pages/EditProgram.tsx` — same field for published programs.
+- `src/pages/CreatePackage.tsx` — per-package field.
+- New `src/components/DiscordAccessCard.tsx` — the buyer-facing card, with URL resolution (product > seller default).
+- `src/pages/ProgramDetail.tsx` — render card when the current user owns the program.
+- `src/components/UserPurchases.tsx` (and `PurchaseItem.tsx`) — render card per purchased item.
+- `src/lib/discord.ts` — URL validation helper.
 
-### 3. (Optional polish) Show the access code on the onboarding page if passed via URL
-If you want to skip even the copy/paste step, support `/auth?sell=1&code=ABC123` — stash the code in localStorage at signup, and `AccessCodeStep` reads + pre-fills it. This is nice-to-have, not required.
+### Future upgrade path (not built now)
+When ready for Whop-style behavior: add a `discord-bot` edge function + OAuth flow, extend `discord_deliveries` with `discord_user_id` and `discord_role_id`, and swap the invite card for a "Link your Discord" button. No data migration needed — existing columns stay as the fallback.
 
-## Files touched
-- `src/pages/Auth.tsx` — read `?sell=1` query param, pre-check `wantsToSell`, show invite banner, set `pendingSellerOnboarding` on sign-in too when flag present.
-- `src/components/SellerOnboarding/AccessCodeStep.tsx` — (only if doing #3) pre-fill code from localStorage.
-
-No database changes. No new routes. No changes to `/interest` gating.
-
-## Your onboarding workflow after this ships
-1. Create an access code in Admin → Access Codes for the new seller.
-2. Email them: "Sign up here: `https://pinemarket.io/auth?sell=1` — use access code `XXXX` when prompted."
-3. They sign up → verify email → land on seller onboarding → paste code → connect Stripe + TradingView → start uploading.
-
-## When you're ready to open the site publicly
-Remove the `AdminRoute` wrappers in `App.tsx` (or repurpose the component). The `/interest` route can stay as a marketing fallback or be deleted.
+### Out of scope
+- Discord OAuth, bot install, role assignment, auto-revoke on refund — deferred to phase 2.
+- Two-way sync (Discord messages ↔ support tickets).
