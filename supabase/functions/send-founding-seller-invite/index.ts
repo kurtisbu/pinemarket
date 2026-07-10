@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
       <a href="${signupUrl}" style="display:inline-block;background:#111;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:600">Start seller onboarding →</a>
     </p>
     <p style="font-size:13px;color:#555">Or copy this link: <br><a href="${signupUrl}">${signupUrl}</a></p>
-    <p style="margin-top:32px">Reply to this email if you have any questions — I'm happy to help you get set up.</p>
+    <p style="margin-top:32px">Questions? <a href="${APP_URL}/support/new">Open a support ticket</a> — we're happy to help you get set up.</p>
     <p style="margin:16px 0 0">— The PineMarket team</p>
   </div>`;
 
@@ -93,7 +93,7 @@ What you get as a founding seller:
 ${accessCode ? `\nYour founding seller access code: ${accessCode}\n` : ''}
 Start seller onboarding: ${signupUrl}
 
-Reply to this email if you have any questions.
+Questions? Open a support ticket: ${APP_URL}/support/new
 
 — The PineMarket team`;
 
