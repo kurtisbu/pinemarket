@@ -17,6 +17,8 @@ interface SellScriptFormProps {
     demo_video_url: string;
     offer_trial: boolean;
     trial_period_days: number;
+    discord_invite_url: string;
+    discord_description: string;
   };
   onInputChange: (field: string, value: string | number | boolean) => void;
   categories: string[];

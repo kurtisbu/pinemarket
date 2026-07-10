@@ -13,6 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Package, Plus, X } from 'lucide-react';
 import StripeConnectBanner from '@/components/StripeConnectBanner';
 import { PriceManager, type PriceObject } from '@/components/SellScript/PriceManager';
+import { validateDiscordInvite } from '@/lib/discord';
 
 interface Program {
   id: string;
@@ -40,6 +41,8 @@ const CreatePackage = () => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    discord_invite_url: '',
+    discord_description: '',
   });
 
   useEffect(() => {
@@ -150,6 +153,12 @@ const CreatePackage = () => {
       return;
     }
 
+    const discordCheck = validateDiscordInvite(formData.discord_invite_url);
+    if (!discordCheck.valid) {
+      toast({ title: 'Invalid Discord invite', description: discordCheck.error, variant: 'destructive' });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -161,6 +170,8 @@ const CreatePackage = () => {
           title: formData.title,
           description: formData.description,
           status: 'draft',
+          discord_invite_url: formData.discord_invite_url.trim() || null,
+          discord_description: formData.discord_description.trim() || null,
         })
         .select()
         .single();
@@ -283,6 +294,32 @@ const CreatePackage = () => {
                     placeholder="Describe what's included in this package and why buyers should choose it..."
                     rows={4}
                     required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="discord_invite_url">Discord Invite (Optional)</Label>
+                  <Input
+                    id="discord_invite_url"
+                    value={formData.discord_invite_url}
+                    onChange={(e) => setFormData(prev => ({ ...prev, discord_invite_url: e.target.value }))}
+                    placeholder="https://discord.gg/your-invite (overrides your profile default)"
+                    maxLength={200}
+                  />
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Shown to buyers after purchase. Leave blank to use your profile default.
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="discord_description">Discord Description (Optional)</Label>
+                  <Textarea
+                    id="discord_description"
+                    value={formData.discord_description}
+                    onChange={(e) => setFormData(prev => ({ ...prev, discord_description: e.target.value }))}
+                    placeholder="What buyers will find in the Discord for this package..."
+                    rows={2}
+                    maxLength={500}
                   />
                 </div>
               </div>

@@ -17,6 +17,15 @@ interface Purchase {
     description: string;
     category: string;
     image_urls: string[];
+    discord_invite_url?: string | null;
+    discord_description?: string | null;
+    seller_id?: string;
+    profiles?: {
+      display_name?: string | null;
+      username?: string | null;
+      default_discord_invite_url?: string | null;
+      default_discord_description?: string | null;
+    } | null;
   };
   script_assignments?: Array<{
     status: string;
@@ -54,7 +63,16 @@ const UserPurchases: React.FC<UserPurchasesProps> = ({ userId }) => {
             title,
             description,
             category,
-            image_urls
+            image_urls,
+            discord_invite_url,
+            discord_description,
+            seller_id,
+            profiles!seller_id (
+              display_name,
+              username,
+              default_discord_invite_url,
+              default_discord_description
+            )
           ),
           script_assignments (
             status,

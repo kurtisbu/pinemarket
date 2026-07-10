@@ -32,6 +32,8 @@ export const useSellScriptForm = () => {
     demo_video_url: '',
     offer_trial: false,
     trial_period_days: 7,
+    discord_invite_url: '',
+    discord_description: '',
   });
 
   const handleInputChange = (field: string, value: string | number | boolean) => {
@@ -181,6 +183,13 @@ export const useSellScriptForm = () => {
       });
       return;
     }
+
+    const { validateDiscordInvite } = await import('@/lib/discord');
+    const discordCheck = validateDiscordInvite(formData.discord_invite_url);
+    if (!discordCheck.valid) {
+      toast({ title: 'Invalid Discord invite', description: discordCheck.error, variant: 'destructive' });
+      return;
+    }
     
     setLoading(true);
 
@@ -230,6 +239,8 @@ export const useSellScriptForm = () => {
         tradingview_publication_url: formData.tradingview_publication_url?.trim() || null,
         tradingview_script_id: null, // Now using program_scripts junction table
         demo_video_url: formData.demo_video_url?.trim() || null,
+        discord_invite_url: formData.discord_invite_url?.trim() || null,
+        discord_description: formData.discord_description?.trim() || null,
         pricing_model: 'flexible',
         price: 0,
         trial_period_days: formData.offer_trial ? formData.trial_period_days : 0

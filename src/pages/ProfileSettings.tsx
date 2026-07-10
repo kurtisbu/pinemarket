@@ -9,6 +9,7 @@ import Header from '@/components/Header';
 import ProfileBasicInfo from '@/components/ProfileBasicInfo';
 import TradingViewUsernameField from '@/components/TradingViewUsernameField';
 import Footer from '@/components/Footer';
+import { validateDiscordInvite } from '@/lib/discord';
 
 interface Profile {
   id: string;
@@ -35,6 +36,8 @@ const ProfileSettings = () => {
     bio: '',
     avatar_url: '',
     tradingview_username: '',
+    default_discord_invite_url: '',
+    default_discord_description: '',
   });
 
   useEffect(() => {
@@ -64,6 +67,8 @@ const ProfileSettings = () => {
         bio: data.bio || '',
         avatar_url: data.avatar_url || '',
         tradingview_username: data.tradingview_username || '',
+        default_discord_invite_url: (data as any).default_discord_invite_url || '',
+        default_discord_description: (data as any).default_discord_description || '',
       });
     } catch (error: any) {
       toast({
@@ -137,6 +142,13 @@ const ProfileSettings = () => {
         return;
       }
 
+      const discordCheck = validateDiscordInvite(formData.default_discord_invite_url);
+      if (!discordCheck.valid) {
+        toast({ title: 'Invalid Discord invite', description: discordCheck.error, variant: 'destructive' });
+        setSaving(false);
+        return;
+      }
+
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -145,6 +157,8 @@ const ProfileSettings = () => {
           bio: formData.bio,
           avatar_url: formData.avatar_url,
           tradingview_username: formData.tradingview_username,
+          default_discord_invite_url: formData.default_discord_invite_url.trim() || null,
+          default_discord_description: formData.default_discord_description.trim() || null,
         })
         .eq('id', user.id);
 

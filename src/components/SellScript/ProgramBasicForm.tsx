@@ -14,6 +14,8 @@ interface ProgramBasicFormProps {
     offer_trial: boolean;
     tradingview_publication_url: string;
     demo_video_url: string;
+    discord_invite_url: string;
+    discord_description: string;
   };
   onInputChange: (field: string, value: string | number | boolean) => void;
   categories: string[];
@@ -125,6 +127,32 @@ const ProgramBasicForm: React.FC<ProgramBasicFormProps> = ({
         <p className="text-sm text-muted-foreground">
           Embed a YouTube, Vimeo, or Loom video on your product page to showcase a live demo.
         </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="discord_invite_url">Discord Invite (Optional)</Label>
+        <Input
+          id="discord_invite_url"
+          value={formData.discord_invite_url}
+          onChange={(e) => onInputChange('discord_invite_url', e.target.value)}
+          placeholder="https://discord.gg/your-invite (overrides your profile default)"
+          maxLength={200}
+        />
+        <p className="text-sm text-muted-foreground">
+          Shown to buyers of this program after purchase. Leave blank to use your profile default.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="discord_description">Discord Description (Optional)</Label>
+        <Textarea
+          id="discord_description"
+          value={formData.discord_description}
+          onChange={(e) => onInputChange('discord_description', e.target.value)}
+          placeholder="What buyers will find in the Discord for this program..."
+          rows={2}
+          maxLength={500}
+        />
       </div>
     </>
   );
