@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -110,6 +111,32 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>{`${profile.display_name || profile.username} (@${profile.username}) — PineMarket`}</title>
+        <meta name="description" content={(profile.bio || `Pine Script creator ${profile.display_name || profile.username} on PineMarket.`).slice(0, 160)} />
+        <link rel="canonical" href={`https://pinemarket.io/profile/${profile.username}`} />
+        <meta property="og:title" content={`${profile.display_name || profile.username} on PineMarket`} />
+        <meta property="og:description" content={(profile.bio || `Pine Script creator ${profile.display_name || profile.username}.`).slice(0, 160)} />
+        <meta property="og:type" content="profile" />
+        <meta property="og:url" content={`https://pinemarket.io/profile/${profile.username}`} />
+        {profile.avatar_url && (
+          <meta property="og:image" content={profile.avatar_url} />
+        )}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'ProfilePage',
+            mainEntity: {
+              '@type': 'Person',
+              name: profile.display_name || profile.username,
+              alternateName: profile.username,
+              description: profile.bio || undefined,
+              image: profile.avatar_url || undefined,
+              url: `https://pinemarket.io/profile/${profile.username}`,
+            },
+          })}
+        </script>
+      </Helmet>
       <Header />
 
       {/* Hero banner */}

@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -180,6 +181,41 @@ const ProgramDetail = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>{`${program.title} — Pine Script on PineMarket`}</title>
+        <meta name="description" content={(program.description || '').slice(0, 160)} />
+        <link rel="canonical" href={`https://pinemarket.io/program/${program.id}`} />
+        <meta property="og:title" content={`${program.title} — PineMarket`} />
+        <meta property="og:description" content={(program.description || '').slice(0, 160)} />
+        <meta property="og:type" content="product" />
+        <meta property="og:url" content={`https://pinemarket.io/program/${program.id}`} />
+        {program.image_urls?.[0] && (
+          <meta property="og:image" content={program.image_urls[0]} />
+        )}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'Product',
+            name: program.title,
+            description: program.description,
+            image: program.image_urls || undefined,
+            category: program.category,
+            brand: program.profiles?.display_name || program.profiles?.username || 'PineMarket',
+            aggregateRating: program.rating_count > 0 ? {
+              '@type': 'AggregateRating',
+              ratingValue: program.average_rating,
+              reviewCount: program.rating_count,
+            } : undefined,
+            offers: {
+              '@type': 'Offer',
+              price: program.price,
+              priceCurrency: 'USD',
+              availability: 'https://schema.org/InStock',
+              url: `https://pinemarket.io/program/${program.id}`,
+            },
+          })}
+        </script>
+      </Helmet>
       <Header />
       
       <main className="container mx-auto px-4 py-8">
