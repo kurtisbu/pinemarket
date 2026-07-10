@@ -12,6 +12,7 @@ import ProgramHeader from '@/components/ProgramDetail/ProgramHeader';
 import ProgramDescription from '@/components/ProgramDetail/ProgramDescription';
 import ProgramSidebar from '@/components/ProgramDetail/ProgramSidebar';
 import DemoVideo from '@/components/ProgramDetail/DemoVideo';
+import DiscordAccessCard from '@/components/DiscordAccessCard';
 import UserRatingSection from '@/components/UserRatingSection';
 import RatingsList from '@/components/RatingsList';
 import ProfileCompletionBanner from '@/components/ProfileCompletionBanner';
@@ -42,7 +43,9 @@ const ProgramDetail = () => {
             avatar_url,
             bio,
             is_tradingview_connected,
-            tradingview_username
+            tradingview_username,
+            default_discord_invite_url,
+            default_discord_description
           )
         `)
         .eq('id', id)
@@ -206,6 +209,15 @@ const ProgramDetail = () => {
               </Button>
             )}
             <ProgramDescription description={program.description} tags={program.tags} programId={program.id} />
+
+            <DiscordAccessCard
+              programId={program.id}
+              sellerDisplayName={program.profiles?.display_name || program.profiles?.username}
+              productInvite={(program as any).discord_invite_url}
+              productDescription={(program as any).discord_description}
+              sellerDefaultInvite={(program.profiles as any)?.default_discord_invite_url}
+              sellerDefaultDescription={(program.profiles as any)?.default_discord_description}
+            />
             
             <UserRatingSection 
               programId={program.id} 
