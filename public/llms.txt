@@ -1,0 +1,16 @@
+# PineMarket
+
+> Marketplace for premium TradingView Pine Script indicators, strategies, screeners, and educational content. Traders buy scripts from verified creators; creators publish and sell with instant TradingView delivery.
+
+PineMarket connects Pine Script authors with traders. Purchases grant instant access through TradingView, and sellers can bundle scripts into programs and packages. Payments are handled through Stripe Connect.
+
+## Pages
+
+- [Home](/): Overview of the marketplace and featured Pine Script programs and creators.
+- [Browse Scripts](/browse): Search and filter published Pine Script indicators, strategies, screeners, utilities, libraries, and educational content.
+- [Creators](/creators): Directory of featured Pine Script creators on PineMarket.
+- [Contact Support](/support/new): Submit a support ticket to the PineMarket team.
+
+## Optional
+
+- [Sign In / Sign Up](/auth): Account creation and login for buyers and sellers.
