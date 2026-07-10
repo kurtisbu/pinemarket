@@ -15,6 +15,7 @@ import Header from '@/components/Header';
 import ScriptSelector from '@/components/SellScript/ScriptSelector';
 import { PriceManager, type PriceObject } from '@/components/SellScript/PriceManager';
 import { Upload, X, Plus, Info } from 'lucide-react';
+import { validateDiscordInvite } from '@/lib/discord';
 
 const EditProgram = () => {
   const { id } = useParams<{ id: string }>();
@@ -37,6 +38,8 @@ const EditProgram = () => {
     status: 'draft',
     tradingview_publication_url: '',
     demo_video_url: '',
+    discord_invite_url: '',
+    discord_description: '',
   });
 
   const categories = ['Indicator', 'Strategy', 'Utility', 'Screener', 'Library', 'Educational'];
@@ -67,6 +70,8 @@ const EditProgram = () => {
         status: data.status,
         tradingview_publication_url: data.tradingview_publication_url || '',
         demo_video_url: (data as any).demo_video_url || '',
+        discord_invite_url: (data as any).discord_invite_url || '',
+        discord_description: (data as any).discord_description || '',
       });
       setExistingImageUrls(data.image_urls || []);
 
@@ -156,6 +161,12 @@ const EditProgram = () => {
       }
     }
 
+    const discordCheck = validateDiscordInvite(formData.discord_invite_url);
+    if (!discordCheck.valid) {
+      toast({ title: 'Invalid Discord invite', description: discordCheck.error, variant: 'destructive' });
+      return;
+    }
+
     setLoading(true);
     try {
       const newImageUrls: string[] = [];
@@ -172,6 +183,8 @@ const EditProgram = () => {
         image_urls: [...existingImageUrls, ...newImageUrls],
         tradingview_publication_url: formData.tradingview_publication_url?.trim() || null,
         demo_video_url: formData.demo_video_url?.trim() || null,
+        discord_invite_url: formData.discord_invite_url?.trim() || null,
+        discord_description: formData.discord_description?.trim() || null,
       };
 
       const { error } = await supabase.from('programs').update(updateData).eq('id', id);
@@ -270,6 +283,17 @@ const EditProgram = () => {
                   <Label htmlFor="demo_video_url">Demo Video URL (Optional)</Label>
                   <Input id="demo_video_url" type="url" value={formData.demo_video_url} onChange={(e) => handleInputChange('demo_video_url', e.target.value)} placeholder="https://youtube.com/watch?v=... or vimeo.com/... or loom.com/share/..." />
                   <p className="text-sm text-muted-foreground">Embed a YouTube, Vimeo, or Loom video to showcase a live demo.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="discord_invite_url">Discord Invite (Optional)</Label>
+                  <Input id="discord_invite_url" value={formData.discord_invite_url} onChange={(e) => handleInputChange('discord_invite_url', e.target.value)} placeholder="https://discord.gg/your-invite (overrides your profile default)" maxLength={200} />
+                  <p className="text-sm text-muted-foreground">Shown to buyers of this program after purchase. Leave blank to use your profile default.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="discord_description">Discord Description (Optional)</Label>
+                  <Textarea id="discord_description" value={formData.discord_description} onChange={(e) => handleInputChange('discord_description', e.target.value)} placeholder="What buyers will find in the Discord for this program..." rows={2} maxLength={500} />
                 </div>
 
                 <div className="space-y-2">
