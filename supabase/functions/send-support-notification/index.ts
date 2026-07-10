@@ -14,6 +14,7 @@ const corsHeaders = {
 
 const ADMIN_EMAIL = 'capitalcodersllc@gmail.com';
 const APP_URL = Deno.env.get('APP_URL') || 'https://pinemarket.io';
+const DISCORD_WEBHOOK_URL = Deno.env.get('DISCORD_SUPPORT_WEBHOOK_URL') || '';
 
 interface Payload {
   ticketId: string;
@@ -118,10 +119,54 @@ Deno.serve(async (req: Request) => {
       // function may not be deployed yet
     }
 
+    // Forward admin-bound notifications to Discord (fire-and-forget)
+    let discordDelivered = false;
+    if (isAdminBound && DISCORD_WEBHOOK_URL) {
+      try {
+        const color =
+          kind === 'new_ticket' ? 0x22c55e : kind === 'user_reply' ? 0x3b82f6 : 0x64748b;
+        const title =
+          kind === 'new_ticket'
+            ? `🆕 New support ticket: ${ticket.subject}`
+            : `💬 Reply on ticket: ${ticket.subject}`;
+        const bodyPreview = (lastMsg?.body || '').slice(0, 1800);
+        const payload = {
+          username: 'PineMarket Support',
+          embeds: [
+            {
+              title,
+              url: `${APP_URL}/admin`,
+              color,
+              fields: [
+                { name: 'From', value: `${ticket.display_name || 'Anonymous'} (${ticket.email})`, inline: false },
+                { name: 'Category', value: String(ticket.category), inline: true },
+                { name: 'Status', value: String(ticket.status), inline: true },
+                ...(bodyPreview ? [{ name: 'Message', value: bodyPreview, inline: false }] : []),
+              ],
+              timestamp: new Date().toISOString(),
+              footer: { text: `Ticket ${ticket.id}` },
+            },
+          ],
+        };
+        const res = await fetch(DISCORD_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        discordDelivered = res.ok;
+        if (!res.ok) {
+          console.error('Discord webhook failed', res.status, await res.text());
+        }
+      } catch (err) {
+        console.error('Discord webhook error', err);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         ok: true,
         delivered,
+        discordDelivered,
         to,
         kind,
         // Returned for debugging / fallback display in dashboard:
