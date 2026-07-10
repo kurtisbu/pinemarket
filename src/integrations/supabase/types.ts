@@ -59,6 +59,70 @@ export type Database = {
           },
         ]
       }
+      discord_deliveries: {
+        Row: {
+          buyer_id: string
+          created_at: string
+          delivered_at: string
+          id: string
+          invite_url: string
+          package_id: string | null
+          program_id: string | null
+          purchase_id: string | null
+          revoked_at: string | null
+          seller_id: string
+          updated_at: string
+        }
+        Insert: {
+          buyer_id: string
+          created_at?: string
+          delivered_at?: string
+          id?: string
+          invite_url: string
+          package_id?: string | null
+          program_id?: string | null
+          purchase_id?: string | null
+          revoked_at?: string | null
+          seller_id: string
+          updated_at?: string
+        }
+        Update: {
+          buyer_id?: string
+          created_at?: string
+          delivered_at?: string
+          id?: string
+          invite_url?: string
+          package_id?: string | null
+          program_id?: string | null
+          purchase_id?: string | null
+          revoked_at?: string | null
+          seller_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discord_deliveries_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "program_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discord_deliveries_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discord_deliveries_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       interest_signups: {
         Row: {
           created_at: string
@@ -229,6 +293,8 @@ export type Database = {
           bio: string | null
           created_at: string
           custom_platform_fee_percent: number | null
+          default_discord_description: string | null
+          default_discord_invite_url: string | null
           display_name: string | null
           featured_at: string | null
           featured_description: string | null
@@ -256,6 +322,8 @@ export type Database = {
           bio?: string | null
           created_at?: string
           custom_platform_fee_percent?: number | null
+          default_discord_description?: string | null
+          default_discord_invite_url?: string | null
           display_name?: string | null
           featured_at?: string | null
           featured_description?: string | null
@@ -283,6 +351,8 @@ export type Database = {
           bio?: string | null
           created_at?: string
           custom_platform_fee_percent?: number | null
+          default_discord_description?: string | null
+          default_discord_invite_url?: string | null
           display_name?: string | null
           featured_at?: string | null
           featured_description?: string | null
@@ -312,6 +382,8 @@ export type Database = {
           average_rating: number
           created_at: string
           description: string
+          discord_description: string | null
+          discord_invite_url: string | null
           id: string
           image_urls: string[] | null
           rating_count: number
@@ -325,6 +397,8 @@ export type Database = {
           average_rating?: number
           created_at?: string
           description: string
+          discord_description?: string | null
+          discord_invite_url?: string | null
           id?: string
           image_urls?: string[] | null
           rating_count?: number
@@ -338,6 +412,8 @@ export type Database = {
           average_rating?: number
           created_at?: string
           description?: string
+          discord_description?: string | null
+          discord_invite_url?: string | null
           id?: string
           image_urls?: string[] | null
           rating_count?: number
@@ -455,6 +531,8 @@ export type Database = {
           created_at: string
           demo_video_url: string | null
           description: string
+          discord_description: string | null
+          discord_invite_url: string | null
           download_count: number
           id: string
           image_urls: string[] | null
@@ -486,6 +564,8 @@ export type Database = {
           created_at?: string
           demo_video_url?: string | null
           description: string
+          discord_description?: string | null
+          discord_invite_url?: string | null
           download_count?: number
           id?: string
           image_urls?: string[] | null
@@ -517,6 +597,8 @@ export type Database = {
           created_at?: string
           demo_video_url?: string | null
           description?: string
+          discord_description?: string | null
+          discord_invite_url?: string | null
           download_count?: number
           id?: string
           image_urls?: string[] | null
@@ -1556,6 +1638,8 @@ export type Database = {
           avatar_url: string
           bio: string
           created_at: string
+          default_discord_description: string
+          default_discord_invite_url: string
           display_name: string
           featured_at: string
           featured_description: string
