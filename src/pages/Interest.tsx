@@ -59,7 +59,7 @@ const Interest = () => {
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10" />
         <div className="relative max-w-5xl mx-auto px-6 pt-20 pb-16 text-center">
           <div className="flex items-center justify-center gap-4 mb-8">
-            <img src={logo} alt="PineMarket logo" className="w-24 h-24 sm:w-32 sm:h-32 object-contain" />
+            <img src={logo} alt="PineMarket trading script marketplace logo" className="w-24 h-24 sm:w-32 sm:h-32 object-contain" />
             <span className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-foreground">
               PineMarket
             </span>

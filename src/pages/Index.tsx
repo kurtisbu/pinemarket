@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import Header from '@/components/Header';
 import Hero from '@/components/Hero';
 import CategoryFilter from '@/components/CategoryFilter';
@@ -40,6 +41,14 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>PineMarket — Pine Script Marketplace for TradingView</title>
+        <meta name="description" content="Buy and sell premium TradingView Pine Script indicators, strategies, and screeners. Instant access from verified creators on PineMarket." />
+        <link rel="canonical" href="https://pinemarket.io/" />
+        <meta property="og:title" content="PineMarket — Pine Script Marketplace for TradingView" />
+        <meta property="og:description" content="Buy and sell premium TradingView Pine Script indicators, strategies, and screeners." />
+        <meta property="og:url" content="https://pinemarket.io/" />
+      </Helmet>
       <Header onSearch={handleSearch} searchQuery={searchQuery} />
       <main>
         <Hero />

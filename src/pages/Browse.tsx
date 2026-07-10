@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import Header from '@/components/Header';
@@ -149,6 +150,14 @@ const Browse = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Browse Pine Scripts — Indicators & Strategies | PineMarket</title>
+        <meta name="description" content="Browse and filter TradingView Pine Script indicators, strategies, screeners, utilities, and libraries from verified creators on PineMarket." />
+        <link rel="canonical" href="https://pinemarket.io/browse" />
+        <meta property="og:title" content="Browse Pine Scripts on PineMarket" />
+        <meta property="og:description" content="Filter TradingView indicators, strategies, and screeners from verified creators." />
+        <meta property="og:url" content="https://pinemarket.io/browse" />
+      </Helmet>
       <Header onSearch={setSearchQuery} searchQuery={searchQuery} />
       
       <main className="container mx-auto px-4 py-8">

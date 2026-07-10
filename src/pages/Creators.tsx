@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { supabase } from '@/integrations/supabase/client';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -136,6 +137,14 @@ const Creators = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Featured Pine Script Creators | PineMarket</title>
+        <meta name="description" content="Discover top TradingView Pine Script creators on PineMarket — ranked by ratings, sales, and published programs." />
+        <link rel="canonical" href="https://pinemarket.io/creators" />
+        <meta property="og:title" content="Featured Pine Script Creators on PineMarket" />
+        <meta property="og:description" content="Top TradingView Pine Script creators ranked by ratings, sales, and published programs." />
+        <meta property="og:url" content="https://pinemarket.io/creators" />
+      </Helmet>
       <Header onSearch={handleSearch} searchQuery={searchQuery} />
       
       <main className="container mx-auto px-4 py-8">
