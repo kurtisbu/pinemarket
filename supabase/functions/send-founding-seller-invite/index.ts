@@ -4,7 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { corsHeaders } from '../_shared/cors.ts';
 
 const GATEWAY_URL = 'https://connector-gateway.lovable.dev/resend';
-const FROM_ADDRESS = Deno.env.get('INVITE_FROM_ADDRESS') || 'PineMarket <invites@notify.pinemarket.io>';
+const FROM_ADDRESS = Deno.env.get('INVITE_FROM_ADDRESS') || 'PineMarket <invites@pinemarket.io>';
 const APP_URL = Deno.env.get('APP_URL') || 'https://pinemarket.io';
 
 interface Payload {
