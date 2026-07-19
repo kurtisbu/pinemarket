@@ -20,6 +20,7 @@ export type Database = {
           created_at: string | null
           details: Json | null
           id: string
+          is_test: boolean
           log_level: string
           message: string
           purchase_id: string
@@ -29,6 +30,7 @@ export type Database = {
           created_at?: string | null
           details?: Json | null
           id?: string
+          is_test?: boolean
           log_level: string
           message: string
           purchase_id: string
@@ -38,6 +40,7 @@ export type Database = {
           created_at?: string | null
           details?: Json | null
           id?: string
+          is_test?: boolean
           log_level?: string
           message?: string
           purchase_id?: string
@@ -66,6 +69,7 @@ export type Database = {
           delivered_at: string
           id: string
           invite_url: string
+          is_test: boolean
           package_id: string | null
           program_id: string | null
           purchase_id: string | null
@@ -79,6 +83,7 @@ export type Database = {
           delivered_at?: string
           id?: string
           invite_url: string
+          is_test?: boolean
           package_id?: string | null
           program_id?: string | null
           purchase_id?: string | null
@@ -92,6 +97,7 @@ export type Database = {
           delivered_at?: string
           id?: string
           invite_url?: string
+          is_test?: boolean
           package_id?: string | null
           program_id?: string | null
           purchase_id?: string | null
@@ -251,6 +257,7 @@ export type Database = {
           failure_reason: string | null
           id: string
           initiated_at: string | null
+          is_test: boolean
           payout_method: string
           seller_id: string
           status: string
@@ -265,6 +272,7 @@ export type Database = {
           failure_reason?: string | null
           id?: string
           initiated_at?: string | null
+          is_test?: boolean
           payout_method: string
           seller_id: string
           status?: string
@@ -279,6 +287,7 @@ export type Database = {
           failure_reason?: string | null
           id?: string
           initiated_at?: string | null
+          is_test?: boolean
           payout_method?: string
           seller_id?: string
           status?: string
@@ -301,6 +310,7 @@ export type Database = {
           featured_priority: number | null
           id: string
           is_featured: boolean | null
+          is_test_account: boolean
           is_tradingview_connected: boolean
           role: string | null
           stripe_account_id: string | null
@@ -330,6 +340,7 @@ export type Database = {
           featured_priority?: number | null
           id: string
           is_featured?: boolean | null
+          is_test_account?: boolean
           is_tradingview_connected?: boolean
           role?: string | null
           stripe_account_id?: string | null
@@ -359,6 +370,7 @@ export type Database = {
           featured_priority?: number | null
           id?: string
           is_featured?: boolean | null
+          is_test_account?: boolean
           is_tradingview_connected?: boolean
           role?: string | null
           stripe_account_id?: string | null
@@ -536,6 +548,7 @@ export type Database = {
           download_count: number
           id: string
           image_urls: string[] | null
+          is_test_program: boolean
           monthly_price: number | null
           price: number
           pricing_model: string
@@ -569,6 +582,7 @@ export type Database = {
           download_count?: number
           id?: string
           image_urls?: string[] | null
+          is_test_program?: boolean
           monthly_price?: number | null
           price: number
           pricing_model?: string
@@ -602,6 +616,7 @@ export type Database = {
           download_count?: number
           id?: string
           image_urls?: string[] | null
+          is_test_program?: boolean
           monthly_price?: number | null
           price?: number
           pricing_model?: string
@@ -647,6 +662,7 @@ export type Database = {
           buyer_id: string
           created_at: string
           id: string
+          is_test: boolean
           package_id: string | null
           payment_intent_id: string | null
           platform_fee: number
@@ -667,6 +683,7 @@ export type Database = {
           buyer_id: string
           created_at?: string
           id?: string
+          is_test?: boolean
           package_id?: string | null
           payment_intent_id?: string | null
           platform_fee?: number
@@ -687,6 +704,7 @@ export type Database = {
           buyer_id?: string
           created_at?: string
           id?: string
+          is_test?: boolean
           package_id?: string | null
           payment_intent_id?: string | null
           platform_fee?: number
@@ -854,6 +872,7 @@ export type Database = {
           error_message: string | null
           expires_at: string | null
           id: string
+          is_test: boolean
           is_trial: boolean | null
           last_attempt_at: string | null
           pine_id: string | null
@@ -876,6 +895,7 @@ export type Database = {
           error_message?: string | null
           expires_at?: string | null
           id?: string
+          is_test?: boolean
           is_trial?: boolean | null
           last_attempt_at?: string | null
           pine_id?: string | null
@@ -898,6 +918,7 @@ export type Database = {
           error_message?: string | null
           expires_at?: string | null
           id?: string
+          is_test?: boolean
           is_trial?: boolean | null
           last_attempt_at?: string | null
           pine_id?: string | null
@@ -1032,6 +1053,7 @@ export type Database = {
           available_balance: number
           created_at: string | null
           id: string
+          is_test: boolean
           last_payout_at: string | null
           pending_balance: number
           seller_id: string
@@ -1043,6 +1065,7 @@ export type Database = {
           available_balance?: number
           created_at?: string | null
           id?: string
+          is_test?: boolean
           last_payout_at?: string | null
           pending_balance?: number
           seller_id: string
@@ -1054,6 +1077,7 @@ export type Database = {
           available_balance?: number
           created_at?: string | null
           id?: string
+          is_test?: boolean
           last_payout_at?: string | null
           pending_balance?: number
           seller_id?: string
@@ -1376,6 +1400,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_test: boolean
           program_id: string
           used_at: string
           user_id: string
@@ -1383,6 +1408,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_test?: boolean
           program_id: string
           used_at?: string
           user_id: string
@@ -1390,6 +1416,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_test?: boolean
           program_id?: string
           used_at?: string
           user_id?: string
@@ -1442,6 +1469,7 @@ export type Database = {
           current_period_end: string | null
           current_period_start: string | null
           id: string
+          is_test: boolean
           status: string
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
@@ -1455,6 +1483,7 @@ export type Database = {
           current_period_end?: string | null
           current_period_start?: string | null
           id?: string
+          is_test?: boolean
           status: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -1468,6 +1497,7 @@ export type Database = {
           current_period_end?: string | null
           current_period_start?: string | null
           id?: string
+          is_test?: boolean
           status?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -1497,6 +1527,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_list_test_accounts: {
+        Args: never
+        Returns: {
+          created_at: string
+          display_name: string
+          email: string
+          id: string
+          is_tradingview_connected: boolean
+          stripe_charges_enabled: boolean
+          username: string
+        }[]
+      }
+      admin_set_test_account: {
+        Args: { _is_test: boolean; _user_id: string }
+        Returns: undefined
+      }
+      admin_wipe_test_data: { Args: never; Returns: Json }
       calculate_trending_scores: {
         Args: { p_program_id?: string }
         Returns: undefined
