@@ -28,7 +28,7 @@ const ProgramPurchaseSection: React.FC<ProgramPurchaseSectionProps> = ({ program
   const [isTrialEligible, setIsTrialEligible] = useState(false);
   const [checkingEligibility, setCheckingEligibility] = useState(true);
 
-  const hasTrialOption = program.trial_period_days && program.trial_period_days > 0;
+  const hasTrialOption = !!(program.trial_period_days && program.trial_period_days > 0);
 
   useEffect(() => {
     const checkTrialEligibility = async () => {
@@ -56,7 +56,7 @@ const ProgramPurchaseSection: React.FC<ProgramPurchaseSectionProps> = ({ program
     checkTrialEligibility();
   }, [user, program.id, hasTrialOption]);
 
-  const showTrialBanner = hasTrialOption && user && isTrialEligible && !checkingEligibility;
+  const showTrialBanner = !!(hasTrialOption && user && isTrialEligible && !checkingEligibility);
 
   return (
     <div className="space-y-4">
