@@ -93,9 +93,10 @@ serve(async (req) => {
       pricesData = existingPrices;
     }
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2023-10-16",
-    });
+    const { getStripeForUser } = await import("../_shared/stripeMode.ts");
+    const stripeCtx = await getStripeForUser(resource.seller_id);
+    const stripe = stripeCtx.stripe;
+    console.log(`[CREATE-PRICES] Stripe mode: ${stripeCtx.isTest ? "SANDBOX" : "LIVE"}`);
 
     // Create Stripe product for the resource
     const stripeProduct = await stripe.products.create({
