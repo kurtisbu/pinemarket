@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -31,6 +33,9 @@ export const ProgramPriceSelector = ({ programId, onPurchase, trialPeriodDays }:
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     fetchPrices();
@@ -75,6 +80,15 @@ export const ProgramPriceSelector = ({ programId, onPurchase, trialPeriodDays }:
   const handlePurchase = async () => {
     if (!selectedPriceId) {
       toast({ title: 'Please select a pricing option', variant: 'destructive' });
+      return;
+    }
+
+    if (!user) {
+      toast({
+        title: 'Sign in required',
+        description: 'Create an account or sign in to complete your purchase.',
+      });
+      navigate(`/auth?redirect=${encodeURIComponent(location.pathname + location.search)}`);
       return;
     }
 
