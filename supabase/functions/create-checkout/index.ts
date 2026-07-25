@@ -135,16 +135,6 @@ serve(async (req) => {
         throw new Error("Seller's Stripe account is not enabled for charges");
       }
 
-      // Enforce mode match: test buyers can only purchase test-seller programs and vice versa
-      const sellerAcctIsTest = String(sellerProfile.stripe_account_id).startsWith('acct_') && sellerProfile.stripe_account_id.length > 0
-        ? await isSellerAccountTest(stripeClient.stripe, sellerProfile.stripe_account_id)
-        : false;
-      if (usingTestMode !== sellerAcctIsTest) {
-        throw new Error(usingTestMode
-          ? "This is a live seller. Test buyer accounts can only purchase from test sellers."
-          : "This seller is set up in sandbox mode. Live buyers cannot purchase from test sellers.");
-      }
-
       price = packagePrice;
       isPackage = true;
       packageId = packagePrice.program_packages.id;
@@ -206,15 +196,6 @@ serve(async (req) => {
 
       if (!sellerProfile.stripe_charges_enabled) {
         throw new Error("Seller's Stripe account is not enabled for charges");
-      }
-
-      const sellerAcctIsTest = String(sellerProfile.stripe_account_id).startsWith('acct_')
-        ? await isSellerAccountTest(stripeClient.stripe, sellerProfile.stripe_account_id)
-        : false;
-      if (usingTestMode !== sellerAcctIsTest) {
-        throw new Error(usingTestMode
-          ? "This is a live seller. Test buyer accounts can only purchase from test sellers."
-          : "This seller is set up in sandbox mode. Live buyers cannot purchase from test sellers.");
       }
 
       price = programPrice;
