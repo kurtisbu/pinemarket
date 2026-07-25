@@ -96,7 +96,6 @@ async function getAccountStatus(payload: any, supabaseAdmin: any, req: Request) 
       status: 401,
     });
   }
-  {
     const supabaseAuth = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
@@ -120,7 +119,6 @@ async function getAccountStatus(payload: any, supabaseAdmin: any, req: Request) 
         status: 403,
       });
     }
-  }
 
   console.log('[STRIPE-ACCOUNT] Fetching account status for:', account_id);
 
@@ -423,7 +421,6 @@ async function createAccountLink(payload: any, supabaseAdmin: any, req: Request)
       status: 401,
     });
   }
-  {
     const supabaseAuth = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
@@ -447,7 +444,6 @@ async function createAccountLink(payload: any, supabaseAdmin: any, req: Request)
         status: 403,
       });
     }
-  }
 
   try {
     const stripeSecretKey = await getStripeKeyForUser(user?.id);
@@ -519,7 +515,6 @@ async function createDashboardLink(payload: any, supabaseAdmin: any, req: Reques
       status: 401,
     });
   }
-  {
     const supabaseAuth = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
@@ -543,7 +538,6 @@ async function createDashboardLink(payload: any, supabaseAdmin: any, req: Reques
         status: 403,
       });
     }
-  }
 
   try {
     const stripeSecretKey = await getStripeKeyForUser(user?.id);
