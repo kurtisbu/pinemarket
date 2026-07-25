@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Mail, Chrome } from 'lucide-react';
+import logo from '@/assets/logo.png';
 
 const Auth = () => {
   const [searchParams] = useSearchParams();
@@ -154,9 +155,7 @@ const Auth = () => {
         <div className="max-w-md w-full space-y-8">
           <div className="text-center">
             <div className="flex items-center justify-center space-x-2 mb-6">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-green-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">PS</span>
-              </div>
+              <img src={logo} alt="PineMarket logo" className="w-10 h-10 object-contain" />
               <h1 className="text-2xl font-bold">PineMarket</h1>
             </div>
             <h2 className="text-3xl font-bold">Reset Password</h2>
@@ -202,9 +201,7 @@ const Auth = () => {
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <div className="flex items-center justify-center space-x-2 mb-6">
-            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-green-500 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">PS</span>
-            </div>
+              <img src={logo} alt="PineMarket logo" className="w-10 h-10 object-contain" />
             <span className="text-2xl font-bold">PineMarket</span>
           </div>
           <h1 className="text-3xl font-bold">
