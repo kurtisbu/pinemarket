@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
+import { getStripeClient } from '../_shared/stripeMode.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,8 +26,9 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
-    if (!stripeSecretKey) {
+    // Payouts run per-seller; we pick the Stripe key based on the seller's is_test_account below.
+    const liveKey = Deno.env.get('STRIPE_SECRET_KEY');
+    if (!liveKey) {
       throw new Error('STRIPE_SECRET_KEY not configured');
     }
 
@@ -44,7 +46,8 @@ Deno.serve(async (req) => {
           id,
           display_name,
           stripe_account_id,
-          stripe_payouts_enabled
+          stripe_payouts_enabled,
+          is_test_account
         ),
         seller_payout_info!seller_payout_info_user_id_fkey (
           payout_method,
@@ -120,11 +123,10 @@ Deno.serve(async (req) => {
           throw payoutError;
         }
 
-        // Initialize Stripe
-        const Stripe = (await import('https://esm.sh/stripe@14.21.0')).default;
-        const stripe = new Stripe(stripeSecretKey, {
-          apiVersion: '2023-10-16',
-        });
+        // Initialize Stripe using the correct mode for this seller
+        const stripeCtx = getStripeClient(!!sellerProfile?.is_test_account);
+        const stripe = stripeCtx.stripe;
+        console.log(`[PROCESS-PAYOUTS] Seller ${seller.seller_id} mode: ${stripeCtx.isTest ? "SANDBOX" : "LIVE"}`);
 
         const payoutAmount = Math.round(seller.available_balance * 100); // Convert to cents
 
