@@ -192,9 +192,7 @@ serve(async (req) => {
   }
 });
 
-async function handleCheckoutCompleted(session: any, supabaseAdmin: any, stripe: Stripe) {
-  // Note: eventIsTest is passed as 4th arg but destructured via arguments to keep signature back-compat.
-  const eventIsTest: boolean = (arguments as any)[3] === true;
+async function handleCheckoutCompleted(session: any, supabaseAdmin: any, stripe: Stripe, eventIsTest: boolean = false) {
   console.log("[WEBHOOK] Processing checkout.session.completed", session.id);
 
   const programId = session.metadata.program_id;
