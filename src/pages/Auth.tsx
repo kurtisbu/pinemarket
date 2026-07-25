@@ -26,9 +26,10 @@ const Auth = () => {
 
   useEffect(() => {
     if (user) {
-      navigate('/');
+      const redirect = searchParams.get('redirect');
+      navigate(redirect || '/');
     }
-  }, [user, navigate]);
+  }, [user, navigate, searchParams]);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
