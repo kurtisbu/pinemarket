@@ -95,6 +95,26 @@ export const ProgramPriceSelector = ({ programId, onPurchase, trialPeriodDays }:
     setPurchasing(true);
 
     try {
+      // Require TradingView username before checkout
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('tradingview_username')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileError) throw profileError;
+
+      if (!profile?.tradingview_username || !profile.tradingview_username.trim()) {
+        toast({
+          title: 'TradingView username required',
+          description: 'Add your TradingView username in Profile Settings before purchasing so we can deliver your script access.',
+          variant: 'destructive',
+        });
+        navigate(`/profile/settings?redirect=${encodeURIComponent(location.pathname + location.search)}`);
+        setPurchasing(false);
+        return;
+      }
+
       const successUrl = `${window.location.origin}/my-purchases?success=true`;
       const cancelUrl = `${window.location.origin}/program/${programId}`;
 
