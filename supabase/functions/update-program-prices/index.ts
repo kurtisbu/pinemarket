@@ -87,9 +87,10 @@ serve(async (req) => {
       });
     }
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2023-10-16",
-    });
+    const { getStripeForUser } = await import("../_shared/stripeMode.ts");
+    const stripeCtx = await getStripeForUser(userId);
+    const stripe = stripeCtx.stripe;
+    console.log(`[UPDATE-PRICES] Stripe mode: ${stripeCtx.isTest ? "SANDBOX" : "LIVE"}`);
 
     let stripeProductId = program.stripe_product_id;
     if (!stripeProductId) {
