@@ -30,9 +30,10 @@ serve(async (req) => {
       throw new Error("User not authenticated");
     }
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2023-10-16",
-    });
+    const { getStripeForUser } = await import("../_shared/stripeMode.ts");
+    const stripeCtx = await getStripeForUser(user.id);
+    const stripe = stripeCtx.stripe;
+    console.log(`[MANAGE-SUB] Stripe mode: ${stripeCtx.isTest ? "SANDBOX" : "LIVE"}`);
 
     // Get customer
     const customers = await stripe.customers.list({
