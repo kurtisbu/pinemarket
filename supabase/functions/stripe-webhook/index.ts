@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { getStripeClient, getWebhookSecret } from "../_shared/stripeMode.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -104,20 +105,14 @@ async function triggerScriptRevocation(
   }
 }
 
-// Get stripe instance
-function getStripe(): Stripe {
-  return new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-    apiVersion: "2023-10-16",
-  });
-}
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   const signature = req.headers.get("stripe-signature");
-  const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
+  const url = new URL(req.url);
+  const { secret: webhookSecret, isTest: isTestMode } = getWebhookSecret(url);
 
   if (!signature || !webhookSecret) {
     return new Response("Missing signature or webhook secret", { status: 400 });
@@ -125,11 +120,14 @@ serve(async (req) => {
 
   try {
     const body = await req.text();
-    const stripe = getStripe();
+    const stripe = getStripeClient(isTestMode).stripe;
+    console.log(`[WEBHOOK] Mode: ${isTestMode ? "SANDBOX" : "LIVE"}`);
 
     const event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
 
     console.log(`[WEBHOOK] Received event: ${event.type}`);
+    // Stripe tags each event with livemode. Test-mode events => is_test = true.
+    const eventIsTest = event.livemode === false;
 
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -138,7 +136,7 @@ serve(async (req) => {
 
     switch (event.type) {
       case "checkout.session.completed":
-        await handleCheckoutCompleted(event.data.object, supabaseAdmin, stripe);
+        await handleCheckoutCompleted(event.data.object, supabaseAdmin, stripe, eventIsTest);
         break;
       
       case "payment_intent.succeeded":
@@ -195,6 +193,8 @@ serve(async (req) => {
 });
 
 async function handleCheckoutCompleted(session: any, supabaseAdmin: any, stripe: Stripe) {
+  // Note: eventIsTest is passed as 4th arg but destructured via arguments to keep signature back-compat.
+  const eventIsTest: boolean = (arguments as any)[3] === true;
   console.log("[WEBHOOK] Processing checkout.session.completed", session.id);
 
   const programId = session.metadata.program_id;
@@ -208,6 +208,7 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any, stripe:
   const feePercentFromMetadata = session.metadata.fee_percent ? parseFloat(session.metadata.fee_percent) : null;
   const sellerFeePercentMeta = session.metadata.seller_fee_percent ? parseFloat(session.metadata.seller_fee_percent) : null;
   const buyerFeePercentMeta = session.metadata.buyer_fee_percent ? parseFloat(session.metadata.buyer_fee_percent) : 0;
+  const isTestPurchase = session.metadata?.is_test === 'true' || eventIsTest;
 
   if ((!programId && !packageId) || !priceId || !userId) {
     console.error("[WEBHOOK] Missing required metadata");
@@ -329,6 +330,7 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any, stripe:
       payment_intent_id: session.payment_intent || session.id,
       tradingview_username: tradingviewUsername,
       stripe_subscription_id: stripeSubscriptionId,
+      is_test: isTestPurchase,
     })
     .select()
     .single();
@@ -342,9 +344,9 @@ async function handleCheckoutCompleted(session: any, supabaseAdmin: any, stripe:
 
   // Create script assignments
   if (isPackage && packageId) {
-    await createPackageAssignments(packageId, purchase.id, userId, sellerId, priceType, tradingviewUsername, subscriptionExpiresAt, supabaseAdmin);
+    await createPackageAssignments(packageId, purchase.id, userId, sellerId, priceType, tradingviewUsername, subscriptionExpiresAt, supabaseAdmin, isTestPurchase);
   } else if (programId) {
-    await createProgramAssignments(programId, purchase.id, userId, sellerId, priceType, tradingviewUsername, subscriptionExpiresAt, supabaseAdmin);
+    await createProgramAssignments(programId, purchase.id, userId, sellerId, priceType, tradingviewUsername, subscriptionExpiresAt, supabaseAdmin, isTestPurchase);
   }
 }
 
@@ -356,7 +358,8 @@ async function createPackageAssignments(
   priceType: string,
   tradingviewUsername: string,
   subscriptionExpiresAt: string | null,
-  supabaseAdmin: any
+  supabaseAdmin: any,
+  isTest: boolean = false
 ) {
   // Get all programs in the package
   const { data: packagePrograms } = await supabaseAdmin
@@ -393,6 +396,7 @@ async function createPackageAssignments(
           pine_id: pineId,
           tradingview_script_id: pineId,
           expires_at: subscriptionExpiresAt,
+          is_test: isTest,
         })
         .select()
         .single();
@@ -421,7 +425,8 @@ async function createProgramAssignments(
   priceType: string,
   tradingviewUsername: string,
   subscriptionExpiresAt: string | null,
-  supabaseAdmin: any
+  supabaseAdmin: any,
+  isTest: boolean = false
 ) {
   // Single program purchase - get all linked scripts from program_scripts
   const { data: programScripts, error: psError } = await supabaseAdmin
@@ -462,6 +467,7 @@ async function createProgramAssignments(
           pine_id: pineId,
           tradingview_script_id: pineId,
           expires_at: subscriptionExpiresAt,
+          is_test: isTest,
         })
         .select()
         .single();
@@ -504,6 +510,7 @@ async function createProgramAssignments(
           pine_id: pineId,
           tradingview_script_id: pineId,
           expires_at: subscriptionExpiresAt,
+          is_test: isTest,
         })
         .select()
         .single();
