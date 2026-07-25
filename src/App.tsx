@@ -26,6 +26,7 @@ import NotFound from "./pages/NotFound";
 import SupportList from "./pages/support/SupportList";
 import SupportNew from "./pages/support/SupportNew";
 import SupportThread from "./pages/support/SupportThread";
+import TestModeBanner from "@/components/TestModeBanner";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,7 @@ const App = () => (
     <Sonner />
     <BrowserRouter>
       <AuthProvider>
+        <TestModeBanner />
         <Routes>
           {/* Public routes */}
           <Route path="/interest" element={<Interest />} />
