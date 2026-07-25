@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { getStripeClient } from "../_shared/stripeMode.ts";
 import {
   ensureStripePriceForPackagePrice,
   ensureStripePriceForProgramPrice,
@@ -62,6 +63,16 @@ serve(async (req) => {
       throw new Error("TradingView username not found. Please add your TradingView username to your profile before purchasing.");
     }
 
+    // Determine whether this buyer is a test account -> route to Stripe sandbox
+    const { data: buyerFlag } = await supabaseAdmin
+      .from('profiles')
+      .select('is_test_account')
+      .eq('id', user.id)
+      .maybeSingle();
+    const buyerIsTest = !!buyerFlag?.is_test_account;
+    const stripeClient = getStripeClient(buyerIsTest);
+    const usingTestMode = stripeClient.isTest;
+
     let price: any;
     let isPackage = false;
     let packageId: string | null = null;
@@ -96,9 +107,7 @@ serve(async (req) => {
 
       if (!packagePrice.stripe_price_id) {
         // Auto-heal: create Stripe product+price and persist stripe_price_id
-        const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-          apiVersion: "2023-10-16",
-        });
+        const stripe = stripeClient.stripe;
 
         packagePrice.stripe_price_id = await ensureStripePriceForPackagePrice(stripe, supabaseAdmin, {
           id: packagePrice.id,
@@ -124,6 +133,16 @@ serve(async (req) => {
 
       if (!sellerProfile.stripe_charges_enabled) {
         throw new Error("Seller's Stripe account is not enabled for charges");
+      }
+
+      // Enforce mode match: test buyers can only purchase test-seller programs and vice versa
+      const sellerAcctIsTest = String(sellerProfile.stripe_account_id).startsWith('acct_') && sellerProfile.stripe_account_id.length > 0
+        ? await isSellerAccountTest(stripeClient.stripe, sellerProfile.stripe_account_id)
+        : false;
+      if (usingTestMode !== sellerAcctIsTest) {
+        throw new Error(usingTestMode
+          ? "This is a live seller. Test buyer accounts can only purchase from test sellers."
+          : "This seller is set up in sandbox mode. Live buyers cannot purchase from test sellers.");
       }
 
       price = packagePrice;
@@ -160,9 +179,7 @@ serve(async (req) => {
 
       if (!programPrice.stripe_price_id) {
         // Auto-heal: create Stripe product+price and persist stripe IDs
-        const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-          apiVersion: "2023-10-16",
-        });
+        const stripe = stripeClient.stripe;
 
         programPrice.stripe_price_id = await ensureStripePriceForProgramPrice(stripe, supabaseAdmin, {
           id: programPrice.id,
@@ -191,6 +208,15 @@ serve(async (req) => {
         throw new Error("Seller's Stripe account is not enabled for charges");
       }
 
+      const sellerAcctIsTest = String(sellerProfile.stripe_account_id).startsWith('acct_')
+        ? await isSellerAccountTest(stripeClient.stripe, sellerProfile.stripe_account_id)
+        : false;
+      if (usingTestMode !== sellerAcctIsTest) {
+        throw new Error(usingTestMode
+          ? "This is a live seller. Test buyer accounts can only purchase from test sellers."
+          : "This seller is set up in sandbox mode. Live buyers cannot purchase from test sellers.");
+      }
+
       price = programPrice;
       sellerId = programPrice.programs.seller_id;
     }
@@ -203,9 +229,8 @@ serve(async (req) => {
     const buyerFeePercent = BUYER_FEE_PERCENT;
     console.log(`[CHECKOUT] Fee rates - seller: ${sellerFeePercent}%, buyer: ${buyerFeePercent}%`);
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2023-10-16",
-    });
+    const stripe = stripeClient.stripe;
+    console.log(`[CHECKOUT] Stripe mode: ${usingTestMode ? "SANDBOX" : "LIVE"}`);
 
     // Resolve the buyer-inclusive Stripe price (list price + buyer fee)
     let buyerInclusivePriceId: string;
@@ -312,6 +337,7 @@ serve(async (req) => {
         buyer_fee_percent: buyerFeePercent.toString(),
         list_amount: listAmount.toString(),
         total_charged: totalCharged.toString(),
+        is_test: usingTestMode ? 'true' : 'false',
       },
     };
 
