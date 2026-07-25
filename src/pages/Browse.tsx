@@ -52,8 +52,9 @@ const Browse = () => {
     setSearchParams(params);
   }, [activeCategory, searchQuery, sortBy, setSearchParams]);
 
+  const { isTestAccount } = useAuth();
   const { data: programs, isLoading, error } = useQuery({
-    queryKey: ['programs', activeCategory, searchQuery, sortBy],
+    queryKey: ['programs', activeCategory, searchQuery, sortBy, isTestAccount],
     queryFn: async () => {
       let query = supabase
         .from('programs')
@@ -70,7 +71,8 @@ const Browse = () => {
             is_active
           )
         `)
-        .eq('status', 'published');
+        .eq('status', 'published')
+        .eq('is_test_program', isTestAccount);
 
       // Apply category filter
       if (activeCategory !== 'All') {
@@ -123,12 +125,13 @@ const Browse = () => {
   });
 
   const { data: categoryCounts } = useQuery({
-    queryKey: ['category-counts'],
+    queryKey: ['category-counts', isTestAccount],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('programs')
         .select('category')
-        .eq('status', 'published');
+        .eq('status', 'published')
+        .eq('is_test_program', isTestAccount);
 
       if (error) throw error;
 
