@@ -15,13 +15,14 @@ const TestAccountsPanel = () => {
   const [userId, setUserId] = useState('');
   const [busy, setBusy] = useState<'on' | 'off' | null>(null);
 
-  const { data: testAccounts, refetch, isLoading } = useQuery({
+  const { data: testAccounts, refetch, isLoading, error } = useQuery({
     queryKey: ['admin-test-accounts'],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('admin_list_test_accounts');
       if (error) throw error;
       return data || [];
     },
+    refetchOnWindowFocus: true,
   });
 
   const setFlag = async (isTest: boolean) => {
@@ -73,7 +74,18 @@ const TestAccountsPanel = () => {
         </Alert>
 
         <div>
-          <h3 className="font-semibold mb-2">Current test accounts {isLoading ? '' : `(${testAccounts?.length || 0})`}</h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold">Current test accounts {isLoading ? '' : `(${testAccounts?.length || 0})`}</h3>
+            <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isLoading}>
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Refresh'}
+            </Button>
+          </div>
+          {error && (
+            <Alert variant="destructive" className="mb-2">
+              <AlertTriangle className="w-4 h-4" />
+              <AlertDescription>{(error as any).message || 'Failed to load test accounts'}</AlertDescription>
+            </Alert>
+          )}
           <Table>
             <TableHeader>
               <TableRow>
