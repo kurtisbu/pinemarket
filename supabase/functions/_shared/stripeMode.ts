@@ -45,6 +45,16 @@ export async function getStripeForUser(userId: string | null | undefined) {
 }
 
 /**
+ * Returns the correct Stripe secret key (live or sandbox) for a given user's mode.
+ */
+export async function getStripeKeyForUser(userId: string | null | undefined): Promise<string> {
+  const testFlag = await isTestUser(userId);
+  const liveKey = Deno.env.get("STRIPE_SECRET_KEY") || "";
+  const testKey = Deno.env.get("STRIPE_SECRET_KEY_TEST") || "";
+  return testFlag && testKey ? testKey : liveKey;
+}
+
+/**
  * Pick webhook secret based on `?mode=test` query param.
  */
 export function getWebhookSecret(url: URL): { secret: string; isTest: boolean } {
