@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Mail, Chrome } from 'lucide-react';
+import logo from '@/assets/logo.png';
 
 const Auth = () => {
   const [searchParams] = useSearchParams();
