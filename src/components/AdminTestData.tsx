@@ -7,6 +7,109 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { FlaskConical, Trash2, Loader2, Copy, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { useQuery } from '@tanstack/react-query';
+
+const TestAccountsPanel = () => {
+  const { toast } = useToast();
+  const [userId, setUserId] = useState('');
+  const [busy, setBusy] = useState<'on' | 'off' | null>(null);
+
+  const { data: testAccounts, refetch, isLoading } = useQuery({
+    queryKey: ['admin-test-accounts'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('admin_list_test_accounts');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const setFlag = async (isTest: boolean) => {
+    if (!userId.trim()) return;
+    setBusy(isTest ? 'on' : 'off');
+    try {
+      const { error } = await supabase.rpc('admin_set_test_account', {
+        _user_id: userId.trim(),
+        _is_test: isTest,
+      });
+      if (error) throw error;
+      toast({ title: isTest ? 'Marked as test account' : 'Removed test flag', description: 'Programs for this user were also updated.' });
+      setUserId('');
+      refetch();
+    } catch (err: any) {
+      toast({ title: 'Failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <FlaskConical className="w-5 h-5" />
+          Test Accounts
+        </CardTitle>
+        <CardDescription>
+          Toggle an existing account into test mode. Test accounts route through Stripe sandbox and are isolated from live listings, purchases, and payouts.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex gap-2">
+          <Input placeholder="User ID (uuid)" value={userId} onChange={(e) => setUserId(e.target.value)} className="font-mono text-sm" />
+          <Button onClick={() => setFlag(true)} disabled={!userId.trim() || busy !== null}>
+            {busy === 'on' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Mark test'}
+          </Button>
+          <Button variant="outline" onClick={() => setFlag(false)} disabled={!userId.trim() || busy !== null}>
+            {busy === 'off' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Unmark'}
+          </Button>
+        </div>
+
+        <Alert>
+          <AlertTriangle className="w-4 h-4" />
+          <AlertDescription>
+            Marking an account as test clears its Stripe Connect fields so the user re-onboards in sandbox mode next time.
+          </AlertDescription>
+        </Alert>
+
+        <div>
+          <h3 className="font-semibold mb-2">Current test accounts {isLoading ? '' : `(${testAccounts?.length || 0})`}</h3>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Username</TableHead>
+                <TableHead>Display Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Stripe</TableHead>
+                <TableHead>TradingView</TableHead>
+                <TableHead>User ID</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(testAccounts || []).map((a: any) => (
+                <TableRow key={a.id}>
+                  <TableCell>{a.username}</TableCell>
+                  <TableCell>{a.display_name}</TableCell>
+                  <TableCell className="font-mono text-xs">{a.email}</TableCell>
+                  <TableCell>{a.stripe_charges_enabled ? <Badge>Ready</Badge> : <Badge variant="outline">Pending</Badge>}</TableCell>
+                  <TableCell>{a.is_tradingview_connected ? <Badge>Connected</Badge> : <Badge variant="outline">No</Badge>}</TableCell>
+                  <TableCell className="font-mono text-xs">{a.id}</TableCell>
+                </TableRow>
+              ))}
+              {(!testAccounts || testAccounts.length === 0) && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground text-sm py-4">
+                    No test accounts yet.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
 const AdminTestData = () => {
   const { toast } = useToast();
@@ -80,6 +183,7 @@ const AdminTestData = () => {
 
   return (
     <div className="space-y-6">
+      <TestAccountsPanel />
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
