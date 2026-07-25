@@ -10,6 +10,7 @@ import ProgramCard from '@/components/ProgramCard';
 import SearchAndSort from '@/components/SearchAndSort';
 import CategoryFilter from '@/components/CategoryFilter';
 import { Loader2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Program {
   id: string;
