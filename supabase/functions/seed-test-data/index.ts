@@ -209,6 +209,7 @@ async function handleSeed(supabaseAdmin: any, adminUserId: string) {
         tradingview_session_cookie: adminProfile.tradingview_session_cookie,
         tradingview_signed_session_cookie: adminProfile.tradingview_signed_session_cookie,
         tradingview_last_validated_at: adminProfile.tradingview_last_validated_at,
+        is_test_account: true,
       })
       .eq('id', authUser.user.id)
 
@@ -237,6 +238,7 @@ async function handleSeed(supabaseAdmin: any, adminUserId: string) {
         display_name: buyer.displayName,
         username: buyer.username,
         tradingview_username: buyer.tvUsername,
+        is_test_account: true,
       })
       .eq('id', authUser.user.id)
 
@@ -272,6 +274,7 @@ async function handleSeed(supabaseAdmin: any, adminUserId: string) {
         billing_interval: billingInterval,
         trial_period_days: progDef.trialDays,
         status: 'draft',
+        is_test_program: true,
       })
       .select('id, title')
       .single()

@@ -64,9 +64,10 @@ serve(async (req) => {
       throw new Error("Invalid billing interval");
     }
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2023-10-16",
-    });
+    const { getStripeForUser } = await import("../_shared/stripeMode.ts");
+    const stripeCtx = await getStripeForUser(data.user?.id);
+    const stripe = stripeCtx.stripe;
+    console.log(`[CREATE-SUB] Stripe mode: ${stripeCtx.isTest ? "SANDBOX" : "LIVE"}`);
 
     // Find or create customer
     let customerId: string;

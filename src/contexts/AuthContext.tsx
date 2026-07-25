@@ -7,6 +7,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  isTestAccount: boolean;
   signUp: (email: string, password: string, tradingviewUsername?: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signInWithProvider: (provider: 'google') => Promise<{ error: any }>;
@@ -27,6 +28,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isTestAccount, setIsTestAccount] = useState(false);
+
+  useEffect(() => {
+    if (!user) {
+      setIsTestAccount(false);
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from('profiles')
+      .select('is_test_account')
+      .eq('id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setIsTestAccount(!!data?.is_test_account);
+      });
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   useEffect(() => {
     // Set up auth state listener
@@ -125,6 +144,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     user,
     session,
     loading,
+    isTestAccount,
     signUp,
     signIn,
     signInWithProvider,

@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
+import { getStripeKeyForUser, getStripeClient } from '../_shared/stripeMode.ts';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -95,7 +96,6 @@ async function getAccountStatus(payload: any, supabaseAdmin: any, req: Request) 
       status: 401,
     });
   }
-  {
     const supabaseAuth = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
@@ -119,12 +119,11 @@ async function getAccountStatus(payload: any, supabaseAdmin: any, req: Request) 
         status: 403,
       });
     }
-  }
 
   console.log('[STRIPE-ACCOUNT] Fetching account status for:', account_id);
 
   try {
-    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
+    const stripeSecretKey = await getStripeKeyForUser(user?.id);
     if (!stripeSecretKey) {
       throw new Error('Stripe secret key not configured');
     }
@@ -235,7 +234,7 @@ async function getMyAccountStatus(supabaseAdmin: any, req: Request) {
       });
     }
 
-    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
+    const stripeSecretKey = await getStripeKeyForUser(user?.id);
     if (!stripeSecretKey) {
       throw new Error('Stripe secret key not configured');
     }
@@ -311,7 +310,7 @@ async function createConnectAccount(payload: any, supabaseAdmin: any, req: Reque
   const { country } = payload;
 
   try {
-    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
+    const stripeSecretKey = await getStripeKeyForUser(user?.id);
     if (!stripeSecretKey) {
       throw new Error('Stripe secret key not configured');
     }
@@ -422,7 +421,6 @@ async function createAccountLink(payload: any, supabaseAdmin: any, req: Request)
       status: 401,
     });
   }
-  {
     const supabaseAuth = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
@@ -446,10 +444,9 @@ async function createAccountLink(payload: any, supabaseAdmin: any, req: Request)
         status: 403,
       });
     }
-  }
 
   try {
-    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
+    const stripeSecretKey = await getStripeKeyForUser(user?.id);
     if (!stripeSecretKey) {
       throw new Error('Stripe secret key not configured');
     }
@@ -518,7 +515,6 @@ async function createDashboardLink(payload: any, supabaseAdmin: any, req: Reques
       status: 401,
     });
   }
-  {
     const supabaseAuth = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
@@ -542,10 +538,9 @@ async function createDashboardLink(payload: any, supabaseAdmin: any, req: Reques
         status: 403,
       });
     }
-  }
 
   try {
-    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
+    const stripeSecretKey = await getStripeKeyForUser(user?.id);
     if (!stripeSecretKey) {
       throw new Error('Stripe secret key not configured');
     }
@@ -637,7 +632,7 @@ async function createMyAccountLink(payload: any, supabaseAdmin: any, req: Reques
       });
     }
 
-    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
+    const stripeSecretKey = await getStripeKeyForUser(user?.id);
     if (!stripeSecretKey) {
       throw new Error('Stripe secret key not configured');
     }
@@ -728,7 +723,7 @@ async function createMyDashboardLink(supabaseAdmin: any, req: Request) {
       });
     }
 
-    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
+    const stripeSecretKey = await getStripeKeyForUser(user?.id);
     if (!stripeSecretKey) {
       throw new Error('Stripe secret key not configured');
     }

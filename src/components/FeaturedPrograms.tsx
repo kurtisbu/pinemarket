@@ -5,12 +5,14 @@ import { useNavigate } from 'react-router-dom';
 import ProgramCard from './ProgramCard';
 import { Button } from '@/components/ui/button';
 import { Sparkles } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const FeaturedPrograms = () => {
   const navigate = useNavigate();
+  const { isTestAccount } = useAuth();
 
   const { data: programs, isLoading } = useQuery({
-    queryKey: ['featured-programs'],
+    queryKey: ['featured-programs', isTestAccount],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('programs')
@@ -28,6 +30,7 @@ const FeaturedPrograms = () => {
           )
         `)
         .eq('status', 'published')
+        .eq('is_test_program', isTestAccount)
         .order('created_at', { ascending: false })
         .limit(6);
 
